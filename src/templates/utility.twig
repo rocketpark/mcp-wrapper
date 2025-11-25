@@ -1,0 +1,62 @@
+{% extends "_layouts/cp" %}
+
+{% block content %}
+<div id="mcp-manifest-app" class="mcp-manifest-manager">
+  <h1 class="mb-4">MCP Manifest Manager</h1>
+
+  <table class="data fullwidth">
+    <thead>
+      <tr>
+        <th>Schema Handle</th>
+        <th>Status</th>
+        <th>Last Generated</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr v-for="schema in schemas" :key="schema.handle">
+        <td><code>{{ schema.handle }}</code></td>
+        <td>
+          <span v-if="schema.rebuilding">⏳ rebuilding…</span>
+          <span v-else-if="schema.exists">✅ Cached</span>
+          <span v-else>⚠️ Not built</span>
+        </td>
+        <td>{{ schema.lastModified ?? '—' }}</td>
+        <td>
+          <a v-if="schema.exists" :href="schema.urlView" target="_blank" class="btn small">View JSON</a>
+          <button class="btn small" @click="rebuild(schema)" :disabled="schema.rebuilding">Rebuild</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+(() => {
+  new Vue({
+    el: '#mcp-manifest-app',
+    data() { return { schemas: {{ schemas|json_encode|raw }} } },
+    methods: {
+      async rebuild(schema) {
+        schema.rebuilding = true
+        try {
+          const response = await fetch(schema.urlRebuild, {
+            method: 'POST',
+            headers: { 'X-CSRF-Token': Craft.csrfTokenValue }
+          })
+          if (!response.ok) throw new Error('HTTP ' + response.status)
+          const data = await response.json()
+          schema.rebuilding = false
+          schema.exists = true
+          schema.lastModified = data.lastModified
+          Craft.cp.displayNotice(`Rebuilt manifest for "${schema.handle}".`)
+        } catch (err) {
+          schema.rebuilding = false
+          Craft.cp.displayError(`Failed to rebuild ${schema.handle}: ${err.message}`)
+        }
+      }
+    }
+  })
+})()
+</script>
+{% endblock %}

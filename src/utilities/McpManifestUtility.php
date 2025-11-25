@@ -1,0 +1,38 @@
+<?php
+namespace rocketpark\mcpwrapper\utilities;
+
+use Craft;
+use craft\base\Utility;
+
+class McpManifestUtility extends Utility
+{
+    public static function displayName(): string => 'MCP Manifest Manager';
+    public static function id(): string => 'mcp-manifest-manager';
+    public static function iconPath(): ?string => Craft::getAlias('@app/icons/cogs.svg');
+
+    public static function contentHtml(): string
+    {
+        return Craft::$app->view->renderTemplate('mcpwrapper/utility', [
+            'schemas' => self::getSchemaInfo(),
+        ]);
+    }
+
+    private static function getSchemaInfo(): array
+    {
+        $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
+        $info = [];
+
+        foreach ($config['schemas'] as $handle => $token) {
+            $path = Craft::getAlias("@storage/runtime/mcp/manifest-{$handle}.json");
+            $exists = file_exists($path);
+            $info[] = [
+                'handle' => $handle,
+                'exists' => $exists,
+                'lastModified' => $exists ? date('Y-m-d H:i:s', filemtime($path)) : null,
+                'urlView' => "/actions/mcpwrapper/utility/view-manifest?schema={$handle}",
+                'urlRebuild' => "/actions/mcpwrapper/utility/rebuild-manifest?schema={$handle}",
+            ];
+        }
+        return $info;
+    }
+}
