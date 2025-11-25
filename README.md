@@ -20,6 +20,7 @@ The Model Context Protocol is an open standard that enables AI applications to s
 ### MCP Protocol Compliance
 
 Implements MCP specification `2025-06-18`:
+
 - **Tool Discovery** (`tools/list`): AI clients can discover available Craft content types
 - **Tool Execution** (`tools/call`): AI clients can query your Craft content
 - **Capability Negotiation** (`initialize`): Proper MCP handshake and version negotiation
@@ -27,6 +28,7 @@ Implements MCP specification `2025-06-18`:
 ### Automatic Tool Generation
 
 The plugin automatically generates MCP tools by introspecting your Craft CMS setup:
+
 - One tool per section (News, Products, Pages, etc.)
 - Proper JSON Schema for tool parameters
 - Filters by GraphQL schema permissions
@@ -46,6 +48,7 @@ Configure different GraphQL tokens for different purposes:
 ### GraphQL-Powered Queries
 
 When AI tools are called, they execute real GraphQL queries with:
+
 - Limit/offset pagination
 - Full-text search
 - ID filtering
@@ -58,6 +61,7 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed installation instructions.
 **Quick Install:**
 
 ```bash
+
 cd /path/to/your-craft-site
 composer require rocket-park/mcp-wrapper
 php craft plugin/install mcp-wrapper
@@ -77,6 +81,7 @@ return [
 ```
 
 Add to `.env`:
+
 ```bash
 GQL_AI_TOKEN="your-graphql-token-from-craft-cp"
 ```
@@ -86,13 +91,15 @@ GQL_AI_TOKEN="your-graphql-token-from-craft-cp"
 ### MCP Endpoint
 
 The MCP server is available at:
-```
+
+```text
 POST https://your-site.com/actions/mcp-wrapper/mcp/index/{schemaHandle}
 ```
 
 ### Example: Tool Discovery
 
 ```bash
+
 curl -X POST https://your-site.com/actions/mcp-wrapper/mcp/index/ai \
   -H "Content-Type: application/json" \
   -d '{
@@ -104,6 +111,7 @@ curl -X POST https://your-site.com/actions/mcp-wrapper/mcp/index/ai \
 ```
 
 **Response:**
+
 ```json
 {
   "jsonrpc": "2.0",
@@ -148,6 +156,7 @@ curl -X POST https://your-site.com/actions/mcp-wrapper/mcp/index/ai \
 ### Claude Desktop
 
 Add to your MCP config:
+
 ```json
 {
   "mcpServers": {
@@ -161,6 +170,7 @@ Add to your MCP config:
 Then ask Claude: *"Show me the latest news articles about product launches"*
 
 Claude will automatically:
+
 1. Discover the `query_news` tool
 2. Call it with appropriate search parameters
 3. Display the results to you
@@ -168,6 +178,7 @@ Claude will automatically:
 ## Control Panel Utility
 
 The plugin includes a CP utility at **Utilities → MCP Manifest Manager** for:
+
 - Viewing cached manifests
 - Rebuilding manifests on demand
 - Monitoring schema status
@@ -184,11 +195,13 @@ The plugin includes a CP utility at **Utilities → MCP Manifest Manager** for:
 ## Development
 
 **Requirements:**
+
 - PHP 8.2+
 - Craft CMS 5.0+
 - GraphQL schemas configured in Craft
 
 **Local Development:**
+
 ```bash
 git clone https://github.com/rocketpark/mcp-wrapper.git
 cd mcp-wrapper
@@ -199,7 +212,7 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for Forge deployment workflow.
 
 ## Architecture
 
-```
+```text
 MCP Client (Claude, ChatGPT, etc.)
     ↓ JSON-RPC 2.0
 McpController (/actions/mcp-wrapper/mcp/index/{schema})

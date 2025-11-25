@@ -12,14 +12,16 @@
 
 #### 1. Add Plugin to Craft Site
 
-**Option A: Via Composer (if published)**
+##### Option A: Via Composer (if published)
+
 ```bash
 cd /home/forge/your-craft-site
 composer require rocket-park/mcp-wrapper
 php craft plugin/install mcp-wrapper
 ```
 
-**Option B: Local Development (path repository)**
+##### Option B: Local Development (path repository)
+
 ```bash
 # Clone plugin into your Craft project
 cd /home/forge/your-craft-site
@@ -68,6 +70,7 @@ GQL_PUBLIC_TOKEN="another-token-here"
 ```
 
 **To get tokens:**
+
 1. Go to Craft CP → GraphQL → Schemas
 2. Select/create a schema
 3. Copy the Access Token
@@ -75,11 +78,13 @@ GQL_PUBLIC_TOKEN="another-token-here"
 #### 4. Test MCP Endpoint
 
 The MCP server will be available at:
-```
+
+```text
 POST https://your-site.com/actions/mcp-wrapper/mcp/index/ai
 ```
 
 **Test with curl:**
+
 ```bash
 # Initialize MCP session
 curl -X POST https://your-site.com/actions/mcp-wrapper/mcp/index/ai \
@@ -147,7 +152,8 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 #### Other MCP Clients
 
 Point any MCP-compatible client to:
-```
+
+```text
 https://your-site.com/actions/mcp-wrapper/mcp/index/{schemaHandle}
 ```
 
@@ -163,14 +169,17 @@ The endpoint accepts JSON-RPC 2.0 POST requests.
 ### Troubleshooting
 
 **"Unknown schema" error:**
+
 - Verify schema handle in URL matches `config/mcpwrapper.php`
 - Check environment variable is set: `php craft/craft app/config GQL_AI_TOKEN`
 
 **GraphQL errors:**
+
 - Verify token has correct permissions in Craft CP → GraphQL
 - Test GraphQL query directly at `/api` endpoint
 
 **No tools returned:**
+
 - Ensure your Craft site has sections created
 - Check GraphQL schema has access to those sections
 
@@ -179,6 +188,7 @@ The endpoint accepts JSON-RPC 2.0 POST requests.
 For local development before deploying to Forge:
 
 1. **Work on feature branch:**
+
    ```bash
    git checkout -b feature/my-improvements
    ```
@@ -186,6 +196,7 @@ For local development before deploying to Forge:
 2. **Test locally** in a local Craft installation
 
 3. **Push to Git:**
+
    ```bash
    git push origin feature/my-improvements
    ```
