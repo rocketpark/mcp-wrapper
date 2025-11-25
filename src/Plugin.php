@@ -9,6 +9,7 @@ use rocketpark\mcpwrapper\utilities\McpManifestUtility;
 use yii\base\Event;
 
 use rocketpark\mcpwrapper\services\ManifestBuilderService;
+use rocketpark\mcpwrapper\services\McpServerService;
 
 class McpWrapper extends Plugin
 {
@@ -27,6 +28,7 @@ class McpWrapper extends Plugin
 
         $this->setComponents([
             'manifestBuilder' => ManifestBuilderService::class,
+            'mcpServer' => McpServerService::class,
         ]);
 
         // Register Utility in the CP

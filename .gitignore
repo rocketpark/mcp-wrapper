@@ -5,3 +5,12 @@
 .env
 /node_modules
 /vendor
+
+# Local development files
+.history/
+.serena/
+composer.lock
+
+# Ignore vscode AI rules
+.github/instructions/codacy.instructions.md
+.codacy/
