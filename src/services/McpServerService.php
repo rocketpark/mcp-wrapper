@@ -81,14 +81,13 @@ class McpServerService extends Component
             throw new \Exception('schemaHandle parameter required', -32602);
         }
 
-        $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
-        $token = $config['schemas'][$schemaHandle] ?? null;
+        $config = Craft::$app->getConfig()->getConfigFromFile('mcp-wrapper');
         
-        if (!$token) {
+        if (!isset($config['schemas'][$schemaHandle])) {
             throw new \Exception("Unknown schema: {$schemaHandle}", -32602);
         }
-
-        $manifestBuilder = Craft::$app->getModule('mcpwrapper')->get('manifestBuilder');
+        
+        $token = $config['schemas'][$schemaHandle];
         $sections = $this->getSectionsForSchema($token);
         
         $tools = [];
@@ -153,12 +152,13 @@ class McpServerService extends Component
             throw new \Exception('schemaHandle required', -32602);
         }
 
-        $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
-        $token = $config['schemas'][$schemaHandle] ?? null;
+        $config = Craft::$app->getConfig()->getConfigFromFile('mcp-wrapper');
         
-        if (!$token) {
+        if (!isset($config['schemas'][$schemaHandle])) {
             throw new \Exception("Unknown schema: {$schemaHandle}", -32602);
         }
+        
+        $token = $config['schemas'][$schemaHandle];
 
         // Build and execute GraphQL query
         $result = $this->executeGraphQLQuery($token, $sectionHandle, $arguments);
