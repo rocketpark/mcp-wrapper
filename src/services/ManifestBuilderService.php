@@ -65,7 +65,7 @@ class ManifestBuilderService extends Component
 
     private function buildToolForSection(string $sectionHandle, string $schemaHandle): ?array
     {
-        $section = Craft::$app->sections->getSectionByHandle($sectionHandle);
+        $section = Craft::$app->getEntries()->getSectionByHandle($sectionHandle);
         if (!$section) return null;
 
         $fields = [];

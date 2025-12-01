@@ -180,7 +180,7 @@ class McpServerService extends Component
     {
         // For now, return all sections
         // In production, filter by GraphQL schema permissions
-        return Craft::$app->sections->getAllSections();
+        return Craft::$app->getEntries()->getAllSections();
     }
 
     /**
