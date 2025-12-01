@@ -47,16 +47,10 @@ class McpWrapper extends Plugin
             fn(RegisterComponentTypesEvent $e) => $e->types[] = McpManifestUtility::class
         );
 
-        // Auto-clear cache when project config or GQL schemas change
+        // Auto-clear cache when project config changes
         Event::on(
             \craft\services\ProjectConfig::class,
             \craft\services\ProjectConfig::EVENT_REBUILD,
-            fn() => $this->get('manifestBuilder')->clearCache()
-        );
-
-        Event::on(
-            \craft\services\Gql::class,
-            \craft\services\Gql::EVENT_AFTER_SAVE_SCHEMA,
             fn() => $this->get('manifestBuilder')->clearCache()
         );
     }
