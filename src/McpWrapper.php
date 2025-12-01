@@ -16,10 +16,17 @@ class McpWrapper extends Plugin
     public string $schemaVersion = '1.0.0';
 
     /**
-     * @var Plugin|null
-     * @property-read Plugin $plugin
+     * @var McpWrapper|null
      */
-    public static ?Plugin $plugin = null;
+    public static ?McpWrapper $plugin = null;
+
+    /**
+     * Returns the plugin instance
+     */
+    public static function getInstance(): ?McpWrapper
+    {
+        return self::$plugin;
+    }
 
     /**
      * @inheritdoc
