@@ -1,5 +1,26 @@
 # MCP Wrapper Deployment Guide
 
+## Live Demo Server
+
+A working MCP server is deployed at:
+
+```text
+https://servicecurator.com/actions/mcp-wrapper/mcp/index?schemaHandle=public
+```
+
+**Quick test:**
+```bash
+# Test initialize
+curl -s -X POST 'https://servicecurator.com/actions/mcp-wrapper/mcp/index?schemaHandle=public' \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc": "2.0", "method": "initialize", "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "test", "version": "1.0"}}, "id": 1}'
+
+# Test tools/list  
+curl -s -X POST 'https://servicecurator.com/actions/mcp-wrapper/mcp/index?schemaHandle=public' \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc": "2.0", "method": "tools/list", "params": {"schemaHandle": "public"}, "id": 2}'
+```
+
 ## For Laravel Forge / Production Craft Sites
 
 ### Prerequisites
@@ -75,19 +96,49 @@ GQL_PUBLIC_TOKEN="another-token-here"
 2. Select/create a schema
 3. Copy the Access Token
 
-#### 4. Test MCP Endpoint
+#### 4. Configure GraphQL Route
+
+Add to `config/routes.php`:
+
+```php
+<?php
+return [
+    'api' => 'graphql/api',
+];
+```
+
+This enables the GraphQL API at `/api` which the MCP server uses internally.
+
+#### 5. Enable GraphQL API
+
+Add to `config/general.php`:
+
+```php
+return \craft\config\GeneralConfig::create()
+    ->enableGql()  // Enable GraphQL API
+    // ... other settings
+;
+```
+
+#### 6. Configure GraphQL Schema Permissions
+
+Go to Craft CP → GraphQL → Schemas and ensure your public or private schema has:
+- **Read access** to the sections you want to expose
+- **Site read access** for the relevant sites
+
+#### 7. Test MCP Endpoint
 
 The MCP server will be available at:
 
 ```text
-POST https://your-site.com/actions/mcp-wrapper/mcp/index/ai
+POST https://your-site.com/actions/mcp-wrapper/mcp/index?schemaHandle=public
 ```
 
 **Test with curl:**
 
 ```bash
 # Initialize MCP session
-curl -X POST https://your-site.com/actions/mcp-wrapper/mcp/index/ai \
+curl -X POST 'https://your-site.com/actions/mcp-wrapper/mcp/index?schemaHandle=public' \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -100,18 +151,21 @@ curl -X POST https://your-site.com/actions/mcp-wrapper/mcp/index/ai \
     }
   }'
 
-# List available tools
-curl -X POST https://your-site.com/actions/mcp-wrapper/mcp/index/ai \
-  -H "Content-Type": application/json" \
+# Expected response:
+# {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{"listChanged":false}},"serverInfo":{"name":"craft-cms-mcp","version":"1.0.0"}}}
+
+# List available tools (one per section)
+curl -X POST 'https://your-site.com/actions/mcp-wrapper/mcp/index?schemaHandle=public' \
+  -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
     "id": 2,
     "method": "tools/list",
-    "params": {}
+    "params": {"schemaHandle": "public"}
   }'
 
-# Call a tool
-curl -X POST https://your-site.com/actions/mcp-wrapper/mcp/index/ai \
+# Call a tool to query entries
+curl -X POST 'https://your-site.com/actions/mcp-wrapper/mcp/index?schemaHandle=public' \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -119,45 +173,46 @@ curl -X POST https://your-site.com/actions/mcp-wrapper/mcp/index/ai \
     "method": "tools/call",
     "params": {
       "name": "query_news",
-      "arguments": {"limit": 5}
+      "arguments": {"limit": 5},
+      "schemaHandle": "public"
     }
   }'
 ```
 
 ### Connecting MCP Clients
 
-#### Claude Desktop
+#### Claude Desktop (Streamable HTTP Transport)
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+The MCP server uses HTTP transport. Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "craft-cms": {
-      "command": "curl",
-      "args": [
-        "-X", "POST",
-        "https://your-site.com/actions/mcp-wrapper/mcp/index/ai",
-        "-H", "Content-Type: application/json",
-        "-d", "@-"
-      ],
-      "transport": "stdio"
+      "url": "https://your-site.com/actions/mcp-wrapper/mcp/index?schemaHandle=public",
+      "transport": "streamable-http"
     }
   }
 }
 ```
 
-**Note:** For production, you'll want to use the official MCP SDK transport instead of curl. This is a simplified example.
+#### Using with MCP Inspector
+
+For testing and debugging:
+
+```bash
+npx @anthropic/mcp-inspector https://your-site.com/actions/mcp-wrapper/mcp/index?schemaHandle=public
+```
 
 #### Other MCP Clients
 
 Point any MCP-compatible client to:
 
 ```text
-https://your-site.com/actions/mcp-wrapper/mcp/index/{schemaHandle}
+POST https://your-site.com/actions/mcp-wrapper/mcp/index?schemaHandle={schemaHandle}
 ```
 
-The endpoint accepts JSON-RPC 2.0 POST requests.
+The endpoint accepts JSON-RPC 2.0 POST requests with Content-Type: application/json.
 
 ### Security Considerations
 
