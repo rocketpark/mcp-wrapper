@@ -78,65 +78,68 @@ class McpServerService extends Component
      */
     private function handleToolsList(array $params): array
     {
-        $schemaHandle = $params['schemaHandle'] ?? null;
-        if (!$schemaHandle) {
-            throw new \Exception('schemaHandle parameter required', -32602);
-        }
-
-        $config = Craft::$app->getConfig()->getConfigFromFile('mcp-wrapper');
-        
-        if (!isset($config['schemas'][$schemaHandle])) {
-            throw new \Exception("Unknown schema: {$schemaHandle}", -32602);
-        }
-        
-        $token = $config['schemas'][$schemaHandle];
+        $token = $this->getSchemaToken($params);
         $sections = $this->getSectionsForSchema($token);
         
-        $tools = [];
-        foreach ($sections as $section) {
-            $fields = $this->getFieldsForSection($section);
-            
-            $tools[] = [
-                'name' => "query_{$section->handle}",
-                'title' => "Query {$section->name}", // Human-readable display name
-                'description' => "Query {$section->name} entries from Craft CMS. Returns entries with their fields and relationships.",
-                'inputSchema' => [
-                    'type' => 'object',
-                    'properties' => [
-                        'limit' => [
-                            'type' => 'integer',
-                            'description' => 'Maximum number of entries to return (1-100)',
-                            'default' => 10,
-                            'minimum' => 1,
-                            'maximum' => 100,
-                        ],
-                        'offset' => [
-                            'type' => 'integer',
-                            'description' => 'Number of entries to skip for pagination',
-                            'default' => 0,
-                            'minimum' => 0,
-                        ],
-                        'search' => [
-                            'type' => 'string',
-                            'description' => 'Full-text search query to filter entries',
-                        ],
-                        'id' => [
-                            'type' => 'array',
-                            'items' => ['type' => 'integer'],
-                            'description' => 'Filter by specific entry IDs',
-                        ],
-                    ],
-                    'required' => [], // All parameters are optional
-                    'additionalProperties' => false,
-                ],
-                'annotations' => [
-                    'readOnlyHint' => true, // This tool only reads data
-                    'openWorldHint' => false, // Results come only from this Craft site
-                ],
-            ];
-        }
+        $tools = array_map(
+            fn($section) => $this->buildToolDefinition($section),
+            $sections
+        );
 
         return ['tools' => $tools];
+    }
+
+    /**
+     * Build MCP tool definition for a Craft section
+     */
+    private function buildToolDefinition($section): array
+    {
+        return [
+            'name' => "query_{$section->handle}",
+            'title' => "Query {$section->name}",
+            'description' => "Query {$section->name} entries from Craft CMS. Returns entries with their fields and relationships.",
+            'inputSchema' => $this->getToolInputSchema(),
+            'annotations' => [
+                'readOnlyHint' => true,
+                'openWorldHint' => false,
+            ],
+        ];
+    }
+
+    /**
+     * Get standard input schema for query tools
+     */
+    private function getToolInputSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'limit' => [
+                    'type' => 'integer',
+                    'description' => 'Maximum number of entries to return (1-100)',
+                    'default' => 10,
+                    'minimum' => 1,
+                    'maximum' => 100,
+                ],
+                'offset' => [
+                    'type' => 'integer',
+                    'description' => 'Number of entries to skip for pagination',
+                    'default' => 0,
+                    'minimum' => 0,
+                ],
+                'search' => [
+                    'type' => 'string',
+                    'description' => 'Full-text search query to filter entries',
+                ],
+                'id' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'integer'],
+                    'description' => 'Filter by specific entry IDs',
+                ],
+            ],
+            'required' => [],
+            'additionalProperties' => false,
+        ];
     }
 
     /**
@@ -151,27 +154,9 @@ class McpServerService extends Component
             throw new \Exception('Tool name required', -32602);
         }
 
-        // Extract section handle from tool name (e.g., "query_news" -> "news")
-        if (!preg_match('/^query_(.+)$/', $toolName, $matches)) {
-            throw new \Exception("Invalid tool name: {$toolName}", -32602);
-        }
-        
-        $sectionHandle = $matches[1];
-        $schemaHandle = $params['schemaHandle'] ?? null;
-        
-        if (!$schemaHandle) {
-            throw new \Exception('schemaHandle required', -32602);
-        }
+        $sectionHandle = $this->extractSectionHandle($toolName);
+        $token = $this->getSchemaToken($params);
 
-        $config = Craft::$app->getConfig()->getConfigFromFile('mcp-wrapper');
-        
-        if (!isset($config['schemas'][$schemaHandle])) {
-            throw new \Exception("Unknown schema: {$schemaHandle}", -32602);
-        }
-        
-        $token = $config['schemas'][$schemaHandle];
-
-        // Build and execute GraphQL query
         $result = $this->executeGraphQLQuery($token, $sectionHandle, $arguments);
 
         return [
@@ -181,8 +166,39 @@ class McpServerService extends Component
                     'text' => json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
                 ],
             ],
-            'isError' => false, // MCP spec: indicate successful execution
+            'isError' => false,
         ];
+    }
+
+    /**
+     * Extract section handle from tool name (e.g., "query_news" -> "news")
+     */
+    private function extractSectionHandle(string $toolName): string
+    {
+        if (!preg_match('/^query_(.+)$/', $toolName, $matches)) {
+            throw new \Exception("Invalid tool name: {$toolName}", -32602);
+        }
+        return $matches[1];
+    }
+
+    /**
+     * Get GraphQL token for the specified schema
+     */
+    private function getSchemaToken(array $params): string
+    {
+        $schemaHandle = $params['schemaHandle'] ?? null;
+        
+        if (!$schemaHandle) {
+            throw new \Exception('schemaHandle parameter required', -32602);
+        }
+
+        $config = Craft::$app->getConfig()->getConfigFromFile('mcp-wrapper');
+        
+        if (!isset($config['schemas'][$schemaHandle])) {
+            throw new \Exception("Unknown schema: {$schemaHandle}", -32602);
+        }
+        
+        return $config['schemas'][$schemaHandle];
     }
 
     /**
@@ -214,28 +230,50 @@ class McpServerService extends Component
      */
     private function executeGraphQLQuery(string $token, string $sectionHandle, array $args): array
     {
-        $limit = $args['limit'] ?? 10;
-        $offset = $args['offset'] ?? 0;
-        $search = $args['search'] ?? null;
-        $ids = $args['id'] ?? null;
-
-        // Build GraphQL query dynamically
-        $filters = ["section: \"{$sectionHandle}\"", "limit: {$limit}", "offset: {$offset}"];
+        $query = $this->buildGraphQLQuery($sectionHandle, $args);
+        $data = $this->sendGraphQLRequest($token, $query);
         
-        if ($search) {
-            $filters[] = 'search: "' . addslashes($search) . '"';
+        if (isset($data['errors'])) {
+            throw new \Exception('GraphQL error: ' . json_encode($data['errors']), -32603);
+        }
+
+        return $data['data'] ?? [];
+    }
+
+    /**
+     * Build GraphQL query string from arguments
+     */
+    private function buildGraphQLQuery(string $sectionHandle, array $args): string
+    {
+        $limit = min(100, max(1, (int) ($args['limit'] ?? 10)));
+        $offset = max(0, (int) ($args['offset'] ?? 0));
+
+        $filters = [
+            "section: \"{$sectionHandle}\"",
+            "limit: {$limit}",
+            "offset: {$offset}",
+        ];
+        
+        if (!empty($args['search'])) {
+            $filters[] = 'search: "' . addslashes($args['search']) . '"';
         }
         
-        if ($ids) {
-            $idsStr = implode(',', array_map('intval', $ids));
+        if (!empty($args['id']) && is_array($args['id'])) {
+            $idsStr = implode(',', array_map('intval', $args['id']));
             $filters[] = "id: [{$idsStr}]";
         }
 
-        $query = sprintf(
+        return sprintf(
             'query { entries(%s) { id title slug uri dateCreated dateUpdated } }',
             implode(', ', $filters)
         );
+    }
 
+    /**
+     * Send GraphQL request to Craft API
+     */
+    private function sendGraphQLRequest(string $token, string $query): array
+    {
         $client = new \GuzzleHttp\Client([
             'base_uri' => Craft::$app->request->getHostInfo(),
             'timeout' => 10,
@@ -249,12 +287,6 @@ class McpServerService extends Component
             'json' => ['query' => $query],
         ]);
 
-        $data = json_decode($response->getBody()->getContents(), true);
-        
-        if (isset($data['errors'])) {
-            throw new \Exception('GraphQL error: ' . json_encode($data['errors']), -32603);
-        }
-
-        return $data['data'] ?? [];
+        return json_decode($response->getBody()->getContents(), true);
     }
 }

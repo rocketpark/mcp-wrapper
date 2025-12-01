@@ -9,6 +9,7 @@ https://servicecurator.com/actions/mcp-wrapper/mcp/index?schemaHandle=public
 ```
 
 **Quick test:**
+
 ```bash
 # Test initialize
 curl -s -X POST 'https://servicecurator.com/actions/mcp-wrapper/mcp/index?schemaHandle=public' \
@@ -123,6 +124,7 @@ return \craft\config\GeneralConfig::create()
 #### 6. Configure GraphQL Schema Permissions
 
 Go to Craft CP → GraphQL → Schemas and ensure your public or private schema has:
+
 - **Read access** to the sections you want to expose
 - **Site read access** for the relevant sites
 
