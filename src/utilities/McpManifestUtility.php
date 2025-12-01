@@ -6,9 +6,20 @@ use craft\base\Utility;
 
 class McpManifestUtility extends Utility
 {
-    public static function displayName(): string => 'MCP Manifest Manager';
-    public static function id(): string => 'mcp-manifest-manager';
-    public static function iconPath(): ?string => Craft::getAlias('@app/icons/cogs.svg');
+    public static function displayName(): string
+    {
+        return 'MCP Manifest Manager';
+    }
+
+    public static function id(): string
+    {
+        return 'mcp-manifest-manager';
+    }
+
+    public static function iconPath(): ?string
+    {
+        return Craft::getAlias('@app/icons/cogs.svg');
+    }
 
     public static function contentHtml(): string
     {
