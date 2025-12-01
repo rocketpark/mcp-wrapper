@@ -31,7 +31,7 @@ class McpServerService extends Component
                 'initialize' => $this->handleInitialize($params),
                 'tools/list' => $this->handleToolsList($params),
                 'tools/call' => $this->handleToolCall($params),
-                'ping' => ['success' => true],
+                'ping' => (object) [], // MCP spec requires empty object response
                 default => throw new \Exception("Unknown method: {$method}", -32601)
             };
 
@@ -66,8 +66,10 @@ class McpServerService extends Component
             ],
             'serverInfo' => [
                 'name' => self::SERVER_NAME,
+                'title' => 'Craft CMS MCP Server', // Human-readable display name
                 'version' => self::SERVER_VERSION,
             ],
+            'instructions' => 'Query Craft CMS content via GraphQL. Use tools/list to discover available content types, then tools/call to query entries.',
         ];
     }
 
@@ -96,23 +98,27 @@ class McpServerService extends Component
             
             $tools[] = [
                 'name' => "query_{$section->handle}",
+                'title' => "Query {$section->name}", // Human-readable display name
                 'description' => "Query {$section->name} entries from Craft CMS. Returns entries with their fields and relationships.",
                 'inputSchema' => [
                     'type' => 'object',
                     'properties' => [
                         'limit' => [
                             'type' => 'integer',
-                            'description' => 'Maximum number of entries to return',
+                            'description' => 'Maximum number of entries to return (1-100)',
                             'default' => 10,
+                            'minimum' => 1,
+                            'maximum' => 100,
                         ],
                         'offset' => [
                             'type' => 'integer',
-                            'description' => 'Number of entries to skip',
+                            'description' => 'Number of entries to skip for pagination',
                             'default' => 0,
+                            'minimum' => 0,
                         ],
                         'search' => [
                             'type' => 'string',
-                            'description' => 'Search query to filter entries',
+                            'description' => 'Full-text search query to filter entries',
                         ],
                         'id' => [
                             'type' => 'array',
@@ -120,7 +126,12 @@ class McpServerService extends Component
                             'description' => 'Filter by specific entry IDs',
                         ],
                     ],
+                    'required' => [], // All parameters are optional
                     'additionalProperties' => false,
+                ],
+                'annotations' => [
+                    'readOnlyHint' => true, // This tool only reads data
+                    'openWorldHint' => false, // Results come only from this Craft site
                 ],
             ];
         }
@@ -170,6 +181,7 @@ class McpServerService extends Component
                     'text' => json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
                 ],
             ],
+            'isError' => false, // MCP spec: indicate successful execution
         ];
     }
 
