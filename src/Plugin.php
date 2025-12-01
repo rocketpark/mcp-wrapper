@@ -13,23 +13,32 @@ use rocketpark\mcpwrapper\services\McpServerService;
 
 class McpWrapper extends Plugin
 {
+    public string $schemaVersion = '1.0.0';
 
-     /**
+    /**
      * @var Plugin|null
      * @property-read Plugin $plugin
      */
     public static ?Plugin $plugin = null;
+
+    /**
+     * @inheritdoc
+     */
+    public static function config(): array
+    {
+        return [
+            'components' => [
+                'manifestBuilder' => ManifestBuilderService::class,
+                'mcpServer' => McpServerService::class,
+            ],
+        ];
+    }
 
     public function init(): void
     {
         parent::init();
 
         self::$plugin = $this;
-
-        $this->setComponents([
-            'manifestBuilder' => ManifestBuilderService::class,
-            'mcpServer' => McpServerService::class,
-        ]);
 
         // Register Utility in the CP
         Event::on(
