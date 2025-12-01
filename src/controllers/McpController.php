@@ -45,7 +45,7 @@ class McpController extends Controller
         $jsonRpcRequest['params']['schemaHandle'] = $schemaHandle;
 
         // Handle request via service
-        $mcpServer = Craft::$app->getModule('mcpwrapper')->get('mcpServer');
+        $mcpServer = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('mcpServer');
         $response = $mcpServer->handleRequest($jsonRpcRequest);
 
         return $this->asJson($response);
