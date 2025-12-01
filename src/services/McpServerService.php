@@ -27,29 +27,52 @@ class McpServerService extends Component
         $id = $jsonRpcRequest['id'] ?? null;
 
         try {
-            $result = match ($method) {
-                'initialize' => $this->handleInitialize($params),
-                'tools/list' => $this->handleToolsList($params),
-                'tools/call' => $this->handleToolCall($params),
-                'ping' => (object) [], // MCP spec requires empty object response
-                default => throw new \Exception("Unknown method: {$method}", -32601)
-            };
-
-            return [
-                'jsonrpc' => '2.0',
-                'id' => $id,
-                'result' => $result,
-            ];
+            $result = $this->dispatchMethod($method, $params);
+            return $this->successResponse($id, $result);
         } catch (\Exception $e) {
-            return [
-                'jsonrpc' => '2.0',
-                'id' => $id,
-                'error' => [
-                    'code' => $e->getCode() ?: -32603,
-                    'message' => $e->getMessage(),
-                ],
-            ];
+            return $this->errorResponse($id, $e);
         }
+    }
+
+    /**
+     * Dispatch to appropriate method handler
+     */
+    private function dispatchMethod(string $method, array $params): mixed
+    {
+        return match ($method) {
+            'initialize' => $this->handleInitialize($params),
+            'tools/list' => $this->handleToolsList($params),
+            'tools/call' => $this->handleToolCall($params),
+            'ping' => (object) [],
+            default => throw new \Exception("Unknown method: {$method}", -32601)
+        };
+    }
+
+    /**
+     * Build JSON-RPC success response
+     */
+    private function successResponse(?int $id, mixed $result): array
+    {
+        return [
+            'jsonrpc' => '2.0',
+            'id' => $id,
+            'result' => $result,
+        ];
+    }
+
+    /**
+     * Build JSON-RPC error response
+     */
+    private function errorResponse(?int $id, \Exception $e): array
+    {
+        return [
+            'jsonrpc' => '2.0',
+            'id' => $id,
+            'error' => [
+                'code' => $e->getCode() ?: -32603,
+                'message' => $e->getMessage(),
+            ],
+        ];
     }
 
     /**
