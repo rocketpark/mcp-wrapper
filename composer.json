@@ -31,7 +31,8 @@
         "handle": "mcp-wrapper",
         "name": "MCP Wrapper",
         "developer": "Rocket Park",
-        "class": "rocketpark\\mcpwrapper\\McpWrapper"
+        "class": "rocketpark\\mcpwrapper\\McpWrapper",
+        "basePath": "src"
     },
     "config": {
         "allow-plugins": {
