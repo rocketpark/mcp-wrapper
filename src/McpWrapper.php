@@ -43,7 +43,7 @@ class McpWrapper extends Plugin
         // Register Utility in the CP
         Event::on(
             Utilities::class,
-            Utilities::EVENT_REGISTER_UTILITY_TYPES,
+            Utilities::EVENT_REGISTER_UTILITIES,
             fn(RegisterComponentTypesEvent $e) => $e->types[] = McpManifestUtility::class
         );
 
