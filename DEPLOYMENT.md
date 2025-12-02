@@ -183,20 +183,26 @@ curl -X POST 'https://your-site.com/actions/mcp-wrapper/mcp/index?schemaHandle=p
 
 ### Connecting MCP Clients
 
-#### Claude Desktop (Streamable HTTP Transport)
+#### Claude Desktop
 
-The MCP server uses HTTP transport. Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "craft-cms": {
-      "url": "https://your-site.com/actions/mcp-wrapper/mcp/index?schemaHandle=public",
-      "transport": "streamable-http"
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://your-site.com/actions/mcp-wrapper/mcp/index?schemaHandle=public"
+      ]
     }
   }
 }
 ```
+
+**Important:** Replace `your-site.com` and `schemaHandle=public` with your actual domain and schema handle.
 
 #### Using with MCP Inspector
 
