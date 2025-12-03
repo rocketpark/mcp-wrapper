@@ -4,7 +4,9 @@ namespace rocketpark\mcpwrapper;
 use Craft;
 use craft\base\Plugin;
 use craft\events\RegisterComponentTypesEvent;
+use craft\events\RegisterUrlRulesEvent;
 use craft\services\Utilities;
+use craft\web\UrlManager;
 use rocketpark\mcpwrapper\utilities\McpManifestUtility;
 use yii\base\Event;
 
@@ -46,6 +48,15 @@ class McpWrapper extends Plugin
         parent::init();
 
         self::$plugin = $this;
+
+        // Register site URL rules for public manifest endpoint
+        Event::on(
+            UrlManager::class,
+            UrlManager::EVENT_REGISTER_SITE_URL_RULES,
+            function(RegisterUrlRulesEvent $event) {
+                $event->rules['mcp/manifest/<schemaHandle:[a-zA-Z0-9_-]+>'] = 'mcp-wrapper/manifest/index';
+            }
+        );
 
         // Register Utility in the CP
         Event::on(
