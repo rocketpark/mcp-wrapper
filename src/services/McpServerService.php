@@ -286,10 +286,46 @@ class McpServerService extends Component
             $filters[] = "id: [{$idsStr}]";
         }
 
+        // Get custom fields for this section
+        $fieldsList = $this->getFieldsListForQuery($sectionHandle);
+
         return sprintf(
-            'query { entries(%s) { id title slug uri dateCreated dateUpdated } }',
-            implode(', ', $filters)
+            'query { entries(%s) { id title slug uri dateCreated dateUpdated %s } }',
+            implode(', ', $filters),
+            $fieldsList
         );
+    }
+
+    /**
+     * Build fields list for GraphQL query based on section's field layout
+     */
+    private function getFieldsListForQuery(string $sectionHandle): string
+    {
+        $section = Craft::$app->getEntries()->getSectionByHandle($sectionHandle);
+        if (!$section) {
+            return '';
+        }
+
+        $fields = [];
+        foreach ($section->getEntryTypes() as $entryType) {
+            foreach ($entryType->getFieldLayout()->getCustomFields() as $field) {
+                $handle = $field->handle;
+                
+                // Handle relational fields
+                if ($field instanceof \craft\fields\Entries ||
+                    $field instanceof \craft\fields\Categories ||
+                    $field instanceof \craft\fields\Tags ||
+                    $field instanceof \craft\fields\Users ||
+                    $field instanceof \craft\fields\Assets) {
+                    $fields[] = "{$handle} { id title }";
+                } else {
+                    // Plain fields (text, number, etc.)
+                    $fields[] = $handle;
+                }
+            }
+        }
+
+        return implode(' ', array_unique($fields));
     }
 
     /**
