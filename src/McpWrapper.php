@@ -58,6 +58,7 @@ class McpWrapper extends Plugin
             UrlManager::EVENT_REGISTER_SITE_URL_RULES,
             function(RegisterUrlRulesEvent $event) {
                 $event->rules['mcp/manifest/<schemaHandle:[a-zA-Z0-9_-]+>'] = 'mcp-wrapper/manifest/index';
+                $event->rules['mcp/<schemaHandle:[a-zA-Z0-9_-]+>'] = 'mcp-wrapper/mcp/index';
             }
         );
 
