@@ -47,6 +47,9 @@ class McpWrapper extends Plugin
     {
         parent::init();
 
+        // Set controller namespace for proper routing
+        $this->controllerNamespace = 'rocketpark\\mcpwrapper\\controllers';
+
         self::$plugin = $this;
 
         // Register site URL rules for public manifest endpoint
