@@ -131,12 +131,160 @@ class McpServerService extends Component
 
     /**
      * Get standard input schema for query tools
+     * Includes all common Craft entry query parameters
      */
     private function getToolInputSchema(): array
     {
         return [
             'type' => 'object',
             'properties' => [
+                // Basic filters
+                'id' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'integer'],
+                    'description' => 'Filter by specific entry IDs',
+                ],
+                'uid' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string'],
+                    'description' => 'Filter by entry UIDs',
+                ],
+                'slug' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string'],
+                    'description' => 'Filter by entry slugs',
+                ],
+                'uri' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string'],
+                    'description' => 'Filter by entry URIs',
+                ],
+                'title' => [
+                    'type' => 'string',
+                    'description' => 'Filter by entry title',
+                ],
+                
+                // Entry type and status
+                'type' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string'],
+                    'description' => 'Filter by entry type handles',
+                ],
+                'typeId' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'integer'],
+                    'description' => 'Filter by entry type IDs',
+                ],
+                'status' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string'],
+                    'description' => 'Filter by status (live, pending, expired, disabled)',
+                ],
+                'archived' => [
+                    'type' => 'boolean',
+                    'description' => 'Filter by archived status',
+                ],
+                'trashed' => [
+                    'type' => 'boolean',
+                    'description' => 'Filter by trashed status',
+                ],
+                
+                // Date filters
+                'dateCreated' => [
+                    'type' => 'string',
+                    'description' => 'Filter by creation date (ISO 8601 format or Craft date syntax)',
+                ],
+                'dateUpdated' => [
+                    'type' => 'string',
+                    'description' => 'Filter by last update date',
+                ],
+                'postDate' => [
+                    'type' => 'string',
+                    'description' => 'Filter by post date',
+                ],
+                'expiryDate' => [
+                    'type' => 'string',
+                    'description' => 'Filter by expiry date',
+                ],
+                'before' => [
+                    'type' => 'string',
+                    'description' => 'Filter entries posted before this date',
+                ],
+                'after' => [
+                    'type' => 'string',
+                    'description' => 'Filter entries posted after this date',
+                ],
+                
+                // Relationships
+                'relatedTo' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'integer'],
+                    'description' => 'Filter by related entry IDs',
+                ],
+                'ancestorOf' => [
+                    'type' => 'integer',
+                    'description' => 'Filter ancestors of specified entry ID',
+                ],
+                'descendantOf' => [
+                    'type' => 'integer',
+                    'description' => 'Filter descendants of specified entry ID',
+                ],
+                'siblingOf' => [
+                    'type' => 'integer',
+                    'description' => 'Filter siblings of specified entry ID',
+                ],
+                'prevSiblingOf' => [
+                    'type' => 'integer',
+                    'description' => 'Filter previous sibling of specified entry ID',
+                ],
+                'nextSiblingOf' => [
+                    'type' => 'integer',
+                    'description' => 'Filter next sibling of specified entry ID',
+                ],
+                'positionedAfter' => [
+                    'type' => 'integer',
+                    'description' => 'Filter entries positioned after specified entry ID',
+                ],
+                'positionedBefore' => [
+                    'type' => 'integer',
+                    'description' => 'Filter entries positioned before specified entry ID',
+                ],
+                
+                // Authors
+                'authorId' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'integer'],
+                    'description' => 'Filter by author user IDs',
+                ],
+                'authorGroup' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string'],
+                    'description' => 'Filter by author user group handles',
+                ],
+                
+                // Search and ordering
+                'search' => [
+                    'type' => 'string',
+                    'description' => 'Full-text search query to filter entries',
+                ],
+                'orderBy' => [
+                    'type' => 'string',
+                    'description' => 'Order results (e.g., "dateCreated DESC", "title ASC")',
+                ],
+                'inReverse' => [
+                    'type' => 'boolean',
+                    'description' => 'Reverse the order of results',
+                ],
+                'fixedOrder' => [
+                    'type' => 'boolean',
+                    'description' => 'Maintain order when filtering by IDs',
+                ],
+                'unique' => [
+                    'type' => 'boolean',
+                    'description' => 'Return unique entries only',
+                ],
+                
+                // Pagination
                 'limit' => [
                     'type' => 'integer',
                     'description' => 'Maximum number of entries to return (1-100)',
@@ -150,14 +298,17 @@ class McpServerService extends Component
                     'default' => 0,
                     'minimum' => 0,
                 ],
-                'search' => [
-                    'type' => 'string',
-                    'description' => 'Full-text search query to filter entries',
+                
+                // Multi-site
+                'site' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string'],
+                    'description' => 'Filter by site handles',
                 ],
-                'id' => [
+                'siteId' => [
                     'type' => 'array',
                     'items' => ['type' => 'integer'],
-                    'description' => 'Filter by specific entry IDs',
+                    'description' => 'Filter by site IDs',
                 ],
             ],
             'required' => [],
@@ -277,13 +428,117 @@ class McpServerService extends Component
             "offset: {$offset}",
         ];
         
+        // Basic ID filters
+        if (!empty($args['id']) && is_array($args['id'])) {
+            $idsStr = implode(',', array_map('intval', $args['id']));
+            $filters[] = "id: [{$idsStr}]";
+        }
+        
+        if (!empty($args['uid']) && is_array($args['uid'])) {
+            $uidsStr = implode(',', array_map(fn($uid) => '"' . addslashes($uid) . '"', $args['uid']));
+            $filters[] = "uid: [{$uidsStr}]";
+        }
+        
+        if (!empty($args['slug']) && is_array($args['slug'])) {
+            $slugsStr = implode(',', array_map(fn($slug) => '"' . addslashes($slug) . '"', $args['slug']));
+            $filters[] = "slug: [{$slugsStr}]";
+        }
+        
+        if (!empty($args['uri']) && is_array($args['uri'])) {
+            $urisStr = implode(',', array_map(fn($uri) => '"' . addslashes($uri) . '"', $args['uri']));
+            $filters[] = "uri: [{$urisStr}]";
+        }
+        
+        if (!empty($args['title'])) {
+            $filters[] = 'title: "' . addslashes($args['title']) . '"';
+        }
+        
+        // Entry type filters
+        if (!empty($args['type']) && is_array($args['type'])) {
+            $typesStr = implode(',', array_map(fn($t) => '"' . addslashes($t) . '"', $args['type']));
+            $filters[] = "type: [{$typesStr}]";
+        }
+        
+        if (!empty($args['typeId']) && is_array($args['typeId'])) {
+            $typeIdsStr = implode(',', array_map('intval', $args['typeId']));
+            $filters[] = "typeId: [{$typeIdsStr}]";
+        }
+        
+        // Status filters
+        if (!empty($args['status']) && is_array($args['status'])) {
+            $statusStr = implode(',', array_map(fn($s) => '"' . addslashes($s) . '"', $args['status']));
+            $filters[] = "status: [{$statusStr}]";
+        }
+        
+        if (isset($args['archived'])) {
+            $filters[] = 'archived: ' . ($args['archived'] ? 'true' : 'false');
+        }
+        
+        if (isset($args['trashed'])) {
+            $filters[] = 'trashed: ' . ($args['trashed'] ? 'true' : 'false');
+        }
+        
+        // Date filters
+        foreach (['dateCreated', 'dateUpdated', 'postDate', 'expiryDate', 'before', 'after'] as $dateField) {
+            if (!empty($args[$dateField])) {
+                $filters[] = "{$dateField}: \"" . addslashes($args[$dateField]) . '"';
+            }
+        }
+        
+        // Relationship filters
+        if (!empty($args['relatedTo']) && is_array($args['relatedTo'])) {
+            $relatedIdsStr = implode(',', array_map('intval', $args['relatedTo']));
+            $filters[] = "relatedTo: [{$relatedIdsStr}]";
+        }
+        
+        foreach (['ancestorOf', 'descendantOf', 'siblingOf', 'prevSiblingOf', 'nextSiblingOf', 'positionedAfter', 'positionedBefore'] as $relField) {
+            if (!empty($args[$relField])) {
+                $filters[] = "{$relField}: " . intval($args[$relField]);
+            }
+        }
+        
+        // Author filters
+        if (!empty($args['authorId']) && is_array($args['authorId'])) {
+            $authorIdsStr = implode(',', array_map('intval', $args['authorId']));
+            $filters[] = "authorId: [{$authorIdsStr}]";
+        }
+        
+        if (!empty($args['authorGroup']) && is_array($args['authorGroup'])) {
+            $authorGroupsStr = implode(',', array_map(fn($g) => '"' . addslashes($g) . '"', $args['authorGroup']));
+            $filters[] = "authorGroup: [{$authorGroupsStr}]";
+        }
+        
+        // Search
         if (!empty($args['search'])) {
             $filters[] = 'search: "' . addslashes($args['search']) . '"';
         }
         
-        if (!empty($args['id']) && is_array($args['id'])) {
-            $idsStr = implode(',', array_map('intval', $args['id']));
-            $filters[] = "id: [{$idsStr}]";
+        // Ordering
+        if (!empty($args['orderBy'])) {
+            $filters[] = 'orderBy: "' . addslashes($args['orderBy']) . '"';
+        }
+        
+        if (isset($args['inReverse'])) {
+            $filters[] = 'inReverse: ' . ($args['inReverse'] ? 'true' : 'false');
+        }
+        
+        if (isset($args['fixedOrder'])) {
+            $filters[] = 'fixedOrder: ' . ($args['fixedOrder'] ? 'true' : 'false');
+        }
+        
+        if (isset($args['unique'])) {
+            $filters[] = 'unique: ' . ($args['unique'] ? 'true' : 'false');
+        }
+        
+        // Multi-site
+        if (!empty($args['site']) && is_array($args['site'])) {
+            $sitesStr = implode(',', array_map(fn($s) => '"' . addslashes($s) . '"', $args['site']));
+            $filters[] = "site: [{$sitesStr}]";
+        }
+        
+        if (!empty($args['siteId']) && is_array($args['siteId'])) {
+            $siteIdsStr = implode(',', array_map('intval', $args['siteId']));
+            $filters[] = "siteId: [{$siteIdsStr}]";
         }
 
         // Get custom fields for this section
