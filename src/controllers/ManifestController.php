@@ -28,7 +28,7 @@ class ManifestController extends Controller
                 Craft::info("Force rebuild requested for schema: {$schemaHandle}", 'mcp-wrapper');
             }
 
-            $manifest = Craft::$app->getModule('mcpwrapper')
+            $manifest = \rocketpark\mcpwrapper\McpWrapper::getInstance()
                 ->get('manifestBuilder')
                 ->buildManifest($token, $schemaHandle, $force);
 
