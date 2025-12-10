@@ -18,7 +18,7 @@ class ManifestController extends Controller
             $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
             $token  = $config['schemas'][$schemaHandle] ?? null;
             
-            if (!$token) {
+            if ($token === null) {
                 Craft::error("Unknown schema handle: {$schemaHandle}", 'mcp-wrapper');
                 throw new NotFoundHttpException("Unknown schema handle: {$schemaHandle}");
             }
