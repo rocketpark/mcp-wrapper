@@ -56,23 +56,63 @@ class ManifestBuilderService extends Component
 
     private function generateManifest(string $token, string $schemaHandle): array
     {
-        $schemaData = $this->introspectGraphQL($token);
-        $types = $schemaData['types'] ?? [];
-        $entryTypes = array_filter($types, fn($t) =>
-            isset($t['fields']) && str_contains(strtolower($t['name']), 'entry')
-        );
+        try {
+            // Try to use Craft services directly first (works in production without introspection)
+            return $this->generateManifestFromCraftServices($schemaHandle);
+        } catch (\Exception $e) {
+            Craft::warning("Failed to generate manifest from Craft services, falling back to GraphQL introspection: {$e->getMessage()}", 'mcp-wrapper');
+            
+            // Fallback to GraphQL introspection
+            $schemaData = $this->introspectGraphQL($token);
+            $types = $schemaData['types'] ?? [];
+            $entryTypes = array_filter($types, fn($t) =>
+                isset($t['fields']) && str_contains(strtolower($t['name']), 'entry')
+            );
 
-        $tools = [];
-        foreach ($entryTypes as $type) {
-            $sectionHandle = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', $type['name']));
-            $tools[] = $this->buildToolForSection($sectionHandle, $schemaHandle);
+            $tools = [];
+            foreach ($entryTypes as $type) {
+                $sectionHandle = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', $type['name']));
+                $tools[] = $this->buildToolForSection($sectionHandle, $schemaHandle);
+            }
+
+            return [
+                'version' => '1.1',
+                'schemaHandle' => $schemaHandle,
+                'description' => "Auto-generated MCP manifest (with relationships) for GraphQL schema '{$schemaHandle}'.",
+                'tools' => array_values(array_filter($tools)),
+            ];
         }
+    }
 
+    /**
+     * Generate manifest directly from Craft services without GraphQL introspection
+     * This works in production environments where introspection might be disabled
+     */
+    private function generateManifestFromCraftServices(string $schemaHandle): array
+    {
+        Craft::info("Generating manifest from Craft services for schema: {$schemaHandle}", 'mcp-wrapper');
+        
+        $sections = Craft::$app->getEntries()->getAllSections();
+        $tools = [];
+        
+        foreach ($sections as $section) {
+            $tool = $this->buildToolForSection($section->handle, $schemaHandle);
+            if ($tool) {
+                $tools[] = $tool;
+            }
+        }
+        
+        if (empty($tools)) {
+            throw new \Exception("No sections found for manifest generation");
+        }
+        
+        Craft::info("Generated " . count($tools) . " tools from Craft services", 'mcp-wrapper');
+        
         return [
             'version' => '1.1',
             'schemaHandle' => $schemaHandle,
-            'description' => "Auto-generated MCP manifest (with relationships) for GraphQL schema '{$schemaHandle}'.",
-            'tools' => array_values(array_filter($tools)),
+            'description' => "MCP manifest for GraphQL schema '{$schemaHandle}' (generated from Craft services).",
+            'tools' => $tools,
         ];
     }
 
