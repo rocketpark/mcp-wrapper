@@ -3,12 +3,12 @@ namespace rocketpark\mcpwrapper\services;
 
 use Craft;
 use craft\base\Component;
+use craft\base\FieldInterface;
 use craft\fields\Assets;
 use craft\fields\Categories;
 use craft\fields\Entries;
 use craft\fields\Tags;
 use craft\fields\Users;
-use craft\fields\BaseField;
 use GuzzleHttp\Client;
 
 class ManifestBuilderService extends Component
@@ -146,7 +146,7 @@ class ManifestBuilderService extends Component
         ];
     }
 
-    private function describeField(BaseField $field): array
+    private function describeField(FieldInterface $field): array
     {
         $base = [
             'handle' => $field->handle,
@@ -182,7 +182,7 @@ class ManifestBuilderService extends Component
         return $handles;
     }
 
-    private function mapFieldType(BaseField $field): string
+    private function mapFieldType(FieldInterface $field): string
     {
         $type = (new \ReflectionClass($field))->getShortName();
 
