@@ -12,18 +12,37 @@ class ManifestController extends Controller
 
     public function actionIndex(string $schemaHandle): Response
     {
-        $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
-        $token  = $config['schemas'][$schemaHandle] ?? null;
-        if (!$token) {
-            throw new NotFoundHttpException("Unknown schema handle: {$schemaHandle}");
+        try {
+            Craft::info("Manifest request for schema: {$schemaHandle}", 'mcp-wrapper');
+            
+            $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
+            $token  = $config['schemas'][$schemaHandle] ?? null;
+            
+            if (!$token) {
+                Craft::error("Unknown schema handle: {$schemaHandle}", 'mcp-wrapper');
+                throw new NotFoundHttpException("Unknown schema handle: {$schemaHandle}");
+            }
+
+            $force = Craft::$app->request->getQueryParam('force') === '1';
+            if ($force) {
+                Craft::info("Force rebuild requested for schema: {$schemaHandle}", 'mcp-wrapper');
+            }
+
+            $manifest = Craft::$app->getModule('mcpwrapper')
+                ->get('manifestBuilder')
+                ->buildManifest($token, $schemaHandle, $force);
+
+            Craft::info("Manifest successfully generated for schema: {$schemaHandle}", 'mcp-wrapper');
+            return $this->asJson($manifest);
+        } catch (NotFoundHttpException $e) {
+            throw $e; // Re-throw to let Craft handle 404
+        } catch (\Exception $e) {
+            Craft::error("Manifest generation error: {$e->getMessage()}", 'mcp-wrapper');
+            Craft::error($e->getTraceAsString(), 'mcp-wrapper');
+            
+            return $this->asJson([
+                'error' => 'Failed to generate manifest: ' . $e->getMessage(),
+            ], 500);
         }
-
-        $force = Craft::$app->request->getQueryParam('force') === '1';
-
-        $manifest = Craft::$app->getModule('mcpwrapper')
-            ->get('manifestBuilder')
-            ->buildManifest($token, $schemaHandle, $force);
-
-        return $this->asJson($manifest);
     }
 }

@@ -17,19 +17,32 @@ class ManifestBuilderService extends Component
 
     public function buildManifest(string $token, string $schemaHandle, bool $forceRebuild = false): array
     {
-        $path = Craft::getAlias("{$this->cacheDir}/manifest-{$schemaHandle}.json");
+        try {
+            $path = Craft::getAlias("{$this->cacheDir}/manifest-{$schemaHandle}.json");
 
-        if (!$forceRebuild && file_exists($path)) {
-            $cached = json_decode(file_get_contents($path), true);
-            if ($cached) return $cached;
+            if (!$forceRebuild && file_exists($path)) {
+                Craft::info("Loading cached manifest for schema: {$schemaHandle}", 'mcp-wrapper');
+                $cached = json_decode(file_get_contents($path), true);
+                if ($cached) return $cached;
+            }
+
+            Craft::info("Generating manifest for schema: {$schemaHandle}", 'mcp-wrapper');
+            $manifest = $this->generateManifest($token, $schemaHandle);
+
+            if (!is_dir(dirname($path))) {
+                mkdir(dirname($path), 0775, true);
+                Craft::info("Created cache directory: " . dirname($path), 'mcp-wrapper');
+            }
+            
+            file_put_contents($path, json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+            Craft::info("Manifest cached at: {$path}", 'mcp-wrapper');
+
+            return $manifest;
+        } catch (\Exception $e) {
+            Craft::error("Failed to build manifest: {$e->getMessage()}", 'mcp-wrapper');
+            Craft::error($e->getTraceAsString(), 'mcp-wrapper');
+            throw $e;
         }
-
-        $manifest = $this->generateManifest($token, $schemaHandle);
-
-        if (!is_dir(dirname($path))) mkdir(dirname($path), 0775, true);
-        file_put_contents($path, json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-
-        return $manifest;
     }
 
     public function clearCache(?string $schemaHandle = null): void
@@ -163,24 +176,45 @@ class ManifestBuilderService extends Component
 
     private function introspectGraphQL(string $token): array
     {
-        $client = new Client([
-            'base_uri' => Craft::$app->request->getHostInfo(),
-            'timeout' => 10,
-        ]);
+        try {
+            $client = new Client([
+                'base_uri' => Craft::$app->request->getHostInfo(),
+                'timeout' => 10,
+            ]);
 
-        $query = <<<'GQL'
-        { __schema { types { name fields { name type { name kind } } } } }
-        GQL;
+            $query = <<<'GQL'
+            { __schema { types { name fields { name type { name kind } } } } }
+            GQL;
 
-        $response = $client->post('/api', [
-            'headers' => [
-                'Authorization' => "Bearer {$token}",
-                'Content-Type' => 'application/json',
-            ],
-            'json' => ['query' => $query],
-        ]);
+            Craft::info("Introspecting GraphQL schema", 'mcp-wrapper');
+            
+            $response = $client->post('/api', [
+                'headers' => [
+                    'Authorization' => "Bearer {$token}",
+                    'Content-Type' => 'application/json',
+                ],
+                'json' => ['query' => $query],
+            ]);
 
-        $data = json_decode($response->getBody()->getContents(), true);
-        return $data['data']['__schema'] ?? [];
+            $data = json_decode($response->getBody()->getContents(), true);
+            
+            if (!isset($data['data']['__schema'])) {
+                Craft::error("GraphQL introspection failed: missing __schema", 'mcp-wrapper');
+                throw new \Exception('GraphQL introspection returned invalid data');
+            }
+            
+            Craft::info("GraphQL introspection successful", 'mcp-wrapper');
+            return $data['data']['__schema'];
+        } catch (\GuzzleHttp\Exception\RequestException $e) {
+            Craft::error("GraphQL introspection request failed: {$e->getMessage()}", 'mcp-wrapper');
+            if ($e->hasResponse()) {
+                $body = $e->getResponse()->getBody()->getContents();
+                Craft::error("Response body: {$body}", 'mcp-wrapper');
+            }
+            throw new \Exception('Failed to introspect GraphQL schema: ' . $e->getMessage());
+        } catch (\Exception $e) {
+            Craft::error("Unexpected error during GraphQL introspection: {$e->getMessage()}", 'mcp-wrapper');
+            throw $e;
+        }
     }
 }

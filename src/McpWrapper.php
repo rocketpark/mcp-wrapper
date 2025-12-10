@@ -62,6 +62,16 @@ class McpWrapper extends Plugin
             }
         );
 
+        // Register CP URL rules for utility
+        Event::on(
+            UrlManager::class,
+            UrlManager::EVENT_REGISTER_CP_URL_RULES,
+            function(RegisterUrlRulesEvent $event) {
+                $event->rules['utilities/mcp-wrapper'] = 'mcp-wrapper/utility/index';
+                $event->rules['utilities/mcp-wrapper/rebuild/<schema:[a-zA-Z0-9_-]+>'] = 'mcp-wrapper/utility/rebuild';
+            }
+        );
+
         // Register Utility in the CP
         Event::on(
             Utilities::class,

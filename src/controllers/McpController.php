@@ -23,32 +23,50 @@ class McpController extends Controller
     {
         $this->response->format = Response::FORMAT_JSON;
         
-        // Parse JSON-RPC request
-        $rawBody = Craft::$app->request->getRawBody();
-        $jsonRpcRequest = json_decode($rawBody, true);
+        try {
+            // Parse JSON-RPC request
+            $rawBody = Craft::$app->request->getRawBody();
+            Craft::info("MCP request received for schema: {$schemaHandle}", 'mcp-wrapper');
+            
+            $jsonRpcRequest = json_decode($rawBody, true);
 
-        if (json_last_error() !== JSON_ERROR_NONE) {
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                $error = 'Parse error: ' . json_last_error_msg();
+                Craft::error("JSON parse error: {$error}", 'mcp-wrapper');
+                return $this->asJson([
+                    'jsonrpc' => '2.0',
+                    'error' => [
+                        'code' => -32700,
+                        'message' => $error,
+                    ],
+                    'id' => null,
+                ]);
+            }
+
+            // Inject schemaHandle into params for service layer
+            if (!isset($jsonRpcRequest['params'])) {
+                $jsonRpcRequest['params'] = [];
+            }
+            $jsonRpcRequest['params']['schemaHandle'] = $schemaHandle;
+
+            // Handle request via service
+            $mcpServer = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('mcpServer');
+            $response = $mcpServer->handleRequest($jsonRpcRequest);
+
+            return $this->asJson($response);
+        } catch (\Exception $e) {
+            Craft::error("MCP controller error: {$e->getMessage()}", 'mcp-wrapper');
+            Craft::error($e->getTraceAsString(), 'mcp-wrapper');
+            
             return $this->asJson([
                 'jsonrpc' => '2.0',
                 'error' => [
-                    'code' => -32700,
-                    'message' => 'Parse error: ' . json_last_error_msg(),
+                    'code' => -32603,
+                    'message' => 'Internal error: ' . $e->getMessage(),
                 ],
                 'id' => null,
             ]);
         }
-
-        // Inject schemaHandle into params for service layer
-        if (!isset($jsonRpcRequest['params'])) {
-            $jsonRpcRequest['params'] = [];
-        }
-        $jsonRpcRequest['params']['schemaHandle'] = $schemaHandle;
-
-        // Handle request via service
-        $mcpServer = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('mcpServer');
-        $response = $mcpServer->handleRequest($jsonRpcRequest);
-
-        return $this->asJson($response);
     }
 
     /**

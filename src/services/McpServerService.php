@@ -27,9 +27,13 @@ class McpServerService extends Component
         $id = $jsonRpcRequest['id'] ?? null;
 
         try {
+            Craft::info("MCP Request: {$method}", 'mcp-wrapper');
             $result = $this->dispatchMethod($method, $params);
+            Craft::info("MCP Response: success for {$method}", 'mcp-wrapper');
             return $this->successResponse($id, $result);
         } catch (\Exception $e) {
+            Craft::error("MCP Error ({$method}): {$e->getMessage()}", 'mcp-wrapper');
+            Craft::error($e->getTraceAsString(), 'mcp-wrapper');
             return $this->errorResponse($id, $e);
         }
     }
@@ -404,14 +408,23 @@ class McpServerService extends Component
      */
     private function executeGraphQLQuery(string $token, string $sectionHandle, array $args): array
     {
-        $query = $this->buildGraphQLQuery($sectionHandle, $args);
-        $data = $this->sendGraphQLRequest($token, $query);
-        
-        if (isset($data['errors'])) {
-            throw new \Exception('GraphQL error: ' . json_encode($data['errors']), -32603);
-        }
+        try {
+            $query = $this->buildGraphQLQuery($sectionHandle, $args);
+            Craft::info("GraphQL Query for {$sectionHandle}: {$query}", 'mcp-wrapper');
+            
+            $data = $this->sendGraphQLRequest($token, $query);
+            
+            if (isset($data['errors'])) {
+                $errorJson = json_encode($data['errors']);
+                Craft::error("GraphQL errors: {$errorJson}", 'mcp-wrapper');
+                throw new \Exception('GraphQL error: ' . $errorJson, -32603);
+            }
 
-        return $data['data'] ?? [];
+            return $data['data'] ?? [];
+        } catch (\Exception $e) {
+            Craft::error("Failed to execute GraphQL query: {$e->getMessage()}", 'mcp-wrapper');
+            throw $e;
+        }
     }
 
     /**
@@ -602,19 +615,31 @@ class McpServerService extends Component
      */
     private function sendGraphQLRequest(string $token, string $query): array
     {
-        $client = new \GuzzleHttp\Client([
-            'base_uri' => Craft::$app->request->getHostInfo(),
-            'timeout' => 10,
-        ]);
+        try {
+            $client = new \GuzzleHttp\Client([
+                'base_uri' => Craft::$app->request->getHostInfo(),
+                'timeout' => 10,
+            ]);
 
-        $response = $client->post('/api', [
-            'headers' => [
-                'Authorization' => "Bearer {$token}",
-                'Content-Type' => 'application/json',
-            ],
-            'json' => ['query' => $query],
-        ]);
+            $response = $client->post('/api', [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $token,
+                    'Content-Type' => 'application/json',
+                ],
+                'json' => ['query' => $query],
+            ]);
 
-        return json_decode($response->getBody()->getContents(), true);
+            return json_decode($response->getBody()->getContents(), true);
+        } catch (\GuzzleHttp\Exception\RequestException $e) {
+            Craft::error("GraphQL request failed: {$e->getMessage()}", 'mcp-wrapper');
+            if ($e->hasResponse()) {
+                $body = $e->getResponse()->getBody()->getContents();
+                Craft::error("Response body: {$body}", 'mcp-wrapper');
+            }
+            throw new \Exception('GraphQL request failed: ' . $e->getMessage(), -32603);
+        } catch (\Exception $e) {
+            Craft::error("Unexpected error in GraphQL request: {$e->getMessage()}", 'mcp-wrapper');
+            throw $e;
+        }
     }
 }
