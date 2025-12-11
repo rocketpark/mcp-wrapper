@@ -23,7 +23,7 @@ class McpManifestUtility extends Utility
 
     public static function contentHtml(): string
     {
-        return Craft::$app->view->renderTemplate('mcp-wrapper/utility', [
+        return Craft::$app->view->renderTemplate('utility', [
             'schemas' => self::getSchemaInfo(),
         ]);
     }
