@@ -12,13 +12,13 @@
     </thead>
     <tbody>
       <tr v-for="schema in schemas" :key="schema.handle">
-        <td><code>{{ schema.handle }}</code></td>
+        <td><code>{% verbatim %}{{ schema.handle }}{% endverbatim %}</code></td>
         <td>
           <span v-if="schema.rebuilding">⏳ rebuilding…</span>
           <span v-else-if="schema.exists">✅ Cached</span>
           <span v-else>⚠️ Not built</span>
         </td>
-        <td>{{ schema.lastModified ?? '—' }}</td>
+        <td>{% verbatim %}{{ schema.lastModified ?? '—' }}{% endverbatim %}</td>
         <td>
           <a v-if="schema.exists" :href="schema.urlView" target="_blank" class="btn small">View JSON</a>
           <button class="btn small" @click="rebuild(schema)" :disabled="schema.rebuilding">Rebuild</button>
