@@ -23,10 +23,21 @@ class McpManifestUtility extends Utility
 
     public static function contentHtml(): string
     {
-        $templatesPath = Craft::getAlias('@rocketpark/mcpwrapper/templates');
-        return Craft::$app->view->renderTemplate($templatesPath . '/utility.twig', [
+        $view = Craft::$app->getView();
+        $oldMode = $view->getTemplateMode();
+        $view->setTemplateMode($view::TEMPLATE_MODE_CP);
+        
+        // Read the template file directly
+        $templatePath = Craft::getAlias('@rocketpark/mcpwrapper/templates/utility.twig');
+        $templateContent = file_get_contents($templatePath);
+        
+        // Render as string with variables
+        $html = $view->renderString($templateContent, [
             'schemas' => self::getSchemaInfo(),
         ]);
+        
+        $view->setTemplateMode($oldMode);
+        return $html;
     }
 
     private static function getSchemaInfo(): array
