@@ -72,30 +72,91 @@ class McpController extends Controller
     /**
      * SSE endpoint for Server-Sent Events streaming
      * 
-     * This implements a simpler SSE approach where the client can:
-     * 1. Send initial request via URL parameters or POST body
-     * 2. Receive response via SSE stream
+     * Handles both GET (SSE stream) and POST (validation/commands) for Airia compatibility.
      * 
-     * For Airia compatibility, this endpoint accepts an SSE connection
-     * and streams MCP responses as events.
+     * POST requests return JSON responses for validation.
+     * GET requests establish SSE stream and send MCP events.
      */
-    public function actionSse(string $schemaHandle): void
+    public function actionSse(string $schemaHandle)
+    {
+        $method = Craft::$app->request->getMethod();
+        
+        // Handle POST requests (validation, commands)
+        if ($method === 'POST') {
+            return $this->handleSsePost($schemaHandle);
+        }
+        
+        // Handle GET requests (SSE stream)
+        $this->handleSseStream($schemaHandle);
+    }
+    
+    /**
+     * Handle POST requests to SSE endpoint (for validation)
+     */
+    private function handleSsePost(string $schemaHandle): Response
+    {
+        $this->response->format = Response::FORMAT_JSON;
+        
+        try {
+            $rawBody = Craft::$app->request->getRawBody();
+            $jsonRpcRequest = json_decode($rawBody, true);
+            
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                return $this->asJson([
+                    'jsonrpc' => '2.0',
+                    'error' => [
+                        'code' => -32700,
+                        'message' => 'Parse error: ' . json_last_error_msg(),
+                    ],
+                    'id' => null,
+                ]);
+            }
+            
+            // Inject schemaHandle
+            if (!isset($jsonRpcRequest['params'])) {
+                $jsonRpcRequest['params'] = [];
+            }
+            $jsonRpcRequest['params']['schemaHandle'] = $schemaHandle;
+            
+            // Handle request
+            $mcpServer = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('mcpServer');
+            $response = $mcpServer->handleRequest($jsonRpcRequest);
+            
+            return $this->asJson($response);
+            
+        } catch (\Exception $e) {
+            Craft::error("MCP SSE POST error: {$e->getMessage()}", 'mcp-wrapper');
+            
+            return $this->asJson([
+                'jsonrpc' => '2.0',
+                'error' => [
+                    'code' => -32603,
+                    'message' => 'Internal error: ' . $e->getMessage(),
+                ],
+                'id' => null,
+            ]);
+        }
+    }
+    
+    /**
+     * Handle GET requests (SSE stream)
+     */
+    private function handleSseStream(string $schemaHandle): void
     {
         // Set SSE headers before any output
         header('Content-Type: text/event-stream');
         header('Cache-Control: no-cache');
         header('Connection: keep-alive');
-        header('X-Accel-Buffering: no'); // Disable nginx buffering
-        header('Access-Control-Allow-Origin: *'); // Allow CORS
+        header('X-Accel-Buffering: no');
+        header('Access-Control-Allow-Origin: *');
         
-        // Start output buffering to send events immediately
+        // Clean output buffer
         if (ob_get_level()) ob_end_clean();
         
         try {
-            // Get MCP server instance
             $mcpServer = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('mcpServer');
             
-            // For initial connection, send server info via initialize
+            // Send initialize response
             $initRequest = [
                 'jsonrpc' => '2.0',
                 'id' => 1,
@@ -119,25 +180,21 @@ class McpController extends Controller
                 'jsonrpc' => '2.0',
                 'id' => 2,
                 'method' => 'tools/list',
-                'params' => [
-                    'schemaHandle' => $schemaHandle,
-                ],
+                'params' => ['schemaHandle' => $schemaHandle],
             ];
             
             $toolsResponse = $mcpServer->handleRequest($toolsRequest);
             $this->sendSseEvent('message', $toolsResponse);
             
-            // Keep connection alive - in a real implementation,
-            // you'd listen for client messages and respond
-            // For now, just send periodic keepalives
+            // Send ready event
             $this->sendSseEvent('ready', ['status' => 'connected']);
             
-            // Send a comment to keep connection alive
+            // Keepalive
             echo ": keepalive\n\n";
             flush();
             
         } catch (\Exception $e) {
-            Craft::error("MCP SSE error: {$e->getMessage()}", 'mcp-wrapper');
+            Craft::error("MCP SSE stream error: {$e->getMessage()}", 'mcp-wrapper');
             
             $errorEvent = [
                 'jsonrpc' => '2.0',
@@ -151,7 +208,6 @@ class McpController extends Controller
             $this->sendSseEvent('error', $errorEvent);
         }
         
-        // Exit cleanly without letting Yii try to send headers
         exit(0);
     }
     
