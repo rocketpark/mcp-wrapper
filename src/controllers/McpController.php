@@ -79,20 +79,17 @@ class McpController extends Controller
      * For Airia compatibility, this endpoint accepts an SSE connection
      * and streams MCP responses as events.
      */
-    public function actionSse(string $schemaHandle): Response
+    public function actionSse(string $schemaHandle): void
     {
-        // Disable default response formatting
-        $this->response->format = Response::FORMAT_RAW;
-        
-        // Set SSE headers
-        $this->response->headers->set('Content-Type', 'text/event-stream');
-        $this->response->headers->set('Cache-Control', 'no-cache');
-        $this->response->headers->set('Connection', 'keep-alive');
-        $this->response->headers->set('X-Accel-Buffering', 'no'); // Disable nginx buffering
-        $this->response->headers->set('Access-Control-Allow-Origin', '*'); // Allow CORS
+        // Set SSE headers before any output
+        header('Content-Type: text/event-stream');
+        header('Cache-Control: no-cache');
+        header('Connection: keep-alive');
+        header('X-Accel-Buffering: no'); // Disable nginx buffering
+        header('Access-Control-Allow-Origin: *'); // Allow CORS
         
         // Start output buffering to send events immediately
-        if (ob_get_level()) ob_end_flush();
+        if (ob_get_level()) ob_end_clean();
         
         try {
             // Get MCP server instance
@@ -154,7 +151,8 @@ class McpController extends Controller
             $this->sendSseEvent('error', $errorEvent);
         }
         
-        return $this->response;
+        // Exit to prevent Yii from trying to send headers again
+        Craft::$app->end();
     }
     
     /**
@@ -164,11 +162,6 @@ class McpController extends Controller
     {
         echo "event: {$eventType}\n";
         echo "data: " . json_encode($data) . "\n\n";
-        
-        // Force flush output
-        if (ob_get_level()) {
-            ob_flush();
-        }
         flush();
     }
 }
