@@ -1,67 +1,106 @@
-# Connecting to Airia Platform
+# Airia Setup Guide
 
-## SSE Endpoint for Airia
+Connect Airia to the Service Curator MCP server using the legacy SSE transport.
 
-Airia's Custom MCP Server interface requires Server-Sent Events (SSE) transport. Use this endpoint:
+## Prerequisites
 
-```
-https://servicecurator.com/actions/mcp-wrapper/mcp/sse?schemaHandle=public
-```
+1. Access to Airia platform
+2. Service Curator MCP server running at servicecurator.com
 
 ## Setup Steps
 
-1. **Log in to Airia** at your organization's Airia workspace
+### 1. Create MCP Credentials in Airia
 
-2. **Navigate to Settings** → **Tool Library**
+1. Log in to Airia
+2. Click your profile icon (bottom left)
+3. Select "Settings & billing"
+4. Go to "Credentials" tab
+5. Click "New credentials"
+6. Select "MCP Access Token"
+7. Name it "Service Curator MCP"
+8. Leave token blank (public schema requires no authentication)
+9. Save the credential
 
-3. **Click "Add Custom MCP Server"**
+### 2. Connect to Service Curator
 
-4. **Enter the SSE URL**:
+1. In Airia, go to AI Lab (home icon, top left)
+2. Click "Manage connections" (link icon in top bar)
+3. Click "Connect with your own MCP server"
+4. Enter SSE URL:
    ```
    https://servicecurator.com/actions/mcp-wrapper/mcp/sse?schemaHandle=public
    ```
+5. Select your "Service Curator MCP" credential
+6. Click "Connect"
 
-5. **Create or Select Credentials** (if required):
-   - Credential Type: MCP Access Token
-   - Name: Service Curator MCP
-   - Leave token blank (no authentication required for public schema)
+## How It Works
 
-6. **Save and Connect**
+The SSE endpoint implements the MCP legacy SSE transport (two-endpoint pattern):
 
-## What Happens
+1. **GET /sse**: Opens an SSE stream and sends:
+   - `endpoint` event with session-specific `/messages` URL
+   - Keepalive messages every 15 seconds
 
-When Airia connects to the SSE endpoint, it will automatically receive:
+2. **POST /messages?sessionId=XXX**: Handles client-to-server JSON-RPC messages:
+   - initialize
+   - tools/list
+   - tools/call
+   - All other MCP methods
 
-1. **Initialize Response** - Server capabilities and version info
-2. **Tools List** - Available tools (`query_news`, `query_topics`)
-3. **Ready Status** - Connection confirmation
-
-The SSE stream stays open and Airia can then call the tools through its interface.
+This two-endpoint pattern is required by the legacy SSE transport and follows the MCP specification.
 
 ## Available Tools
 
-- **query_news** - Query news entries from Craft CMS
-- **query_topics** - Query topic categories
+Once connected, you'll have access to:
+
+- **query_news**: Query news articles from Service Curator
+  - Filter by ID, slug, title, date, status, etc.
+  - Full-text search support
+  - Pagination with limit/offset
+
+- **query_topics**: Query topic categories
+  - Same filtering capabilities as news
+  - Relationship data included
 
 ## Troubleshooting
 
-### Connection Fails
+### "Failed to load Mcp server info"
 
-- **Check URL**: Ensure you're using the `/sse` endpoint, not `/index`
-- **Schema Handle**: Verify `schemaHandle=public` is in the URL
-- **Network**: Ensure your network allows SSE connections (some corporate firewalls block event streams)
+This error can occur if:
+- The server is unreachable
+- There's a CORS issue
+- The SSE stream isn't establishing correctly
 
-### No Tools Appear
+To verify the server is working:
+```bash
+# Test SSE endpoint - should return endpoint event with sessionId
+curl -N https://servicecurator.com/actions/mcp-wrapper/mcp/sse?schemaHandle=public
 
-- Wait 5-10 seconds after connection - SSE streams events sequentially
-- Check Airia's console logs for errors
-- Verify the public schema has access to news and topics sections
+# Should output:
+# event: endpoint
+# data: {"endpoint":"/actions/mcp-wrapper/mcp/messages?sessionId=..."}
+# 
+# : keepalive
+```
 
-### Tools Don't Execute
+Test the messages endpoint with a valid session:
+```bash
+# Get a session ID from the SSE stream first
+# Then test the messages endpoint:
+curl -X POST 'https://servicecurator.com/actions/mcp-wrapper/mcp/messages?sessionId=YOUR_SESSION_ID' \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"airia","version":"1.0"}}}'
 
-- The SSE endpoint only handles discovery, not execution
-- Tool execution may require additional Airia configuration
-- Contact Airia support for execution troubleshooting
+# Should return:
+# {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18",...}}
+```
+
+### Connection drops frequently
+
+SSE connections are persistent. If they drop frequently:
+- Check network stability
+- Verify firewall isn't blocking persistent connections
+- Contact Airia support for platform-specific issues
 
 ## Alternative Schemas
 
@@ -74,15 +113,23 @@ https://servicecurator.com/actions/mcp-wrapper/mcp/sse?schemaHandle=internal
 
 Note: These schemas must be configured in the plugin's `config.php` file and have valid GraphQL tokens.
 
-## Technical Details
+## Alternative: Claude Desktop
 
-The SSE endpoint implements the deprecated HTTP+SSE transport from the MCP specification for compatibility with platforms that haven't yet adopted the modern Streamable HTTP transport. 
+For testing or alternative access, you can use Claude Desktop with the Streamable HTTP endpoint:
 
-When a client connects:
-1. Server sends `text/event-stream` headers
-2. Server streams `initialize` response as `message` event
-3. Server streams `tools/list` response as `message` event  
-4. Server sends `ready` event with connection status
-5. Connection stays open for additional events
+```json
+{
+  "mcpServers": {
+    "service-curator": {
+      "command": "npx",
+      "args": [
+        "@modelcontextprotocol/server-mcp-remote",
+        "https://servicecurator.com/actions/mcp-wrapper/mcp/index?schemaHandle=public"
+      ]
+    }
+  }
+}
+```
 
-This is a read-only connection for discovery. Tool execution happens through separate requests.
+Add this to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS).
+
