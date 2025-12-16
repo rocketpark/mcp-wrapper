@@ -151,8 +151,8 @@ class McpController extends Controller
             $this->sendSseEvent('error', $errorEvent);
         }
         
-        // Exit to prevent Yii from trying to send headers again
-        Craft::$app->end();
+        // Exit cleanly without letting Yii try to send headers
+        exit(0);
     }
     
     /**
