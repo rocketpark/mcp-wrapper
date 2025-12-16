@@ -13,7 +13,7 @@ const SCHEMA = 'public'; // Change this if you have a different schema configure
 // JSON-RPC 2.0 handler
 async function handleMCPRequest(request) {
   try {
-    const response = await fetch(`${BASE_URL}/mcp/${SCHEMA}`, {
+    const response = await fetch(`${BASE_URL}/actions/mcp-wrapper/mcp/index?schemaHandle=${SCHEMA}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(request)

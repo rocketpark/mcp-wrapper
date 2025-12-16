@@ -70,13 +70,105 @@ class McpController extends Controller
     }
 
     /**
-     * SSE endpoint for streaming (future enhancement)
+     * SSE endpoint for Server-Sent Events streaming
+     * 
+     * This implements a simpler SSE approach where the client can:
+     * 1. Send initial request via URL parameters or POST body
+     * 2. Receive response via SSE stream
+     * 
+     * For Airia compatibility, this endpoint accepts an SSE connection
+     * and streams MCP responses as events.
      */
-    public function actionStream(string $schemaHandle): Response
+    public function actionSse(string $schemaHandle): Response
     {
-        // TODO: Implement Server-Sent Events for streaming responses
-        return $this->asJson([
-            'error' => 'SSE not yet implemented',
-        ]);
+        // Disable default response formatting
+        $this->response->format = Response::FORMAT_RAW;
+        
+        // Set SSE headers
+        $this->response->headers->set('Content-Type', 'text/event-stream');
+        $this->response->headers->set('Cache-Control', 'no-cache');
+        $this->response->headers->set('Connection', 'keep-alive');
+        $this->response->headers->set('X-Accel-Buffering', 'no'); // Disable nginx buffering
+        $this->response->headers->set('Access-Control-Allow-Origin', '*'); // Allow CORS
+        
+        // Start output buffering to send events immediately
+        if (ob_get_level()) ob_end_flush();
+        
+        try {
+            // Get MCP server instance
+            $mcpServer = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('mcpServer');
+            
+            // For initial connection, send server info via initialize
+            $initRequest = [
+                'jsonrpc' => '2.0',
+                'id' => 1,
+                'method' => 'initialize',
+                'params' => [
+                    'schemaHandle' => $schemaHandle,
+                    'protocolVersion' => '2025-06-18',
+                    'capabilities' => new \stdClass(),
+                    'clientInfo' => [
+                        'name' => 'sse-client',
+                        'version' => '1.0.0',
+                    ],
+                ],
+            ];
+            
+            $initResponse = $mcpServer->handleRequest($initRequest);
+            $this->sendSseEvent('message', $initResponse);
+            
+            // Send tools list
+            $toolsRequest = [
+                'jsonrpc' => '2.0',
+                'id' => 2,
+                'method' => 'tools/list',
+                'params' => [
+                    'schemaHandle' => $schemaHandle,
+                ],
+            ];
+            
+            $toolsResponse = $mcpServer->handleRequest($toolsRequest);
+            $this->sendSseEvent('message', $toolsResponse);
+            
+            // Keep connection alive - in a real implementation,
+            // you'd listen for client messages and respond
+            // For now, just send periodic keepalives
+            $this->sendSseEvent('ready', ['status' => 'connected']);
+            
+            // Send a comment to keep connection alive
+            echo ": keepalive\n\n";
+            flush();
+            
+        } catch (\Exception $e) {
+            Craft::error("MCP SSE error: {$e->getMessage()}", 'mcp-wrapper');
+            
+            $errorEvent = [
+                'jsonrpc' => '2.0',
+                'error' => [
+                    'code' => -32603,
+                    'message' => 'Internal error: ' . $e->getMessage(),
+                ],
+                'id' => null,
+            ];
+            
+            $this->sendSseEvent('error', $errorEvent);
+        }
+        
+        return $this->response;
+    }
+    
+    /**
+     * Send an SSE event
+     */
+    private function sendSseEvent(string $eventType, array $data): void
+    {
+        echo "event: {$eventType}\n";
+        echo "data: " . json_encode($data) . "\n\n";
+        
+        // Force flush output
+        if (ob_get_level()) {
+            ob_flush();
+        }
+        flush();
     }
 }

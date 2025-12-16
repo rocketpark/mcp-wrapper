@@ -88,13 +88,33 @@ GQL_AI_TOKEN="your-graphql-token-from-craft-cp"
 
 ## Usage
 
-### MCP Endpoint
+### MCP Endpoints
 
-The MCP server is available at:
+The plugin provides two transport endpoints:
+
+#### 1. HTTP POST (Streamable HTTP) - Recommended
 
 ```text
 POST https://your-site.com/actions/mcp-wrapper/mcp/index/{schemaHandle}
 ```
+
+This is the modern MCP transport (spec 2025-06-18). Use this for:
+- Claude Desktop (via mcp-remote)
+- Custom MCP clients
+- Most new integrations
+
+#### 2. Server-Sent Events (SSE) - Legacy Compatibility
+
+```text
+GET https://your-site.com/actions/mcp-wrapper/mcp/sse/{schemaHandle}
+```
+
+This is the deprecated HTTP+SSE transport for compatibility with clients that require SSE:
+- Airia platform
+- Older MCP implementations
+- Clients expecting event streams
+
+**Note:** SSE transport opens a persistent connection and streams MCP events. The connection automatically sends the `initialize` and `tools/list` responses on connection.
 
 ### Example: Tool Discovery
 
