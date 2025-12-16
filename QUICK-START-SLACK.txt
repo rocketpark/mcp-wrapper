@@ -1,0 +1,70 @@
+🚀 *MCP WRAPPER - QUICK START FOR YOUR BOSS*
+
+*TL;DR:* This plugin lets AI assistants (like Airia) directly query and interact with your Craft CMS content. Think of it like giving AI a read-only API to your website's content.
+
+---
+
+✨ *EASIEST WAY TO TRY IT*
+
+1. *In your Airia platform*, add a new MCP connection:
+   `https://servicecurator.com/actions/mcp-wrapper/mcp/index?schemaHandle=ai`
+   
+   (This is the live test site - no setup needed!)
+
+3. *Start chatting with your AI agent:*
+   • "What sections are available?"
+   • "Show me recent entries"
+   • "Find content about [topic]"
+   
+   The AI will automatically discover and query your Craft CMS content.
+
+---
+
+🎯 *WHY THIS IS COOL*
+
+• AI assistants can now intelligently search and retrieve content from Craft
+• No need to manually copy/paste content - the AI fetches it directly
+• You control what content is accessible via GraphQL permissions
+• Works with any AI platform that supports MCP (Claude, Airia, custom agents, etc.)
+
+---
+
+🔧 *IF YOU WANT TO CONNECT TO ELIZABETH'S TEST SITE*
+
+*Option A: Using Airia (Cloud-based)*
+Just configure the endpoint URL that Elizabeth provides. Since it's already live, no tunneling needed!
+
+*Option B: Using Claude Desktop (Mac/Windows app)*
+Add this to your Claude config file:
+```
+{
+  "mcpServers": {
+    "craft-demo": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://servicecurator.com/actions/mcp-wrapper/mcp/index?schemaHandle=ai"]
+    }
+  }
+}
+```
+
+---
+
+💬 *EXAMPLE CONVERSATION*
+
+You: "What content is available on this site?"
+AI: "I can see News entries, Blog posts, and Products sections..."
+
+You: "Show me the 5 most recent news articles"
+AI: [Fetches and displays the actual entries from Craft]
+
+You: "Find blog posts about sustainability"
+AI: [Searches and returns matching content]
+
+---
+
+📝 *NOTES*
+
+• The plugin is already installed on servicecurator.com
+• The URL is: https://servicecurator.com/actions/mcp-wrapper/mcp/index?schemaHandle=ai
+• This is safe to try - it's read-only access controlled by GraphQL permissions
+• If you want to try it with YOUR OWN local development site, you'll need ngrok or similar to create a tunnel

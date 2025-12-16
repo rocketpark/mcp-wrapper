@@ -87,16 +87,12 @@ class McpServerService extends Component
         return [
             'protocolVersion' => self::MCP_VERSION,
             'capabilities' => [
-                'tools' => [
-                    'listChanged' => false, // Tools list is static per schema
-                ],
+                'tools' => (object) [], // Tools capability with no specific options
             ],
             'serverInfo' => [
                 'name' => self::SERVER_NAME,
-                'title' => 'Craft CMS MCP Server', // Human-readable display name
                 'version' => self::SERVER_VERSION,
             ],
-            'instructions' => 'Query Craft CMS content via GraphQL. Use tools/list to discover available content types, then tools/call to query entries.',
         ];
     }
 
