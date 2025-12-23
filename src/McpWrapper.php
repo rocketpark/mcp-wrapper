@@ -69,6 +69,8 @@ class McpWrapper extends Plugin
             function(RegisterUrlRulesEvent $event) {
                 $event->rules['utilities/mcp-wrapper'] = 'mcp-wrapper/utility/index';
                 $event->rules['utilities/mcp-wrapper/rebuild/<schema:[a-zA-Z0-9_-]+>'] = 'mcp-wrapper/utility/rebuild';
+                // Allow standard action routes for utility controller
+                $event->rules['actions/mcp-wrapper/utility/<action:\w+>'] = 'mcp-wrapper/utility/<action>';
             }
         );
 
