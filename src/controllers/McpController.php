@@ -77,28 +77,64 @@ class McpController extends Controller
      */
     public function actionSse(string $schemaHandle)
     {
-        // Store session in cache for /messages endpoint to use
+        $method = Craft::$app->request->getMethod();
+        
+        // Handle POST - direct JSON-RPC requests to SSE endpoint
+        if ($method === 'POST') {
+            $this->response->format = Response::FORMAT_JSON;
+            
+            try {
+                $jsonRpcRequest = Craft::$app->request->getBodyParams();
+                if (!$jsonRpcRequest || !isset($jsonRpcRequest['method'])) {
+                    $jsonRpcRequest = json_decode(Craft::$app->request->getRawBody(), true);
+                }
+                
+                if (!$jsonRpcRequest) {
+                    return $this->asJson([
+                        'jsonrpc' => '2.0',
+                        'error' => ['code' => -32700, 'message' => 'Parse error'],
+                        'id' => null,
+                    ]);
+                }
+                
+                if (!isset($jsonRpcRequest['params'])) {
+                    $jsonRpcRequest['params'] = [];
+                }
+                $jsonRpcRequest['params']['schemaHandle'] = $schemaHandle;
+                
+                $mcpServer = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('mcpServer');
+                $response = $mcpServer->handleRequest($jsonRpcRequest);
+                
+                return $this->asJson($response);
+                
+            } catch (\Exception $e) {
+                Craft::error("MCP SSE POST error: {$e->getMessage()}", 'mcp-wrapper');
+                return $this->asJson([
+                    'jsonrpc' => '2.0',
+                    'error' => ['code' => -32603, 'message' => 'Internal error: ' . $e->getMessage()],
+                    'id' => null,
+                ]);
+            }
+        }
+        
+        // Handle GET - SSE stream with endpoint event
         $sessionId = bin2hex(random_bytes(16));
         Craft::$app->cache->set("mcp_session_{$sessionId}", $schemaHandle, 3600);
         
-        // Set SSE headers
         header('Content-Type: text/event-stream');
         header('Cache-Control: no-cache');
         header('Connection: keep-alive');
         header('X-Accel-Buffering: no');
         header('Access-Control-Allow-Origin: *');
         
-        // Clean output buffer
         if (ob_get_level()) ob_end_clean();
         
-        // Send endpoint event with session ID (required by SSE spec)
         echo "event: endpoint\n";
         echo "data: " . json_encode([
             'endpoint' => "/actions/mcp-wrapper/mcp/messages?sessionId={$sessionId}"
         ]) . "\n\n";
         flush();
         
-        // Keepalive
         while (true) {
             echo ": keepalive\n\n";
             flush();

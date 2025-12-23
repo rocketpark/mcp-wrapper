@@ -52,8 +52,8 @@ class McpManifestUtility extends Utility
                 'handle' => $handle,
                 'exists' => $exists,
                 'lastModified' => $exists ? date('Y-m-d H:i:s', filemtime($path)) : null,
-                'urlView' => "/actions/mcpwrapper/utility/view-manifest?schema={$handle}",
-                'urlRebuild' => "/actions/mcpwrapper/utility/rebuild-manifest?schema={$handle}",
+                'urlView' => "/actions/mcp-wrapper/utility/view-manifest?schema={$handle}",
+                'urlRebuild' => "/actions/mcp-wrapper/utility/rebuild-manifest?schema={$handle}",
             ];
         }
         return $info;
