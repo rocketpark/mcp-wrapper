@@ -583,8 +583,15 @@ class McpServerService extends Component
                     $field instanceof \craft\fields\Users ||
                     $field instanceof \craft\fields\Assets) {
                     $fields[] = "{$handle} { id title }";
+                }
+                // Handle Matrix and Table fields - skip them to avoid subselection errors
+                elseif ($field instanceof \craft\fields\Matrix ||
+                         $field instanceof \craft\fields\Table) {
+                    // Skip matrix/table fields for now - they require complex nested queries
+                    // TODO: Implement proper matrix field handling with configurable subfields
+                    continue;
                 } else {
-                    // Plain fields (text, number, etc.)
+                    // Plain fields (text, number, date, etc.)
                     $fields[] = $handle;
                 }
             }

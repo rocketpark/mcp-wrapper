@@ -1,0 +1,130 @@
+import { IntegrationDefinition, z } from '@botpress/sdk'
+
+export default new IntegrationDefinition({
+  name: 'craftcms-mcp',
+  version: '1.0.0',
+  title: 'Craft CMS via MCP',
+  description: 'Query Craft CMS content through the Model Context Protocol (MCP) server',
+  icon: 'icon.svg',
+  readme: 'hub.md',
+  
+  configuration: {
+    schema: z.object({
+      mcpServerUrl: z.string().default('https://servicecurator.com').describe('Base URL of your Craft CMS MCP server'),
+      schemaHandle: z.enum(['public', 'ai', 'frontend', 'internal']).default('public').describe('The GraphQL schema handle to use'),
+    }),
+  },
+
+  actions: {
+    listTools: {
+      title: 'List Available MCP Tools',
+      description: 'Retrieves all available content types (sections) from Craft CMS',
+      input: {
+        schema: z.object({}),
+      },
+      output: {
+        schema: z.object({
+          tools: z.array(z.object({
+            name: z.string(),
+            description: z.string(),
+          })),
+        }),
+      },
+    },
+
+    queryContent: {
+      title: 'Query Craft CMS Content',
+      description: 'Query content from a specific Craft CMS section with full Craft query parameters',
+      input: {
+        schema: z.object({
+          toolName: z.string().describe('Name of the MCP tool to call (e.g., query_news, query_topics)'),
+          // Common filters
+          search: z.string().optional().describe('Full-text search query'),
+          title: z.string().optional().describe('Filter by entry title'),
+          slug: z.array(z.string()).optional().describe('Filter by entry slugs'),
+          id: z.array(z.number()).optional().describe('Filter by specific entry IDs'),
+          // Status filters
+          status: z.array(z.string()).optional().describe('Filter by status (live, pending, expired, disabled)'),
+          // Date filters
+          before: z.string().optional().describe('Filter entries posted before this date'),
+          after: z.string().optional().describe('Filter entries posted after this date'),
+          dateCreated: z.string().optional().describe('Filter by creation date'),
+          dateUpdated: z.string().optional().describe('Filter by update date'),
+          // Pagination & ordering
+          limit: z.number().default(10).describe('Maximum number of entries to return (1-100)'),
+          offset: z.number().default(0).describe('Number of entries to skip'),
+          orderBy: z.string().optional().describe('Order results (e.g., "dateCreated DESC", "title ASC")'),
+        }),
+      },
+      output: {
+        schema: z.object({
+          content: z.array(z.any()).describe('Raw MCP response content'),
+        }),
+      },
+    },
+
+    getEntry: {
+      title: 'Get Specific Entry',
+      description: 'Retrieve a specific Craft CMS entry by ID',
+      input: {
+        schema: z.object({
+          toolName: z.string().describe('Name of the MCP tool to call'),
+          id: z.string().describe('The ID of the entry to retrieve'),
+        }),
+      },
+      output: {
+        schema: z.object({
+          entry: z.any().nullable().describe('The requested entry'),
+        }),
+      },
+    },
+
+    intelligentSearch: {
+      title: 'Intelligent Search',
+      description: 'Natural language search that automatically understands user intent and queries the right content',
+      input: {
+        schema: z.object({
+          query: z.string().describe('Natural language query (e.g., "show me recent sustainability news")'),
+        }),
+      },
+      output: {
+        schema: z.object({
+          results: z.array(z.any()).describe('Search results'),
+          summary: z.string().describe('Human-readable summary'),
+          searchDetails: z.object({
+            extractedTerms: z.string(),
+            contentTypes: z.array(z.string()),
+            appliedFilters: z.record(z.any()),
+          }).describe('What the search understood'),
+        }),
+      },
+    },
+
+    answerQuestion: {
+      title: 'Answer Question with Knowledge Base',
+      description: 'Answer questions using your Craft CMS content as the knowledge source',
+      input: {
+        schema: z.object({
+          question: z.string().describe('User question to answer'),
+          searchSections: z.array(z.string()).optional().describe('Which sections to search (default: all)'),
+        }),
+      },
+      output: {
+        schema: z.object({
+          answer: z.string().describe('AI-generated answer'),
+          sources: z.array(z.object({
+            title: z.string(),
+            url: z.string().optional(),
+          })).describe('Content sources used'),
+        }),
+      },
+    },
+  },
+
+  events: {},
+  channels: {},
+  states: {},
+  user: {
+    tags: {},
+  },
+})

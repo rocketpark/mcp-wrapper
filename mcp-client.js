@@ -19,11 +19,18 @@ async function handleMCPRequest(request) {
       body: JSON.stringify(request)
     });
 
-    return await response.json();
+    const jsonResponse = await response.json();
+
+    // Ensure the response has a valid id field (match the request id)
+    if (jsonResponse && request.id !== undefined && jsonResponse.id === null) {
+      jsonResponse.id = request.id;
+    }
+
+    return jsonResponse;
   } catch (error) {
     return {
       jsonrpc: '2.0',
-      id: request.id,
+      id: request.id !== undefined ? request.id : null,
       error: {
         code: -32603,
         message: `Internal error: ${error.message}`
