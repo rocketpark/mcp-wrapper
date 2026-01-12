@@ -157,7 +157,50 @@ export default new bp.Integration({
       try {
         logger.forBot().info(`Querying ${toolName} with args: ${JSON.stringify(queryArgs)}`)
         
-        // Build arguments object from all input fields
+        // For office locations with search terms, fetch all and filter by region
+        if (toolName === 'query_officeLocations' && queryArgs.search) {
+          const searchTerm = queryArgs.search.toLowerCase()
+          logger.forBot().info(`Office location search for: ${searchTerm}`)
+          
+          // Get all offices (up to 50)
+          const result = await client.callTool(toolName, {
+            limit: 50,
+            offset: 0,
+          })
+          
+          if (result.content?.[0]?.text) {
+            const data = JSON.parse(result.content[0].text)
+            const allEntries = data.entries || []
+            
+            // Filter by search term in title, slug, summary, or region
+            const filtered = allEntries.filter((entry: any) => {
+              const searchableText = [
+                entry.title || '',
+                entry.slug || '',
+                entry.officeSummary || '',
+                ...(entry.region || []).map((r: any) => r.title || '')
+              ].join(' ').toLowerCase()
+              
+              return searchableText.includes(searchTerm)
+            })
+            
+            logger.forBot().info(`Filtered ${filtered.length} offices from ${allEntries.length} total`)
+            
+            // Apply limit and offset to filtered results
+            const limit = queryArgs.limit || 10
+            const offset = queryArgs.offset || 0
+            const paginatedResults = filtered.slice(offset, offset + limit)
+            
+            return {
+              content: [{
+                type: 'text',
+                text: JSON.stringify({ entries: paginatedResults })
+              }],
+            }
+          }
+        }
+        
+        // Standard query for non-office-location or non-search queries
         const toolArguments: any = {
           limit: queryArgs.limit || 10,
           offset: queryArgs.offset || 0,
@@ -287,7 +330,7 @@ export default new bp.Integration({
         logger.forBot().info(`Answering: ${question}`)
 
         // Extract keywords from question (remove common question words)
-        const stopWords = /\b(what|are|is|how|do|does|can|the|a|an|to|for|in|on|of|about|with|should|would|could)\b/gi
+        const stopWords = /\b(what|are|is|how|do|does|can|the|a|an|to|for|in|on|of|about|with|should|would|could|where)\b/gi
         const keywordList = question
           .toLowerCase()
           .replace(/\?/g, '')
@@ -309,15 +352,37 @@ export default new bp.Integration({
         const relevantContent: any[] = []
         for (const section of sections) {
           try {
-            const result = await client.callTool(`query_${section}`, {
-              search: primaryKeyword,
-              limit: 5,
-            })
-            if (result.content?.[0]?.text) {
-              const data = JSON.parse(result.content[0].text)
-              // Handle both 'entries' and 'results' response formats
-              const entries = data.entries || data.results || []
-              relevantContent.push(...entries)
+            // For office locations, try without search first to get all, then filter
+            if (section === 'officeLocations' && keywordList.length > 0) {
+              const result = await client.callTool(`query_${section}`, {
+                limit: 50, // Get more offices to search through
+              })
+              if (result.content?.[0]?.text) {
+                const data = JSON.parse(result.content[0].text)
+                const entries = data.entries || []
+                // Filter entries that match any keyword in title OR region
+                const filtered = entries.filter((e: any) => {
+                  const searchableText = [
+                    e.title || '',
+                    e.slug || '',
+                    e.officeSummary || '',
+                    ...(e.region || []).map((r: any) => r.title || '')
+                  ].join(' ').toLowerCase()
+                  
+                  return keywordList.some(kw => searchableText.includes(kw.toLowerCase()))
+                })
+                relevantContent.push(...filtered)
+              }
+            } else {
+              const result = await client.callTool(`query_${section}`, {
+                search: primaryKeyword,
+                limit: 5,
+              })
+              if (result.content?.[0]?.text) {
+                const data = JSON.parse(result.content[0].text)
+                const entries = data.entries || data.results || []
+                relevantContent.push(...entries)
+              }
             }
           } catch (err) {
             logger.forBot().warn(`Could not query ${section}: ${err}`)
