@@ -172,16 +172,23 @@ export default new bp.Integration({
             const data = JSON.parse(result.content[0].text)
             const allEntries = data.entries || []
             
-            // Filter by search term in title, slug, summary, or region
+            // Filter by search term in title, slug, summary, or ANY region title
             const filtered = allEntries.filter((entry: any) => {
-              const searchableText = [
+              // Check title, slug, summary
+              const mainText = [
                 entry.title || '',
                 entry.slug || '',
-                entry.officeSummary || '',
-                ...(entry.region || []).map((r: any) => r.title || '')
+                entry.officeSummary || ''
               ].join(' ').toLowerCase()
               
-              return searchableText.includes(searchTerm)
+              if (mainText.includes(searchTerm)) return true
+              
+              // Check each region title individually
+              const regions = entry.region || []
+              return regions.some((r: any) => {
+                const regionTitle = (r.title || '').toLowerCase()
+                return regionTitle.includes(searchTerm)
+              })
             })
             
             logger.forBot().info(`Filtered ${filtered.length} offices from ${allEntries.length} total`)
@@ -360,20 +367,39 @@ export default new bp.Integration({
               if (result.content?.[0]?.text) {
                 const data = JSON.parse(result.content[0].text)
                 const entries = data.entries || []
-                // Filter entries that match any keyword in title OR region
+                // Filter entries that match any keyword in title, slug, summary OR any region title
                 const filtered = entries.filter((e: any) => {
-                  const searchableText = [
+                  const mainText = [
                     e.title || '',
                     e.slug || '',
-                    e.officeSummary || '',
-                    ...(e.region || []).map((r: any) => r.title || '')
+                    e.officeSummary || ''
                   ].join(' ').toLowerCase()
                   
-                  return keywordList.some(kw => searchableText.includes(kw.toLowerCase()))
+                  // Check main text first
+                  if (keywordList.some(kw => mainText.includes(kw.toLowerCase()))) {
+                    return true
+                  }
+                  
+                  // Check each region title individually
+                  const regions = e.region || []
+                  return regions.some((r: any) => {
+                    const regionTitle = (r.title || '').toLowerCase()
+                    return keywordList.some(kw => regionTitle.includes(kw.toLowerCase()))
+                  })
                 })
                 relevantContent.push(...filtered)
               }
             } else {
+              // Skip sections known to be empty or misconfigured
+              const emptyOrProblematicSections = [
+                'services', 'servicesBrowse', 'servicesBrowseEurope',
+                'podcasts', 'podcastsBrowse', 'podcastEpisodes'
+              ]
+              if (emptyOrProblematicSections.includes(section)) {
+                logger.forBot().info(`Skipping ${section} (known to be empty/misconfigured)`)
+                continue
+              }
+              
               const result = await client.callTool(`query_${section}`, {
                 search: primaryKeyword,
                 limit: 5,
@@ -381,7 +407,9 @@ export default new bp.Integration({
               if (result.content?.[0]?.text) {
                 const data = JSON.parse(result.content[0].text)
                 const entries = data.entries || data.results || []
-                relevantContent.push(...entries)
+                if (entries.length > 0) {
+                  relevantContent.push(...entries)
+                }
               }
             }
           } catch (err) {
