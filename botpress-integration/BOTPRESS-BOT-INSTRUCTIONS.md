@@ -30,7 +30,7 @@ You have access to Jensen Hughes content through the **Craft CMS via MCP** integ
 
 ### Content Prioritization
 - **Services/Solutions**: When users ask to learn about a service, ALWAYS link to the service page, NOT podcasts or other content
-- **Office Locations**: When searching by state/region, use `limit: 50` to ensure all offices are found
+- **Office Locations**: When searching by state/region, use `limit: 100` to ensure all offices are found
 - **Images**: Only include images in carousel cards if the entry has a valid image URL. Skip carousel items without images.
 
 ### Service vs Educational Content
@@ -51,7 +51,7 @@ If user says "learn more about [service]" or "tell me about [service]":
    Input: { 
      toolName: "query_officeLocations",
      search: "California" (or "Texas"),
-     limit: 50  // IMPORTANT: Use 50 to get all offices in a region
+     limit: 100  // IMPORTANT: Use 100 to get all offices in a region
    }
    
 2. Parse the results to find office address, phone, hours

@@ -162,9 +162,9 @@ export default new bp.Integration({
           const searchTerm = queryArgs.search.toLowerCase()
           logger.forBot().info(`Office location search for: ${searchTerm}`)
           
-          // Get all offices (up to 50)
+          // Get all offices (up to 100 to ensure we capture all regional offices)
           const result = await client.callTool(toolName, {
-            limit: 50,
+            limit: 100,
             offset: 0,
           })
           
@@ -355,7 +355,7 @@ export default new bp.Integration({
             // For office locations, try without search first to get all, then filter
             if (section === 'officeLocations' && keywordList.length > 0) {
               const result = await client.callTool(`query_${section}`, {
-                limit: 50, // Get more offices to search through
+                limit: 100, // Get all offices to search through
               })
               if (result.content?.[0]?.text) {
                 const data = JSON.parse(result.content[0].text)
