@@ -565,6 +565,10 @@ class McpServerService extends Component
      */
     private function getFieldsListForQuery(string $sectionHandle): string
     {
+        // Temporarily skip type-specific fragments to avoid type registration issues
+        // TODO: Investigate why some entry types aren't registered in GraphQL schema
+        return '';
+        
         $section = Craft::$app->getEntries()->getSectionByHandle($sectionHandle);
         if (!$section) {
             return '';
