@@ -1974,11 +1974,11 @@ public function newsEntries(): array {
 
 ## Implementation Recommendations
 
-### Priority 1: Critical Security (Implement Immediately)
+### Priority 1: Critical Security (Implement Immediately) ✅ COMPLETED
 
 These gaps pose production risks and should be addressed before wider deployment.
 
-#### 1.1 IP Allowlisting
+#### 1.1 IP Allowlisting ✅ COMPLETED
 
 **Problem:** Public HTTP endpoints with no access control beyond GraphQL tokens.
 
@@ -2285,17 +2285,37 @@ private function callTool(string $name, array $arguments): array {
 [2026-01-13 14:24:12] mcp-wrapper.WARNING: Security: IP access denied {"ip":"203.0.113.45","path":"/actions/mcp-wrapper/mcp/ai"}
 ```
 
-**Priority:** 🔴 **CRITICAL - Week 1**
+**Priority:** 🔴 **CRITICAL - Week 1** ✅ **COMPLETED**
+
+**Implementation Status:**
+- ✅ `config/mcpwrapper.php` - Security configuration with IP allowlist, dangerous tools toggle
+- ✅ `src/support/IpValidator.php` - CIDR notation support for IP validation
+- ✅ `src/controllers/McpController.php` - IP validation in `beforeAction()`
+- ✅ `src/attributes/Tool.php` - Attribute-based tool registration
+- ✅ `src/tools/EntryTools.php` - Manual tool implementation example
+- ✅ `src/services/ToolRegistryService.php` - Tool discovery and registration
+- ✅ `src/support/SafeExecution.php` - Error handling wrapper
+- ✅ `src/support/Response.php` - Standardized response formatting
 
 ---
 
-### Priority 2: MCP Feature Parity (4-6 Weeks)
+### Priority 2: MCP Feature Parity (4-6 Weeks) 🚧 IN PROGRESS
 
 These features make the MCP server much more useful and unlock new AI workflows.
 
-#### 2.1 Implement MCP Prompts
+#### 2.1 Implement MCP Prompts ✅ COMPLETED
 
 **What:** Pre-built conversation starters with structured data.
+
+**Implementation Status:**
+- ✅ `src/services/PromptRegistryService.php` - Complete prompt management service
+- ✅ `src/McpWrapper.php` - Registered promptRegistry component
+- ✅ `src/services/McpServerService.php` - Added prompts/list and prompts/get handlers
+- ✅ Updated initialize method to include prompts capability
+- ✅ Three prompts implemented:
+  - `schema_explorer` - Explore Craft content model
+  - `content_health` - Analyze content freshness and status
+  - `query_builder` - Help build GraphQL queries
 
 **Implementation:**
 ```php
@@ -2528,9 +2548,21 @@ private function handlePromptsGet(array $params): array {
 
 ---
 
-#### 2.2 Implement MCP Resources
+#### 2.2 Implement MCP Resources ✅ COMPLETED
 
 **What:** URI-based read-only data access (like REST API for AI).
+
+**Implementation Status:**
+- ✅ `src/services/ResourceRegistryService.php` - Complete resource management service
+- ✅ `src/McpWrapper.php` - Registered resourceRegistry component
+- ✅ `src/services/McpServerService.php` - Added resources/list and resources/read handlers
+- ✅ Updated initialize method to include resources capability
+- ✅ Five resource types implemented:
+  - `craft://{schema}/schema` - GraphQL SDL
+  - `craft://{schema}/sections` - List all sections
+  - `craft://{schema}/sections/{handle}` - Section details with fields
+  - `craft://{schema}/entries/{section}` - Recent entries from section
+  - `craft://{schema}/volumes` - Asset volumes
 
 **Implementation:**
 ```php
@@ -2731,14 +2763,50 @@ User: "What fields does the news section have?"
 AI: *reads resource mcp://ai/sections/news*
 ```
 
-**Priority:** 🟡 **HIGH - Week 3-4**
+**Priority:** 🟡 **HIGH - Week 3-4** ✅ **COMPLETED**
 
 ---
 
-#### 2.3 Add More System/Admin Tools
+#### 2.3 Add More System/Admin Tools ✅ COMPLETED
 
 **Current:** Only content querying via GraphQL  
 **Needed:** System inspection, debugging, administration
+
+**Implementation Status:**
+- ✅ `src/tools/SystemTools.php` - Complete system administration toolkit
+- ✅ `src/McpWrapper.php` - Registered SystemTools class
+- ✅ 7 system tools implemented
+
+**Implemented Tools:**
+
+**1. System Information** ✅
+- `craft_get_system_info` - Craft version, PHP, database, plugins, server info
+- Returns comprehensive system configuration
+
+**2. Plugin Management** ✅
+- `craft_list_plugins` - List all installed plugins with status
+- Optional filter for enabled-only plugins
+
+**3. Queue Status** ✅
+- `craft_get_queue_status` - View waiting and failed jobs
+- Includes job descriptions, priorities, timestamps
+
+**4. Log Reader** ✅
+- `craft_read_logs` - Read recent log entries
+- Filter by level (error, warning, info, all)
+- Configurable limit
+
+**5. Cache Information** ✅
+- `craft_get_cache_info` - Cache configuration and paths
+
+**6. Cache Management** ✅
+- `craft_clear_caches` - Clear data, template, compiled, transforms
+- Marked as dangerous tool
+- Selective cache clearing
+
+**7. Project Config Status** ✅
+- `craft_get_project_config_status` - Check for pending changes
+- Read-only status, YAML sync status
 
 **Recommended New Tools:**
 
