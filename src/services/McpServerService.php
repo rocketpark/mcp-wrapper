@@ -598,13 +598,8 @@ class McpServerService extends Component
 
             // Build inline fragment for this entry type
             if (!empty($fields)) {
-                // GraphQL type name format is: sectionHandle_entryTypeHandle_Entry
-                // But if entry type handle matches section handle, it's just: sectionHandle_Entry
-                if ($entryType->handle === $sectionHandle) {
-                    $typeName = $sectionHandle . '_Entry';
-                } else {
-                    $typeName = $sectionHandle . '_' . $entryType->handle . '_Entry';
-                }
+                // GraphQL type name format is: typeHandle_Entry
+                $typeName = $entryType->handle . '_Entry';
                 $fieldsStr = implode(' ', $fields);
                 $entryTypeFragments[] = "... on {$typeName} { {$fieldsStr} }";
             }
