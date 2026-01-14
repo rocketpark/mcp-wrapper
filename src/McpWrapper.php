@@ -13,7 +13,10 @@ use yii\base\Event;
 use rocketpark\mcpwrapper\services\ManifestBuilderService;
 use rocketpark\mcpwrapper\services\McpServerService;
 use rocketpark\mcpwrapper\services\ToolRegistryService;
+use rocketpark\mcpwrapper\services\PromptRegistryService;
+use rocketpark\mcpwrapper\services\ResourceRegistryService;
 use rocketpark\mcpwrapper\tools\EntryTools;
+use rocketpark\mcpwrapper\tools\SystemTools;
 
 class McpWrapper extends Plugin
 {
@@ -42,6 +45,8 @@ class McpWrapper extends Plugin
                 'manifestBuilder' => ManifestBuilderService::class,
                 'mcpServer' => McpServerService::class,
                 'toolRegistry' => ToolRegistryService::class,
+                'promptRegistry' => PromptRegistryService::class,
+                'resourceRegistry' => ResourceRegistryService::class,
             ],
         ];
     }
@@ -106,9 +111,8 @@ class McpWrapper extends Plugin
         
         // Register built-in tool classes
         $toolRegistry->registerToolClass(EntryTools::class);
+        $toolRegistry->registerToolClass(SystemTools::class);
         
-        // TODO: Add more tool classes here
-        // $toolRegistry->registerToolClass(AssetTools::class);
-        // $toolRegistry->registerToolClass(UserTools::class);
+        // TODO: Add more tool classes here or allow plugins to register their own
     }
 }

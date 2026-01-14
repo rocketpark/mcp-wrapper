@@ -14,3 +14,19 @@ composer.lock
 # Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
 .codacy/
+
+# Ignore documentation and test files (temporary working files)
+TESTING-GUIDE.md
+TEST-RESULTS.md
+DEPLOYMENT-TEST-RESULTS.md
+PHASE-2-COMPLETE.md
+QUICK-REFERENCE.md
+IMPLEMENTATION-PROGRESS.md
+
+# Ignore diagnostic scripts
+diagnose-*.sh
+test-implementation.php
+
+# Ignore backup files
+*.backup
+src/**/*.backup

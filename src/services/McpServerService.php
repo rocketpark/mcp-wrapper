@@ -48,6 +48,10 @@ class McpServerService extends Component
             'initialize' => $this->handleInitialize($params),
             'tools/list' => $this->handleToolsList($params),
             'tools/call' => $this->handleToolCall($params),
+            'prompts/list' => $this->handlePromptsList($params),
+            'prompts/get' => $this->handlePromptsGet($params),
+            'resources/list' => $this->handleResourcesList($params),
+            'resources/read' => $this->handleResourcesRead($params),
             'ping' => (object) [],
             default => throw new \Exception("Unknown method: {$method}", -32601)
         };
@@ -88,7 +92,9 @@ class McpServerService extends Component
         return [
             'protocolVersion' => self::MCP_VERSION,
             'capabilities' => [
-                'tools' => (object) [], // Tools capability with no specific options
+                'tools' => (object) [], // Tools capability
+                'prompts' => (object) [], // Prompts capability
+                'resources' => (object) [], // Resources capability
             ],
             'serverInfo' => [
                 'name' => self::SERVER_NAME,
@@ -98,17 +104,25 @@ class McpServerService extends Component
     }
 
     /**
-     * List all available MCP tools (one per Craft section)
+     * List all available MCP tools (GraphQL queries + manual tools)
      */
     private function handleToolsList(array $params): array
     {
         $token = $this->getSchemaToken($params);
         $sections = $this->getSectionsForSchema($token);
         
+        // Build GraphQL query tools from sections
         $tools = array_map(
             fn($section) => $this->buildToolDefinition($section),
             $sections
         );
+
+        // Add manual tools from ToolRegistry
+        $toolRegistry = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('toolRegistry');
+        $manualTools = $toolRegistry->discoverManualTools();
+        
+        // Merge both arrays
+        $tools = array_merge($tools, $manualTools);
 
         return ['tools' => $tools];
     }
@@ -318,7 +332,7 @@ class McpServerService extends Component
     }
 
     /**
-     * Execute a tool call (query GraphQL)
+     * Execute a tool call (manual tool or GraphQL query)
      */
     private function handleToolCall(array $params): array
     {
@@ -329,6 +343,23 @@ class McpServerService extends Component
             throw new \Exception('Tool name required', -32602);
         }
 
+        // Check if this is a manual tool (craft_*)
+        if (str_starts_with($toolName, 'craft_')) {
+            $toolRegistry = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('toolRegistry');
+            $result = $toolRegistry->executeTool($toolName, $arguments);
+            
+            return [
+                'content' => [
+                    [
+                        'type' => 'text',
+                        'text' => json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
+                    ],
+                ],
+                'isError' => false,
+            ];
+        }
+
+        // Otherwise, it's a GraphQL query tool
         $sectionHandle = $this->extractSectionHandle($toolName);
         $token = $this->getSchemaToken($params);
 
@@ -367,7 +398,7 @@ class McpServerService extends Component
             throw new \Exception('schemaHandle parameter required', -32602);
         }
 
-        $config = Craft::$app->getConfig()->getConfigFromFile('mcp-wrapper');
+        $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
         
         if (!isset($config['schemas'][$schemaHandle])) {
             throw new \Exception("Unknown schema: {$schemaHandle}", -32602);
@@ -478,7 +509,10 @@ class McpServerService extends Component
                 throw new \Exception('GraphQL error: ' . $errorJson, -32603);
             }
 
-            return $data['data'] ?? [];
+            $result = $data['data'] ?? [];
+            $entryCount = isset($result['entries']) ? count($result['entries']) : 0;
+            Craft::info("GraphQL query returned {$entryCount} entries", 'mcp-wrapper');
+            return $result;
         } catch (\Exception $e) {
             Craft::error("Failed to execute GraphQL query: {$e->getMessage()}", 'mcp-wrapper');
             throw $e;
@@ -642,6 +676,7 @@ class McpServerService extends Component
 
         $schema = $this->introspectGraphQLSchema($token);
         $availableTypes = array_column($schema['types'], 'name');
+        Craft::info("Available GraphQL types for {$sectionHandle}: " . implode(', ', array_filter($availableTypes, fn($t) => str_contains($t, 'Entry'))), 'mcp-wrapper');
 
         $entryTypeFragments = [];
         foreach ($section->getEntryTypes() as $entryType) {
@@ -650,13 +685,28 @@ class McpServerService extends Component
             
             // Skip entry types that aren't registered in the current GraphQL schema
             if (!in_array($typeName, $availableTypes, true)) {
-                Craft::info("Skipping unregistered type: {$typeName}", 'mcp-wrapper');
+                Craft::info("Skipping unregistered type: {$typeName} (not in schema)", 'mcp-wrapper');
                 continue;
             }
+            
+            // Check if this entry type actually has entries
+            $entryCount = \craft\elements\Entry::find()
+                ->section($section->handle)
+                ->type($entryType->handle)
+                ->status(null)  // Include all statuses
+                ->count();
+                
+            if ($entryCount === 0) {
+                Craft::info("Skipping empty entry type: {$typeName} (no entries)", 'mcp-wrapper');
+                continue;
+            }
+            
+            Craft::info("Including type: {$typeName} in query ({$entryCount} entries)", 'mcp-wrapper');
 
             $fields = [];
             foreach ($entryType->getFieldLayout()->getCustomFields() as $field) {
                 $handle = $field->handle;
+                $fieldClass = get_class($field);
 
                 // Handle relational fields
                 if ($field instanceof \craft\fields\Entries ||
@@ -666,14 +716,21 @@ class McpServerService extends Component
                     $field instanceof \craft\fields\Assets) {
                     $fields[] = "{$handle} { id title }";
                 }
-                // Handle Matrix and Table fields - skip them to avoid subselection errors
+                // Skip complex field types that require sub-selections or special handling
+                // These include: Matrix, Neo, Table, CKEditor, Freeform, SEOmatic, etc.
                 elseif ($field instanceof \craft\fields\Matrix ||
-                         $field instanceof \craft\fields\Table) {
-                    // Skip matrix/table fields for now - they require complex nested queries
-                    // TODO: Implement proper matrix field handling with configurable subfields
+                        $field instanceof \craft\fields\Table ||
+                        $fieldClass === 'benf\\neo\\Field' ||
+                        str_contains($fieldClass, '\\neo\\') ||
+                        str_contains($fieldClass, 'CKEditor') ||
+                        str_contains($fieldClass, 'Freeform') ||
+                        str_contains($fieldClass, 'SuperTable') ||
+                        str_contains($fieldClass, 'seomatic')) {
+                    // Skip these fields - they require complex nested queries or special handling
+                    Craft::info("Skipping complex field type: {$handle} ({$fieldClass})", 'mcp-wrapper');
                     continue;
                 } else {
-                    // Plain fields (text, number, date, etc.)
+                    // Plain fields (text, number, date, lightswitch, dropdown, etc.)
                     $fields[] = $handle;
                 }
             }
@@ -718,6 +775,85 @@ class McpServerService extends Component
         } catch (\Exception $e) {
             Craft::error("Unexpected error in GraphQL request: {$e->getMessage()}", 'mcp-wrapper');
             throw $e;
+        }
+    }
+    
+    /**
+     * Handle prompts/list request
+     * Returns all available MCP prompts
+     */
+    private function handlePromptsList(array $params): array
+    {
+        $promptRegistry = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('promptRegistry');
+        $prompts = $promptRegistry->listPrompts();
+        
+        return ['prompts' => $prompts];
+    }
+    
+    /**
+     * Handle prompts/get request
+     * Returns a specific prompt with its message content
+     */
+    private function handlePromptsGet(array $params): array
+    {
+        $name = $params['name'] ?? null;
+        $arguments = $params['arguments'] ?? [];
+        
+        if (!$name) {
+            throw new \Exception('Missing required parameter: name', -32602);
+        }
+        
+        $promptRegistry = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('promptRegistry');
+        
+        try {
+            $prompt = $promptRegistry->getPrompt($name, $arguments);
+            return $prompt;
+        } catch (\Exception $e) {
+            throw new \Exception("Failed to get prompt '{$name}': {$e->getMessage()}", -32603);
+        }
+    }
+    
+    /**
+     * Handle resources/list request
+     * Returns all available MCP resources
+     */
+    private function handleResourcesList(array $params): array
+    {
+        $schemaHandle = $params['schemaHandle'] ?? null;
+        
+        if (!$schemaHandle) {
+            throw new \Exception('Missing required parameter: schemaHandle', -32602);
+        }
+        
+        $resourceRegistry = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('resourceRegistry');
+        $resources = $resourceRegistry->listResources($schemaHandle);
+        
+        return ['resources' => $resources];
+    }
+    
+    /**
+     * Handle resources/read request
+     * Reads a specific resource by URI
+     */
+    private function handleResourcesRead(array $params): array
+    {
+        $uri = $params['uri'] ?? null;
+        $schemaHandle = $params['schemaHandle'] ?? null;
+        
+        if (!$uri) {
+            throw new \Exception('Missing required parameter: uri', -32602);
+        }
+        
+        if (!$schemaHandle) {
+            throw new \Exception('Missing required parameter: schemaHandle', -32602);
+        }
+        
+        $resourceRegistry = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('resourceRegistry');
+        
+        try {
+            return $resourceRegistry->readResource($uri, $schemaHandle);
+        } catch (\Exception $e) {
+            throw new \Exception("Failed to read resource '{$uri}': {$e->getMessage()}", -32603);
         }
     }
 }
