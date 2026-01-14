@@ -69,9 +69,10 @@ class ManifestController extends Controller
             Craft::error("Manifest generation error: {$e->getMessage()}", 'mcp-wrapper');
             Craft::error($e->getTraceAsString(), 'mcp-wrapper');
             
+            $this->response->statusCode = 500;
             return $this->asJson([
                 'error' => 'Failed to generate manifest: ' . $e->getMessage(),
-            ], 500);
+            ]);
         }
     }
 }
