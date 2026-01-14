@@ -3,12 +3,41 @@ namespace rocketpark\mcpwrapper\controllers;
 
 use Craft;
 use craft\web\Controller;
+use rocketpark\mcpwrapper\support\IpValidator;
+use yii\web\ForbiddenHttpException;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
 
 class ManifestController extends Controller
 {
     protected array|int|bool $allowAnonymous = true;
+
+    /**
+     * Validate IP access before any action
+     */
+    public function beforeAction($action): bool
+    {
+        if (!parent::beforeAction($action)) {
+            return false;
+        }
+
+        // Check IP whitelist
+        $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
+        $allowedIps = $config['security']['allowedIps'] ?? [];
+        
+        if (!empty($allowedIps)) {
+            $remoteIp = Craft::$app->request->getUserIP();
+            
+            if (!IpValidator::isAllowed($remoteIp, $allowedIps)) {
+                Craft::warning("MCP access denied for IP: {$remoteIp}", 'mcp-wrapper');
+                throw new ForbiddenHttpException('Access denied: IP not whitelisted');
+            }
+            
+            Craft::info("MCP access granted for IP: {$remoteIp}", 'mcp-wrapper');
+        }
+
+        return true;
+    }
 
     public function actionIndex(string $schemaHandle): Response
     {
@@ -40,9 +69,10 @@ class ManifestController extends Controller
             Craft::error("Manifest generation error: {$e->getMessage()}", 'mcp-wrapper');
             Craft::error($e->getTraceAsString(), 'mcp-wrapper');
             
+            $this->response->statusCode = 500;
             return $this->asJson([
                 'error' => 'Failed to generate manifest: ' . $e->getMessage(),
-            ], 500);
+            ]);
         }
     }
 }

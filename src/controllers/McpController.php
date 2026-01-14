@@ -3,6 +3,8 @@ namespace rocketpark\mcpwrapper\controllers;
 
 use Craft;
 use craft\web\Controller;
+use rocketpark\mcpwrapper\support\IpValidator;
+use yii\web\ForbiddenHttpException;
 use yii\web\Response;
 
 /**
@@ -14,6 +16,33 @@ class McpController extends Controller
 {
     protected array|int|bool $allowAnonymous = true;
     public $enableCsrfValidation = false; // MCP clients don't use CSRF tokens
+
+    /**
+     * Validate IP access before any action
+     */
+    public function beforeAction($action): bool
+    {
+        if (!parent::beforeAction($action)) {
+            return false;
+        }
+
+        // Check IP whitelist
+        $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
+        $allowedIps = $config['security']['allowedIps'] ?? [];
+        
+        if (!empty($allowedIps)) {
+            $remoteIp = Craft::$app->request->getUserIP();
+            
+            if (!IpValidator::isAllowed($remoteIp, $allowedIps)) {
+                Craft::warning("MCP access denied for IP: {$remoteIp}", 'mcp-wrapper');
+                throw new ForbiddenHttpException('Access denied: IP not whitelisted');
+            }
+            
+            Craft::info("MCP access granted for IP: {$remoteIp}", 'mcp-wrapper');
+        }
+
+        return true;
+    }
 
     /**
      * Main MCP endpoint

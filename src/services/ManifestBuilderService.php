@@ -106,6 +106,9 @@ class ManifestBuilderService extends Component
             throw new \Exception("No sections found for manifest generation");
         }
         
+        // Apply security filters
+        $tools = $this->applySecurityFilters($tools);
+        
         Craft::info("Generated " . count($tools) . " tools from Craft services", 'mcp-wrapper');
         
         return [
@@ -114,6 +117,35 @@ class ManifestBuilderService extends Component
             'description' => "MCP manifest for GraphQL schema '{$schemaHandle}' (generated from Craft services).",
             'tools' => $tools,
         ];
+    }
+
+    /**
+     * Apply security filters to tools based on config
+     */
+    private function applySecurityFilters(array $tools): array
+    {
+        $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
+        $security = $config['security'] ?? [];
+        
+        $enableDangerousTools = $security['enableDangerousTools'] ?? true;
+        $disabledTools = $security['disabledTools'] ?? [];
+        
+        return array_values(array_filter($tools, function($tool) use ($enableDangerousTools, $disabledTools) {
+            // Filter disabled tools
+            if (in_array($tool['name'], $disabledTools)) {
+                Craft::info("Tool disabled by config: {$tool['name']}", 'mcp-wrapper');
+                return false;
+            }
+            
+            // Filter dangerous tools if not enabled
+            $isDangerous = isset($tool['dangerous']) && $tool['dangerous'];
+            if ($isDangerous && !$enableDangerousTools) {
+                Craft::info("Dangerous tool filtered out: {$tool['name']}", 'mcp-wrapper');
+                return false;
+            }
+            
+            return true;
+        }));
     }
 
     private function buildToolForSection(string $sectionHandle, string $schemaHandle): ?array
@@ -133,6 +165,7 @@ class ManifestBuilderService extends Component
             'description' => "Query {$sectionHandle} entries (schema {$schemaHandle}) with relationships.",
             'endpoint' => '/api',
             'method' => 'POST',
+            'dangerous' => false, // GraphQL queries are read-only
             'parameters' => [
                 'query' => "query { entries(section: \"{$sectionHandle}\") { " .
                     implode(' ', array_column($fields, 'handle')) . " } }",

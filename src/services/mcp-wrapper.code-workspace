@@ -6,6 +6,9 @@
 		{
 			"name": "jensenhughes",
 			"path": "../../../../Herd/jensenhughes"
+		},
+		{
+			"path": "../../../../../../Volumes/LizsDisk/craft-mcp"
 		}
 	],
 	"settings": {}
