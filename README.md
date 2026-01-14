@@ -246,12 +246,88 @@ Craft CMS Content
 
 ## Roadmap
 
-- [ ] Server-Sent Events (SSE) support for streaming
-- [ ] MCP Resources (expose entries as readable resources)
-- [ ] MCP Prompts (pre-built query templates)
-- [ ] Enhanced field type support (Matrix, Super Table, etc.)
-- [ ] Caching layer for tool definitions
-- [ ] Admin UI for testing tools
+### ✅ Completed (v2.0)
+- [x] Security: IP allowlisting with CIDR support
+- [x] Security: Dangerous tools protection
+- [x] MCP Prompts (3 prompts: schema_explorer, content_health, query_builder)
+- [x] MCP Resources (5 resources: schema, sections, entries, volumes)
+- [x] System Tools (7 admin tools: info, plugins, queue, logs, cache, project config)
+- [x] Tool registry architecture with attributes
+- [x] Safe execution wrapper for error handling
+
+### 🔜 Planned (v2.1+)
+- [ ] Completion providers (section handles, field handles, etc.)
+- [ ] Installation wizard (`php craft mcp-wrapper/install`)
+- [ ] Client config generator (Claude Desktop, Cursor, Cline)
+- [ ] Extension API events for plugins
+- [ ] Hot reload support
+- [ ] Multi-site specific tools
+- [ ] Commerce integration tools
+
+## Available Tools
+
+### Dynamic Tools (GraphQL)
+Auto-generated from your Craft sections (10-20 tools):
+- `query_{section}` - Query entries from any section
+- Supports pagination, search, filtering
+- Respects GraphQL schema permissions
+
+### Manual Tools - Content (2 tools)
+- `craft_get_entry_by_id` - Get full entry data bypassing GraphQL permissions
+- `craft_search_entries` - Advanced entry search with filters
+
+### Manual Tools - System (7 tools)
+- `craft_get_system_info` - Craft/PHP/DB version, plugins, server info
+- `craft_list_plugins` - List installed plugins with status
+- `craft_get_queue_status` - View queue jobs (waiting, failed)
+- `craft_read_logs` - Read recent log entries
+- `craft_get_cache_info` - Cache configuration
+- `craft_clear_caches` ⚠️ - Clear data/template/compiled/transforms
+- `craft_get_project_config_status` - Check for pending changes
+
+### MCP Prompts (3 prompts)
+- `schema_explorer` - Explore Craft content model with AI guidance
+- `content_health` - Analyze content freshness and maintenance needs
+- `query_builder` - Help build GraphQL queries for sections
+
+### MCP Resources (5 resources)
+- `craft://{schema}/schema` - Complete GraphQL SDL
+- `craft://{schema}/sections` - List all sections
+- `craft://{schema}/sections/{handle}` - Section field layout
+- `craft://{schema}/entries/{section}` - Recent 50 entries
+- `craft://{schema}/volumes` - Asset volumes
+
+## Security Configuration
+
+```php
+// config/mcpwrapper.php
+return [
+    'schemas' => [
+        'ai' => getenv('GQL_AI_TOKEN'),
+    ],
+    
+    'security' => [
+        // IP whitelist (supports CIDR notation)
+        'allowedIps' => [
+            '127.0.0.1',
+            '::1',
+            '10.0.0.0/8',  // Private network
+            // getenv('ADMIN_IP'),
+        ],
+        
+        // Require authentication
+        'requireAuth' => true,
+        
+        // Enable dangerous operations (mutations, deletions)
+        'enableDangerousTools' => getenv('CRAFT_ENVIRONMENT') === 'dev',
+        
+        // Disabled tools (won't appear in manifest)
+        'disabledTools' => [
+            // 'craft_clear_caches',
+        ],
+    ],
+];
+```
 
 ## License
 

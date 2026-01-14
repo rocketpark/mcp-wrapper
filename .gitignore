@@ -9,6 +9,7 @@
 # Local development files
 .history/
 .serena/
+.claude/
 composer.lock
 
 # Ignore vscode AI rules
