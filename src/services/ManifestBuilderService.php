@@ -92,6 +92,35 @@ class ManifestBuilderService extends Component
     {
         Craft::info("Generating manifest from Craft services for schema: {$schemaHandle}", 'mcp-wrapper');
         
+        // Get all tools (GraphQL + manual)
+        $toolRegistry = Craft::$app->getModule('mcp-wrapper')->get('toolRegistry');
+        $tools = $toolRegistry->getAllTools($schemaHandle);
+        
+        if (empty($tools)) {
+            throw new \Exception("No tools available for manifest generation");
+        }
+        
+        // Apply security filters
+        $tools = $this->applySecurityFilters($tools);
+        
+        Craft::info("Generated manifest with " . count($tools) . " tools", 'mcp-wrapper');
+        
+        return [
+            'version' => '1.2',
+            'schemaHandle' => $schemaHandle,
+            'description' => "MCP manifest for GraphQL schema '{$schemaHandle}' with manual and auto-generated tools.",
+            'tools' => $tools,
+        ];
+    }
+
+    /**
+     * Get only the GraphQL auto-generated tools (for ToolRegistry)
+     * 
+     * @param string $schemaHandle GraphQL schema handle
+     * @return array Array of GraphQL tool definitions
+     */
+    public function getGeneratedTools(string $schemaHandle): array
+    {
         $sections = Craft::$app->getEntries()->getAllSections();
         $tools = [];
         
@@ -102,21 +131,7 @@ class ManifestBuilderService extends Component
             }
         }
         
-        if (empty($tools)) {
-            throw new \Exception("No sections found for manifest generation");
-        }
-        
-        // Apply security filters
-        $tools = $this->applySecurityFilters($tools);
-        
-        Craft::info("Generated " . count($tools) . " tools from Craft services", 'mcp-wrapper');
-        
-        return [
-            'version' => '1.1',
-            'schemaHandle' => $schemaHandle,
-            'description' => "MCP manifest for GraphQL schema '{$schemaHandle}' (generated from Craft services).",
-            'tools' => $tools,
-        ];
+        return $tools;
     }
 
     /**

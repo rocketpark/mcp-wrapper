@@ -12,6 +12,8 @@ use yii\base\Event;
 
 use rocketpark\mcpwrapper\services\ManifestBuilderService;
 use rocketpark\mcpwrapper\services\McpServerService;
+use rocketpark\mcpwrapper\services\ToolRegistryService;
+use rocketpark\mcpwrapper\tools\EntryTools;
 
 class McpWrapper extends Plugin
 {
@@ -39,6 +41,7 @@ class McpWrapper extends Plugin
             'components' => [
                 'manifestBuilder' => ManifestBuilderService::class,
                 'mcpServer' => McpServerService::class,
+                'toolRegistry' => ToolRegistryService::class,
             ],
         ];
     }
@@ -87,5 +90,25 @@ class McpWrapper extends Plugin
             \craft\services\ProjectConfig::EVENT_REBUILD,
             fn() => $this->get('manifestBuilder')->clearCache()
         );
+        
+        // Register manual tool classes
+        $this->registerToolClasses();
+        
+        Craft::info('MCP Wrapper initialized', 'mcp-wrapper');
+    }
+
+    /**
+     * Register manual tool classes with the ToolRegistry
+     */
+    private function registerToolClasses(): void
+    {
+        $toolRegistry = $this->get('toolRegistry');
+        
+        // Register built-in tool classes
+        $toolRegistry->registerToolClass(EntryTools::class);
+        
+        // TODO: Add more tool classes here
+        // $toolRegistry->registerToolClass(AssetTools::class);
+        // $toolRegistry->registerToolClass(UserTools::class);
     }
 }
