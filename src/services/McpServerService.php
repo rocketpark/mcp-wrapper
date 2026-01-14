@@ -332,7 +332,7 @@ class McpServerService extends Component
         $sectionHandle = $this->extractSectionHandle($toolName);
         $token = $this->getSchemaToken($params);
 
-        $result = $this->executeGraphQLQuery($token, $sectionHandle, $arguments);
+        $result = $this->executeGraphQLQuery($token, $sectionHandle, $arguments, $params);
 
         return [
             'content' => [
@@ -464,10 +464,10 @@ class McpServerService extends Component
     /**
      * Execute GraphQL query against Craft API
      */
-    private function executeGraphQLQuery(string $token, string $sectionHandle, array $args): array
+    private function executeGraphQLQuery(string $token, string $sectionHandle, array $args, array $params = []): array
     {
         try {
-            $query = $this->buildGraphQLQuery($sectionHandle, $args);
+            $query = $this->buildGraphQLQuery($sectionHandle, $args, $params);
             Craft::info("GraphQL Query for {$sectionHandle}: {$query}", 'mcp-wrapper');
             
             $data = $this->sendGraphQLRequest($token, $query);
@@ -488,7 +488,7 @@ class McpServerService extends Component
     /**
      * Build GraphQL query string from arguments
      */
-    private function buildGraphQLQuery(string $sectionHandle, array $args): string
+    private function buildGraphQLQuery(string $sectionHandle, array $args, array $params = []): string
     {
         $limit = min(100, max(1, (int) ($args['limit'] ?? 10)));
         $offset = max(0, (int) ($args['offset'] ?? 0));
@@ -613,7 +613,7 @@ class McpServerService extends Component
         }
 
         // Get custom fields for this section
-        $fieldsList = $this->getFieldsListForQuery($sectionHandle);
+        $fieldsList = $this->getFieldsListForQuery($sectionHandle, $params);
 
         return sprintf(
             'query { entries(%s) { id title slug uri dateCreated dateUpdated %s } }',
@@ -625,19 +625,35 @@ class McpServerService extends Component
     /**
      * Build fields list for GraphQL query based on section's field layout
      */
-    private function getFieldsListForQuery(string $sectionHandle): string
+    private function getFieldsListForQuery(string $sectionHandle, array $params = []): string
     {
-        // Temporarily skip type-specific fragments to avoid type registration issues
-        // TODO: Investigate why some entry types aren't registered in GraphQL schema
-        return '';
-        
         $section = Craft::$app->getEntries()->getSectionByHandle($sectionHandle);
         if (!$section) {
             return '';
         }
 
+        // Get available types from the current GraphQL schema to avoid querying unregistered types
+        try {
+            $token = $this->getSchemaToken($params);
+        } catch (\Exception $e) {
+            Craft::warning("Could not get schema token for field introspection: {$e->getMessage()}", 'mcp-wrapper');
+            return '';
+        }
+
+        $schema = $this->introspectGraphQLSchema($token);
+        $availableTypes = array_column($schema['types'], 'name');
+
         $entryTypeFragments = [];
         foreach ($section->getEntryTypes() as $entryType) {
+            // GraphQL type name format is: typeHandle_Entry
+            $typeName = $entryType->handle . '_Entry';
+            
+            // Skip entry types that aren't registered in the current GraphQL schema
+            if (!in_array($typeName, $availableTypes, true)) {
+                Craft::info("Skipping unregistered type: {$typeName}", 'mcp-wrapper');
+                continue;
+            }
+
             $fields = [];
             foreach ($entryType->getFieldLayout()->getCustomFields() as $field) {
                 $handle = $field->handle;
@@ -664,8 +680,6 @@ class McpServerService extends Component
 
             // Build inline fragment for this entry type
             if (!empty($fields)) {
-                // GraphQL type name format is: typeHandle_Entry
-                $typeName = $entryType->handle . '_Entry';
                 $fieldsStr = implode(' ', $fields);
                 $entryTypeFragments[] = "... on {$typeName} { {$fieldsStr} }";
             }
