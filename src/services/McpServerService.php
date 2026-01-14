@@ -3,6 +3,7 @@ namespace rocketpark\mcpwrapper\services;
 
 use Craft;
 use craft\base\Component;
+use GuzzleHttp\Client;
 use yii\web\Response;
 
 /**
@@ -380,9 +381,70 @@ class McpServerService extends Component
      */
     private function getSectionsForSchema(string $token): array
     {
-        // For now, return all sections
-        // In production, filter by GraphQL schema permissions
-        return Craft::$app->getEntries()->getAllSections();
+        try {
+            // Introspect GraphQL schema to get available entry types
+            $schema = $this->introspectGraphQLSchema($token);
+            $availableTypes = array_column($schema['types'], 'name');
+            
+            // Get all sections and filter by which have entry types in the schema
+            $allSections = Craft::$app->getEntries()->getAllSections();
+            $accessibleSections = [];
+            
+            foreach ($allSections as $section) {
+                // Check if any entry type for this section is in the GraphQL schema
+                foreach ($section->getEntryTypes() as $entryType) {
+                    $typeName = $entryType->handle . '_Entry';
+                    if (in_array($typeName, $availableTypes, true)) {
+                        $accessibleSections[] = $section;
+                        break; // Found at least one accessible entry type, include this section
+                    }
+                }
+            }
+            
+            Craft::info("Found " . count($accessibleSections) . " accessible sections out of " . count($allSections) . " total", 'mcp-wrapper');
+            return $accessibleSections;
+        } catch (\Exception $e) {
+            Craft::error("Failed to get sections for schema: {$e->getMessage()}", 'mcp-wrapper');
+            // Fallback to all sections if introspection fails
+            return Craft::$app->getEntries()->getAllSections();
+        }
+    }
+
+    /**
+     * Introspect GraphQL schema to get available types
+     */
+    private function introspectGraphQLSchema(string $token): array
+    {
+        try {
+            $client = new Client([
+                'base_uri' => Craft::$app->request->getHostInfo(),
+                'timeout' => 10,
+            ]);
+
+            $query = '{ __schema { types { name } } }';
+
+            Craft::info("Introspecting GraphQL schema", 'mcp-wrapper');
+            
+            $response = $client->post('/api', [
+                'headers' => [
+                    'Authorization' => "Bearer {$token}",
+                    'Content-Type' => 'application/json',
+                ],
+                'json' => ['query' => $query],
+            ]);
+
+            $data = json_decode($response->getBody()->getContents(), true);
+            
+            if (!isset($data['data']['__schema'])) {
+                throw new \Exception('GraphQL introspection returned invalid data');
+            }
+            
+            Craft::info("GraphQL introspection successful, found " . count($data['data']['__schema']['types']) . " types", 'mcp-wrapper');
+            return $data['data']['__schema'];
+        } catch (\Exception $e) {
+            Craft::error("GraphQL introspection failed: {$e->getMessage()}", 'mcp-wrapper');
+            throw $e;
+        }
     }
 
     /**
