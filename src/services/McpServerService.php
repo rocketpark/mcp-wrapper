@@ -516,9 +516,14 @@ class McpServerService extends Component
             }
 
             $result = $data['data'] ?? [];
-            $entryCount = isset($result['entries']) ? count($result['entries']) : 0;
-            Craft::info("GraphQL query returned {$entryCount} entries", 'mcp-wrapper');
-            return $result;
+            // Result uses section-specific field name (e.g., servicesEntries) not generic 'entries'
+            $sectionField = $sectionHandle . 'Entries';
+            $entries = $result[$sectionField] ?? $result['entries'] ?? [];
+            $entryCount = count($entries);
+            Craft::info("GraphQL query returned {$entryCount} entries from field '{$sectionField}'", 'mcp-wrapper');
+            
+            // Normalize result to always use 'entries' key for consistency
+            return ['entries' => $entries];
         } catch (\Exception $e) {
             Craft::error("Failed to execute GraphQL query: {$e->getMessage()}", 'mcp-wrapper');
             throw $e;
