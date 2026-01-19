@@ -1,71 +1,42 @@
 # MCP Wrapper for Craft CMS
 
-## Overview
+A production-ready Craft CMS plugin that exposes your content to AI assistants through the Model Context Protocol (MCP).
 
-MCP Wrapper is a Craft CMS plugin that implements the **Model Context Protocol (MCP)** specification, exposing your Craft CMS content as **MCP Tools** that AI assistants (like Claude Desktop, ChatGPT, and other MCP clients) can discover and query via GraphQL.
+## What It Does
 
-### What is MCP?
+Enables AI assistants (Claude, ChatGPT, Botpress, etc.) to intelligently query your Craft CMS content through a standardized protocol. Think of it as an API specifically designed for AI consumption.
 
-The Model Context Protocol is an open standard that enables AI applications to securely connect to external data sources and tools. Think of it as "USB-C for AI" - one standardized interface that works across different AI assistants.
+### Key Capabilities
 
-### What This Plugin Does
+- 🤖 **AI-Native**: Designed for AI assistants to discover and query your content automatically
+- 🔒 **Enterprise Security**: IP allowlisting, dangerous tool protection, configurable permissions
+- 🔧 **GraphQL-Powered**: Leverages Craft's powerful GraphQL API with schema-based access control
+- 📊 **System Tools**: Query system info, plugins, queue status, logs, cache, and config
+- 🚀 **Production-Ready**: Running successfully with Botpress on Jensen Hughes website
 
-1. **Exposes MCP Tools**: Each Craft section becomes an MCP tool (e.g., `query_news`, `query_products`)
-2. **JSON-RPC 2.0 Server**: Implements the official MCP protocol for tool discovery and execution
-3. **GraphQL Integration**: Tools execute queries against your Craft GraphQL API
-4. **Multi-Schema Support**: Configure different GraphQL schemas for different use cases (AI, public, internal)
+## Live Example
 
-## Key Features
-
-### MCP Protocol Compliance
-
-Implements MCP specification `2025-06-18`:
-
-- **Tool Discovery** (`tools/list`): AI clients can discover available Craft content types
-- **Tool Execution** (`tools/call`): AI clients can query your Craft content
-- **Capability Negotiation** (`initialize`): Proper MCP handshake and version negotiation
-
-### Automatic Tool Generation
-
-The plugin automatically generates MCP tools by introspecting your Craft CMS setup:
-
-- One tool per section (News, Products, Pages, etc.)
-- Proper JSON Schema for tool parameters
-- Filters by GraphQL schema permissions
-
-### Secure Multi-Schema Architecture
-
-Configure different GraphQL tokens for different purposes:
-
-```php
-'schemas' => [
-    'ai' => getenv('GQL_AI_TOKEN'),      // For AI assistants (limited data)
-    'public' => getenv('GQL_PUBLIC_TOKEN'), // For public integrations
-    'internal' => getenv('GQL_INTERNAL_TOKEN'), // For internal tools
-]
-```
-
-### GraphQL-Powered Queries
-
-When AI tools are called, they execute real GraphQL queries with:
-
-- Limit/offset pagination
-- Full-text search
-- ID filtering
-- Access control via GraphQL schema permissions
+**Jensen Hughes AI Chatbot** powered by this plugin:
+- Visitors ask: "What services do you offer?"
+- Bot queries Craft CMS via MCP
+- Returns real, up-to-date service listings
 
 ## Installation
 
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed installation instructions.
+**Requirements:**
+- Craft CMS 5.0+
+- PHP 8.2+
+- Redis (recommended for caching)
 
 **Quick Install:**
 
 ```bash
-
 cd /path/to/your-craft-site
 composer require rocket-park/mcp-wrapper
 php craft plugin/install mcp-wrapper
 ```
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions.
 
 ## Configuration
 
@@ -74,8 +45,16 @@ Create `config/mcpwrapper.php`:
 ```php
 <?php
 return [
+    // GraphQL schema mapping
     'schemas' => [
-        'ai' => getenv('GQL_AI_TOKEN'),
+        'MCPSchema' => getenv('MCP_GQLSCHEMA_TOKEN'),
+    ],
+    
+    // Security settings
+    'security' => [
+        'enableDangerousTools' => false,  // Block write operations in production
+        'disabledTools' => [],             // Disable specific tools by name
+        'ipWhitelist' => [],               // Restrict access by IP (CIDR supported)
     ],
 ];
 ```
@@ -83,20 +62,330 @@ return [
 Add to `.env`:
 
 ```bash
-GQL_AI_TOKEN="your-graphql-token-from-craft-cp"
+MCP_GQLSCHEMA_TOKEN="your-graphql-token-from-craft-cp"
 ```
+
+## Features
+
+### MCP Protocol Compliance
+
+Implements MCP specification `2025-06-18`:
+
+- ✅ Tool Discovery (`tools/list`)
+- ✅ Tool Execution (`tools/call`)
+- ✅ Capability Negotiation (`initialize`)
+- ✅ JSON-RPC 2.0 transport
+
+### Automatic Tool Generation
+
+Plugin introspects your Craft CMS and auto-generates MCP tools:
+
+**Content Tools** (from GraphQL schema):
+- `query_news`, `query_products`, `query_pages`, etc.
+- One tool per section with full GraphQL query support
+- Pagination, search, filtering built-in
+
+**System Tools** (manual):
+- `craft_get_entry_by_id` - Fetch specific entries
+- `craft_search_entries` - Full-text search
+- `craft_get_entry_by_slug` - Get by slug
+- `craft_get_system_info` - Craft version, PHP, database info
+- `craft_list_plugins` - Installed plugins
+- `craft_get_queue_status` - Background job status
+- `craft_read_logs` - Application logs
+- `craft_get_cache_info` - Cache statistics
+- `craft_get_project_config_status` - Config sync status
+- `craft_clear_caches` ⚠️ (dangerous - disabled by default)
+- `craft_rebuild_config` ⚠️ (dangerous - disabled by default)
+- `craft_run_queue` ⚠️ (dangerous - disabled by default)
+
+### Security Features
+
+**1. Dangerous Tool Protection**
+```php
+'enableDangerousTools' => false
+```
+Blocks write/modify operations (cache clear, config rebuild, queue run).
+
+**2. Tool Disabling**
+```php
+'disabledTools' => ['craft_read_logs', 'craft_get_queue_status']
+```
+Disable specific tools individually.
+
+**3. IP Allowlisting**
+```php
+'ipWhitelist' => [
+    '127.0.0.1',
+    '203.0.113.0/24',  // CIDR notation
+    '2001:db8::/32',   // IPv6 support
+]
+```
+Restrict access to specific IPs or ranges.
+
+### Multi-Schema Support
+
+Configure different GraphQL schemas for different use cases:
+
+```php
+'schemas' => [
+    'public' => getenv('GQL_PUBLIC_TOKEN'),   // Limited public data
+    'ai' => getenv('GQL_AI_TOKEN'),           // AI assistant access
+    'internal' => getenv('GQL_INTERNAL_TOKEN'), // Full internal access
+]
+```
+
+Each schema can have different:
+- Sections/entry types
+- Field visibility
+- Permission levels
 
 ## Usage
 
-### MCP Endpoints
+### Endpoint
 
-The plugin provides two transport endpoints:
-
-#### 1. HTTP POST (Streamable HTTP) - Recommended
-
-```text
-POST https://your-site.com/actions/mcp-wrapper/mcp/index/{schemaHandle}
 ```
+POST https://your-site.com/mcp/{schemaHandle}
+```
+
+Example: `https://your-site.com/mcp/MCPSchema`
+
+### MCP Client Integration
+
+**Claude Desktop (config file):**
+```json
+{
+  "mcpServers": {
+    "craftcms": {
+      "command": "mcp-client",
+      "args": ["https://your-site.com/mcp/MCPSchema"]
+    }
+  }
+}
+```
+
+**Botpress Integration:**
+```typescript
+configuration: {
+  mcpServerUrl: 'https://your-site.com',
+  schemaHandle: 'MCPSchema'
+}
+```
+
+### Testing
+
+**List available tools:**
+```bash
+curl -X POST "https://your-site.com/mcp/MCPSchema" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc":"2.0",
+    "method":"tools/list",
+    "params":{},
+    "id":1
+  }'
+```
+
+**Query content:**
+```bash
+curl -X POST "https://your-site.com/mcp/MCPSchema" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc":"2.0",
+    "method":"tools/call",
+    "params":{
+      "name":"query_news",
+      "arguments":{"limit":5}
+    },
+    "id":2
+  }'
+```
+
+**Get system info:**
+```bash
+curl -X POST "https://your-site.com/mcp/MCPSchema" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc":"2.0",
+    "method":"tools/call",
+    "params":{
+      "name":"craft_get_system_info",
+      "arguments":{}
+    },
+    "id":3
+  }'
+```
+
+See [TESTING.md](./TESTING.md) for comprehensive testing guide.
+
+## Documentation
+
+- **[TESTING.md](./TESTING.md)** - Complete testing guide with scripts and scenarios
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Deployment and configuration instructions
+- **[QUICK-START.md](./QUICK-START.md)** - Quick start guide for developers
+- **[FIELD-PRIVACY-GUIDE.md](./FIELD-PRIVACY-GUIDE.md)** - Security and privacy best practices
+- **[BOTPRESS-STAGING-TEST-CHECKLIST.md](./BOTPRESS-STAGING-TEST-CHECKLIST.md)** - Botpress integration testing
+- **[BOTPRESS-TEST-WORKFLOWS.md](./BOTPRESS-TEST-WORKFLOWS.md)** - Bot testing workflows
+- **[CHANGELOG.md](./CHANGELOG.md)** - Version history
+
+## Architecture
+
+### How It Works
+
+1. **GraphQL Introspection**: Plugin introspects your GraphQL schema on first request
+2. **Tool Generation**: Creates MCP tool definitions for each section/query type
+3. **Caching**: Tools are cached (Redis/file) for performance
+4. **Security Validation**: Checks IP, tool permissions before execution
+5. **Query Execution**: Translates MCP tool calls to GraphQL queries
+6. **Response Formatting**: Returns results in MCP-compliant format
+
+### File Structure
+
+```
+src/
+├── controllers/
+│   └── McpController.php       # Main HTTP endpoint
+├── services/
+│   ├── McpServerService.php    # MCP protocol implementation
+│   ├── ToolRegistryService.php # Tool registration and discovery
+│   └── ManifestBuilderService.php # GraphQL introspection
+├── tools/
+│   ├── SystemTools.php         # Craft system tools
+│   └── EntryTools.php          # Entry management tools
+├── attributes/
+│   └── Tool.php                # Tool registration attribute
+└── support/
+    ├── Response.php            # Response formatting
+    └── IpValidator.php         # IP validation with CIDR
+```
+
+## Performance
+
+- **Caching**: GraphQL schema introspection cached via Redis or file storage
+- **Lazy Loading**: Tools generated on-demand
+- **Response Times**: 
+  - Tool list: <500ms
+  - Simple queries: <1s
+  - Complex queries: <3s
+
+## Security Best Practices
+
+### Production Configuration
+
+```php
+return [
+    'schemas' => [
+        'public' => getenv('GQL_PUBLIC_TOKEN'),
+    ],
+    'security' => [
+        'enableDangerousTools' => false,  // Always false in production
+        'disabledTools' => [
+            'craft_read_logs',  // Don't expose logs
+        ],
+        'ipWhitelist' => [
+            '203.0.113.0/24',  // Your office
+            '198.51.100.0/24', // Your hosting provider
+        ],
+    ],
+];
+```
+
+### GraphQL Schema Security
+
+1. Create dedicated GraphQL schema for AI access
+2. Limit to specific sections/entry types
+3. Exclude sensitive fields (passwords, API keys, etc.)
+4. Set appropriate query depth/complexity limits
+
+See [FIELD-PRIVACY-GUIDE.md](./FIELD-PRIVACY-GUIDE.md) for detailed security recommendations.
+
+## Troubleshooting
+
+### Common Issues
+
+**Empty tools list:**
+- Verify GraphQL schema exists in Craft CP
+- Check token is valid in config
+- Ensure schema has permissions/sections
+
+**Route not found:**
+```bash
+# Relink site in Herd
+herd unlink your-site && herd link your-site
+
+# Clear Craft caches
+php craft clear-caches/all
+```
+
+**Redis connection errors:**
+```bash
+# Start Redis
+brew services start redis
+```
+
+**Tool execution errors:**
+- Check `enableDangerousTools` setting
+- Verify tool isn't in `disabledTools` list
+- Check IP allowlist if configured
+
+See [TESTING.md](./TESTING.md) troubleshooting section for more details.
+
+## Development
+
+### Running Tests
+
+```bash
+# Security test suite (6 scenarios)
+./test-mcp-security.sh
+
+# Simple diagnostic tests
+./test-mcp-simple.sh
+
+# Direct HTTP test with verbose output
+./test-mcp-direct.sh
+```
+
+### Adding Custom Tools
+
+1. Create tool class with `#[Tool]` attribute
+2. Implement tool method
+3. Register via `ToolRegistryService`
+
+Example:
+```php
+use rocketpark\mcpwrapper\attributes\Tool;
+
+class CustomTools
+{
+    #[Tool(
+        name: 'my_custom_tool',
+        description: 'Does something custom',
+        dangerous: false
+    )]
+    public static function myCustomTool(array $arguments): array
+    {
+        return ['result' => 'success'];
+    }
+}
+```
+
+## Contributing
+
+This plugin is maintained by Rocket Park LLC for use with Craft CMS projects.
+
+## License
+
+See [LICENSE.md](./LICENSE.md)
+
+## Support
+
+For issues, questions, or feature requests, please contact Rocket Park LLC.
+
+## Credits
+
+Built by Rocket Park LLC for enterprise Craft CMS deployments.
+
+Special thanks to the Anthropic team for the MCP specification and the Craft CMS team for the excellent plugin architecture.
 
 This is the modern MCP transport (spec 2025-06-18). Use this for:
 - Claude Desktop (via mcp-remote)
