@@ -199,7 +199,7 @@ curl -s -X POST "https://jensenhughes3.on-forge.com/mcp/MCPSchema" \
 
 ## Botpress Integration Testing
 
-### Setup
+### Botpress Setup
 
 1. **Update Botpress Configuration:**
 
@@ -227,13 +227,13 @@ Ask these questions in your bot:
 
 **System Information:**
 
-4. "What version of Craft CMS?"
-5. "Show me system information"
+1. "What version of Craft CMS?"
+2. "Show me system information"
 
 **Security Tests (should fail gracefully):**
 
-6. "Clear the cache"
-7. "Run the queue"
+1. "Clear the cache"
+2. "Run the queue"
 
 ### Expected Behavior
 
