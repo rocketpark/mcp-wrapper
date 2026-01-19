@@ -124,6 +124,9 @@ class McpServerService extends Component
         // Merge both arrays
         $tools = array_merge($tools, $manualTools);
 
+        // Filter tools based on security configuration
+        $tools = $this->filterToolsBySecurityConfig($tools);
+
         return ['tools' => $tools];
     }
 
@@ -342,6 +345,9 @@ class McpServerService extends Component
         if (!$toolName) {
             throw new \Exception('Tool name required', -32602);
         }
+
+        // Validate tool access before execution
+        $this->validateToolAccess($toolName);
 
         // Check if this is a manual tool (craft_*)
         if (str_starts_with($toolName, 'craft_')) {
@@ -855,5 +861,71 @@ class McpServerService extends Component
         } catch (\Exception $e) {
             throw new \Exception("Failed to read resource '{$uri}': {$e->getMessage()}", -32603);
         }
+    }
+    
+    /**
+     * Validate tool access based on security configuration
+     * 
+     * @param string $toolName Tool name to validate
+     * @throws \Exception if tool is disabled or dangerous tools are not enabled
+     */
+    private function validateToolAccess(string $toolName): void
+    {
+        $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
+        
+        // Check if tool is explicitly disabled
+        $disabledTools = $config['security']['disabledTools'] ?? [];
+        if (in_array($toolName, $disabledTools, true)) {
+            Craft::warning("Access denied: Tool '{$toolName}' is disabled", 'mcp-wrapper');
+            throw new \Exception("Tool '{$toolName}' is disabled", -32601);
+        }
+        
+        // Check if tool is dangerous and if dangerous tools are enabled
+        $enableDangerous = $config['security']['enableDangerousTools'] ?? false;
+        
+        if (!$enableDangerous) {
+            // Get tool definition to check if it's dangerous
+            $toolRegistry = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('toolRegistry');
+            $manualTools = $toolRegistry->discoverManualTools();
+            
+            foreach ($manualTools as $tool) {
+                if ($tool['name'] === $toolName && ($tool['dangerous'] ?? false)) {
+                    Craft::warning("Access denied: Dangerous tool '{$toolName}' not enabled", 'mcp-wrapper');
+                    throw new \Exception("Dangerous tools are not enabled. Set 'enableDangerousTools' to true in config.", -32601);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Filter tools based on security configuration
+     * Removes disabled tools and dangerous tools if not enabled
+     * 
+     * @param array $tools Array of tool definitions
+     * @return array Filtered tools array
+     */
+    private function filterToolsBySecurityConfig(array $tools): array
+    {
+        $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
+        $disabledTools = $config['security']['disabledTools'] ?? [];
+        $enableDangerous = $config['security']['enableDangerousTools'] ?? false;
+        
+        return array_values(array_filter($tools, function($tool) use ($disabledTools, $enableDangerous) {
+            $toolName = $tool['name'] ?? '';
+            
+            // Filter out explicitly disabled tools
+            if (in_array($toolName, $disabledTools, true)) {
+                Craft::info("Filtering out disabled tool: {$toolName}", 'mcp-wrapper');
+                return false;
+            }
+            
+            // Filter out dangerous tools if not enabled
+            if (!$enableDangerous && ($tool['dangerous'] ?? false)) {
+                Craft::info("Filtering out dangerous tool: {$toolName} (dangerous tools not enabled)", 'mcp-wrapper');
+                return false;
+            }
+            
+            return true;
+        }));
     }
 }

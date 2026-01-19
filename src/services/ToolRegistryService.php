@@ -72,6 +72,10 @@ class ToolRegistryService extends Component
                         'description' => $toolAttr->description,
                         'inputSchema' => $toolAttr->inputSchema,
                         'dangerous' => $toolAttr->dangerous,
+                        'annotations' => [
+                            'readOnlyHint' => !$toolAttr->dangerous,
+                            'openWorldHint' => false,
+                        ],
                         'handler' => [
                             'class' => $className,
                             'method' => $method->getName(),

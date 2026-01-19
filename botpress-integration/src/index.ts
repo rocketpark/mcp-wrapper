@@ -16,7 +16,7 @@ class MCPClient {
    * Make a JSON-RPC 2.0 request to the MCP server
    */
   private async makeRequest(method: string, params: any = {}): Promise<any> {
-    const endpoint = `${this.baseUrl}/actions/mcp-wrapper/mcp/index?schemaHandle=${this.schemaHandle}`
+    const endpoint = `${this.baseUrl}/mcp/${this.schemaHandle}`
     
     const request = {
       jsonrpc: '2.0',
