@@ -661,12 +661,22 @@ class McpServerService extends Component
         // Remove section filter since we're using section-specific field
         $filters = array_filter($filters, fn($f) => !str_contains($f, 'section:'));
 
-        return sprintf(
-            'query { %s(%s) { id title slug uri dateCreated dateUpdated %s } }',
-            $sectionField,
-            implode(', ', $filters),
-            $fieldsList
-        );
+        // If we have inline fragments (entry type specific fields), wrap basic fields in the same fragments
+        if (!empty($fieldsList)) {
+            return sprintf(
+                'query { %s(%s) { %s } }',
+                $sectionField,
+                implode(', ', $filters),
+                $fieldsList  // This already includes "... on TypeName { id title slug ... }"
+            );
+        } else {
+            // Fallback for sections without custom fields
+            return sprintf(
+                'query { %s(%s) { id title slug uri dateCreated dateUpdated } }',
+                $sectionField,
+                implode(', ', $filters)
+            );
+        }
     }
 
     /**
@@ -748,11 +758,11 @@ class McpServerService extends Component
                 }
             }
 
-            // Build inline fragment for this entry type
-            if (!empty($fields)) {
-                $fieldsStr = implode(' ', $fields);
-                $entryTypeFragments[] = "... on {$typeName} { {$fieldsStr} }";
-            }
+            // Build inline fragment for this entry type including basic fields
+            $basicFields = ['id', 'title', 'slug', 'uri', 'dateCreated', 'dateUpdated'];
+            $allFields = array_merge($basicFields, $fields);
+            $fieldsStr = implode(' ', $allFields);
+            $entryTypeFragments[] = "... on {$typeName} { {$fieldsStr} }";
         }
 
         return implode(' ', $entryTypeFragments);
