@@ -655,8 +655,15 @@ class McpServerService extends Component
         // Get custom fields for this section
         $fieldsList = $this->getFieldsListForQuery($sectionHandle, $params);
 
+        // Use section-specific GraphQL field (e.g., servicesBrowseEntries) instead of generic entries
+        $sectionField = $sectionHandle . 'Entries';
+        
+        // Remove section filter since we're using section-specific field
+        $filters = array_filter($filters, fn($f) => !str_contains($f, 'section:'));
+
         return sprintf(
-            'query { entries(%s) { id title slug uri dateCreated dateUpdated %s } }',
+            'query { %s(%s) { id title slug uri dateCreated dateUpdated %s } }',
+            $sectionField,
             implode(', ', $filters),
             $fieldsList
         );
