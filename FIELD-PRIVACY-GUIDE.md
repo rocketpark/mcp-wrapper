@@ -22,19 +22,32 @@ Your bot is displaying sensitive information like internal contact emails that s
 
 1. **Go to Craft CMS Admin Panel**
    - Navigate to: **GraphQL → Schemas**
-   - Select your schema (e.g., "ai" or "jensenhughes")
+   - Select **MCPSchema** (the schema used by your bot)
 
 2. **Configure Scope for Office Locations Section**
-   - Find "Office Locations" (or whatever your section is called)
+   - Find "Office Locations" section
    - Click to expand field permissions
 
-3. **Uncheck Sensitive Fields**
-   - ✅ Keep: `title`, `address`, `phone`, `services`, `city`, `state`
-   - ❌ Uncheck: `contactEmails`, `internalContacts`, `staffEmails`
+3. **Uncheck These Sensitive Fields:**
+   - ❌ **CRITICAL:** `formSubmissionNotificationEmail` - Contains all staff emails
+   - ❌ Any other internal contact fields you don't want public
+
+   **Keep these fields checked:**
+   - ✅ `title`
+   - ✅ `address` (Matrix field - will show physical address)
+   - ✅ `officeSummary`
+   - ✅ `region`
+   - ✅ `googleMapId`
+   - ✅ `googleMyBusiness`
 
 4. **Save Schema**
 
-**Result:** When the bot queries for office data, it simply won't receive email fields at all.
+5. **Clear Caches**
+   ```bash
+   php craft clear-caches/all
+   ```
+
+**Result:** When the bot queries for office data, `formSubmissionNotificationEmail` will not be available at all.
 
 #### Testing:
 ```graphql

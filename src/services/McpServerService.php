@@ -744,10 +744,21 @@ class McpServerService extends Component
                     $field instanceof \craft\fields\Assets) {
                     $fields[] = "{$handle} { id title }";
                 }
-                // Skip complex field types that require sub-selections or special handling
-                // These include: Matrix, Neo, Table, CKEditor, Freeform, SEOmatic, etc.
-                elseif ($field instanceof \craft\fields\Matrix ||
-                        $field instanceof \craft\fields\Table ||
+                // Handle Matrix fields with basic nested structure
+                elseif ($field instanceof \craft\fields\Matrix) {
+                    // For Matrix fields, include them with a basic nested query
+                    // This will return the available fields based on what's configured in the GraphQL schema
+                    $matrixSubfields = $this->getMatrixFieldStructure($handle, $entryType);
+                    if ($matrixSubfields) {
+                        $fields[] = "{$handle} { {$matrixSubfields} }";
+                    } else {
+                        // Fallback to just requesting the field - GraphQL will return what's available
+                        Craft::info("Including Matrix field without subfields: {$handle}", 'mcp-wrapper');
+                        $fields[] = $handle;
+                    }
+                }
+                // Skip other complex field types that require special handling
+                elseif ($field instanceof \craft\fields\Table ||
                         $fieldClass === 'benf\\neo\\Field' ||
                         str_contains($fieldClass, '\\neo\\') ||
                         str_contains($fieldClass, 'CKEditor') ||
@@ -771,6 +782,34 @@ class McpServerService extends Component
         }
 
         return implode(' ', $entryTypeFragments);
+    }
+
+    /**
+     * Get basic field structure for a Matrix field
+     * Returns common fields that work across most Matrix block types
+     */
+    private function getMatrixFieldStructure(string $fieldHandle, $entryType): string
+    {
+        // Common fields that typically exist in Matrix blocks
+        // GraphQL will ignore fields that don't exist, so this is safe
+        $commonFields = [
+            'id',
+            'typeHandle',
+        ];
+        
+        // For specific known field handles, we can add more specific subfields
+        $knownStructures = [
+            'address' => 'id typeHandle ... on address_Entry { streetAddress city state postalCode country }',
+            'contactEmails' => 'id typeHandle ... on email_Entry { emailAddress }',
+            'contactLinks' => 'id typeHandle ... on contactLink_Entry { label url }',
+        ];
+        
+        if (isset($knownStructures[$fieldHandle])) {
+            return $knownStructures[$fieldHandle];
+        }
+        
+        // Default: return basic fields
+        return implode(' ', $commonFields);
     }
 
     /**
