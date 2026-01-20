@@ -335,11 +335,11 @@ class ManifestBuilderService extends Component
     private function getAllowedSectionsForSchema(string $token): array
     {
         try {
-            // Find the GQL token record first
-            $gqlToken = \craft\models\GqlToken::find()->where(['accessToken' => $token])->one();
+            // Find the GQL token using Craft's service
+            $gqlToken = Craft::$app->getGql()->getTokenByAccessToken($token);
             
             if (!$gqlToken) {
-                Craft::warning("Could not find GQL token record", 'mcp-wrapper');
+                Craft::warning("Could not find GQL token", 'mcp-wrapper');
                 return []; // Empty array means allow all
             }
             
