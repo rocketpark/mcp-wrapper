@@ -338,10 +338,14 @@ class ManifestBuilderService extends Component
             // Get all GraphQL schemas
             $schemas = Craft::$app->getGql()->getSchemas();
             
+            Craft::info("Total GraphQL schemas found: " . count($schemas), 'mcp-wrapper');
+            
             // Find schema by token
             $targetSchema = null;
             foreach ($schemas as $schema) {
-                if ($schema->accessToken === $token) {
+                Craft::info("Checking schema: {$schema->name}, token hash: " . substr(md5($token), 0, 8) . "...", 'mcp-wrapper');
+                // Compare tokens - the schema stores the actual token value
+                if (hash_equals($schema->getAccessToken(), $token)) {
                     $targetSchema = $schema;
                     break;
                 }
