@@ -156,16 +156,37 @@ class ManifestBuilderService extends Component
      */
     public function getGeneratedTools(string $schemaHandle): array
     {
+        // Get the token for this schema
+        $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
+        $token = $config['schemas'][$schemaHandle] ?? null;
+        
+        if (!$token) {
+            Craft::warning("No token found for schema: {$schemaHandle}", 'mcp-wrapper');
+            return [];
+        }
+        
+        // Get allowed sections for this schema
+        $allowedSections = $this->getAllowedSectionsForSchema($token);
+        Craft::info("Schema '{$schemaHandle}' allows " . (empty($allowedSections) ? "ALL" : count($allowedSections)) . " sections", 'mcp-wrapper');
+        
         $sections = Craft::$app->getEntries()->getAllSections();
         $tools = [];
         
         foreach ($sections as $section) {
+            // Skip if this section is not allowed in the schema
+            if (!empty($allowedSections) && !in_array($section->handle, $allowedSections)) {
+                Craft::info("Skipping section '{$section->handle}' - not enabled in schema '{$schemaHandle}'", 'mcp-wrapper');
+                continue;
+            }
+            
             $tool = $this->buildToolForSection($section->handle, $schemaHandle);
             if ($tool) {
                 $tools[] = $tool;
+                Craft::info("Added tool for section: {$section->handle}", 'mcp-wrapper');
             }
         }
         
+        Craft::info("Generated " . count($tools) . " GraphQL tools for schema '{$schemaHandle}'", 'mcp-wrapper');
         return $tools;
     }
 
