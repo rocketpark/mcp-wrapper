@@ -65,25 +65,38 @@ class ManifestBuilderService extends Component
             // Fallback to GraphQL introspection
             $schemaData = $this->introspectGraphQL($token);
             $types = $schemaData['types'] ?? [];
-            $entryTypes = array_filter($types, fn($t) =>
-                isset($t['fields']) && str_contains(strtolower($t['name']), 'entry')
-            );
-
+            
+            // Find the Query type to get actual section query fields
+            $queryType = null;
+            foreach ($types as $type) {
+                if ($type['name'] === 'Query') {
+                    $queryType = $type;
+                    break;
+                }
+            }
+            
+            if (!$queryType || !isset($queryType['fields'])) {
+                throw new \Exception('Could not find Query type in GraphQL schema');
+            }
+            
             $tools = [];
-            foreach ($entryTypes as $type) {
-                // Extract section handle from GraphQL type name (e.g., "service_Entry" -> "service")
-                $typeName = $type['name'] ?? '';
-                $sectionHandle = str_replace('_Entry', '', $typeName);
-                $sectionHandle = strtolower($sectionHandle);
+            foreach ($queryType['fields'] as $field) {
+                $fieldName = $field['name'] ?? '';
                 
-                Craft::info("Processing GraphQL type '{$typeName}' -> section handle '{$sectionHandle}'", 'mcp-wrapper');
-                
-                $tool = $this->buildToolForSection($sectionHandle, $schemaHandle);
-                if ($tool) {
-                    $tools[] = $tool;
-                    Craft::info("Successfully built tool: {$tool['name']}", 'mcp-wrapper');
-                } else {
-                    Craft::warning("Failed to build tool for section '{$sectionHandle}' (from GraphQL type '{$typeName}')", 'mcp-wrapper');
+                // Look for section query fields (e.g., "servicesEntries", "ourTeamEntries")
+                if (str_ends_with($fieldName, 'Entries')) {
+                    // Extract section handle (e.g., "servicesEntries" -> "services")
+                    $sectionHandle = substr($fieldName, 0, -7); // Remove "Entries" suffix
+                    
+                    Craft::info("Processing GraphQL query field '{$fieldName}' -> section handle '{$sectionHandle}'", 'mcp-wrapper');
+                    
+                    $tool = $this->buildToolForSection($sectionHandle, $schemaHandle);
+                    if ($tool) {
+                        $tools[] = $tool;
+                        Craft::info("Successfully built tool: {$tool['name']}", 'mcp-wrapper');
+                    } else {
+                        Craft::warning("Failed to build tool for section '{$sectionHandle}' (from GraphQL query field '{$fieldName}')", 'mcp-wrapper');
+                    }
                 }
             }
 
