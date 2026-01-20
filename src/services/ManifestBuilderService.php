@@ -353,11 +353,13 @@ class ManifestBuilderService extends Component
             }
             
             Craft::info("Found GraphQL schema: {$targetSchema->name} (uid: {$targetSchema->uid})", 'mcp-wrapper');
+            Craft::info("Schema scope: " . json_encode($targetSchema->scope), 'mcp-wrapper');
+            Craft::info("Schema is public: " . ($targetSchema->isPublic ? 'YES' : 'NO'), 'mcp-wrapper');
             
             // Get the schema's scope (permissions)
             $scope = $targetSchema->scope ?? [];
             if (empty($scope)) {
-                Craft::info("Schema has empty scope - allowing all sections", 'mcp-wrapper');
+                Craft::info("Schema has empty scope - this might be a public schema or misconfigured", 'mcp-wrapper');
                 return [];
             }
             
