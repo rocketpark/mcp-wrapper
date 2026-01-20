@@ -71,8 +71,20 @@ class ManifestBuilderService extends Component
 
             $tools = [];
             foreach ($entryTypes as $type) {
-                $sectionHandle = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', $type['name']));
-                $tools[] = $this->buildToolForSection($sectionHandle, $schemaHandle);
+                // Extract section handle from GraphQL type name (e.g., "service_Entry" -> "service")
+                $typeName = $type['name'] ?? '';
+                $sectionHandle = str_replace('_Entry', '', $typeName);
+                $sectionHandle = strtolower($sectionHandle);
+                
+                Craft::info("Processing GraphQL type '{$typeName}' -> section handle '{$sectionHandle}'", 'mcp-wrapper');
+                
+                $tool = $this->buildToolForSection($sectionHandle, $schemaHandle);
+                if ($tool) {
+                    $tools[] = $tool;
+                    Craft::info("Successfully built tool: {$tool['name']}", 'mcp-wrapper');
+                } else {
+                    Craft::warning("Failed to build tool for section '{$sectionHandle}' (from GraphQL type '{$typeName}')", 'mcp-wrapper');
+                }
             }
 
             return [
