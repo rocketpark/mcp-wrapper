@@ -252,6 +252,10 @@ class ManifestBuilderService extends Component
     private function extractSourceHandles($sources): array
     {
         if (!$sources) return [];
+        if (!is_array($sources)) {
+            Craft::warning("extractSourceHandles received non-array sources: " . gettype($sources) . " = " . json_encode($sources), 'mcp-wrapper');
+            return [];
+        }
         $handles = [];
         foreach ($sources as $src) {
             if ($src === '*') $handles[] = 'all';
