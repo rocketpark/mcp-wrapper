@@ -343,9 +343,12 @@ class ManifestBuilderService extends Component
             // Find schema by token
             $targetSchema = null;
             foreach ($schemas as $schema) {
-                Craft::info("Checking schema: {$schema->name}, token hash: " . substr(md5($token), 0, 8) . "...", 'mcp-wrapper');
-                // Compare tokens - the schema stores the actual token value
-                if (hash_equals($schema->getAccessToken(), $token)) {
+                Craft::info("Checking schema: {$schema->name}", 'mcp-wrapper');
+                
+                // Generate token from schema UID (this is how Craft generates tokens)
+                $schemaToken = Craft::$app->getSecurity()->hashData($schema->uid);
+                
+                if ($schemaToken === $token) {
                     $targetSchema = $schema;
                     break;
                 }
