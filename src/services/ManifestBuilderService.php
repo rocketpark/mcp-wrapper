@@ -291,6 +291,16 @@ class ManifestBuilderService extends Component
                 throw new \Exception('GraphQL introspection returned invalid data');
             }
             
+            // Log all Entry types found
+            $entryTypes = array_filter($data['data']['__schema']['types'], function($type) {
+                return isset($type['name']) && str_ends_with($type['name'], '_Entry');
+            });
+            $entryTypeNames = array_map(fn($t) => $t['name'], $entryTypes);
+            Craft::info("GraphQL Entry types found: " . implode(', ', $entryTypeNames), 'mcp-wrapper');
+            
+            // Log full schema data for debugging
+            Craft::info("Full GraphQL schema data: " . json_encode($data['data']['__schema'], JSON_PRETTY_PRINT), 'mcp-wrapper');
+            
             Craft::info("GraphQL introspection successful", 'mcp-wrapper');
             return $data['data']['__schema'];
         } catch (\GuzzleHttp\Exception\RequestException $e) {
