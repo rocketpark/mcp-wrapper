@@ -522,6 +522,9 @@ class McpServerService extends Component
             $entryCount = count($entries);
             Craft::info("GraphQL query returned {$entryCount} entries from field '{$sectionField}'", 'mcp-wrapper');
             
+            // Filter out sensitive fields from entries
+            $entries = $this->filterSensitiveFields($entries);
+            
             // Normalize result to always use 'entries' key for consistency
             return ['entries' => $entries];
         } catch (\Exception $e) {
@@ -685,6 +688,38 @@ class McpServerService extends Component
     }
 
     /**
+     * Filter out sensitive fields from entry data
+     * 
+     * @param array $entries Array of entry data from GraphQL
+     * @return array Filtered entries without sensitive fields
+     */
+    private function filterSensitiveFields(array $entries): array
+    {
+        $sensitiveFields = [
+            'formSubmissionNotificationEmail',
+            'formSubmissionNotificationEmail2',
+            'internalNotes',
+            'internalComments',
+            'adminNotes',
+        ];
+        
+        foreach ($entries as &$entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            
+            foreach ($sensitiveFields as $field) {
+                if (isset($entry[$field])) {
+                    unset($entry[$field]);
+                    Craft::info("Filtered sensitive field '{$field}' from entry {$entry['id']}", 'mcp-wrapper');
+                }
+            }
+        }
+        
+        return $entries;
+    }
+
+    /**
      * Build fields list for GraphQL query based on section's field layout
      */
     private function getFieldsListForQuery(string $sectionHandle, array $params = []): string
@@ -735,6 +770,20 @@ class McpServerService extends Component
             foreach ($entryType->getFieldLayout()->getCustomFields() as $field) {
                 $handle = $field->handle;
                 $fieldClass = get_class($field);
+
+                // Skip sensitive fields that shouldn't be exposed via MCP
+                $sensitiveFields = [
+                    'formSubmissionNotificationEmail',
+                    'formSubmissionNotificationEmail2',
+                    'internalNotes',
+                    'internalComments',
+                    'adminNotes',
+                ];
+                
+                if (in_array($handle, $sensitiveFields, true)) {
+                    Craft::info("Excluding sensitive field from MCP: {$handle}", 'mcp-wrapper');
+                    continue;
+                }
 
                 // Handle relational fields
                 if ($field instanceof \craft\fields\Entries ||
