@@ -59,6 +59,9 @@ class McpWrapper extends Plugin
         $this->controllerNamespace = 'rocketpark\\mcpwrapper\\controllers';
 
         self::$plugin = $this;
+        
+        // Configure custom log file for MCP Wrapper
+        $this->_configureLogging();
 
         // Register site URL rules for public manifest endpoint
         Event::on(
@@ -114,5 +117,25 @@ class McpWrapper extends Plugin
         $toolRegistry->registerToolClass(SystemTools::class);
         
         // TODO: Add more tool classes here or allow plugins to register their own
+    }
+    
+    /**
+     * Configure custom logging for MCP Wrapper plugin
+     */
+    private function _configureLogging(): void
+    {
+        $logPath = Craft::getAlias('@storage/logs/mcpwrapper.log');
+        
+        // Add custom file target for mcp-wrapper category
+        Craft::getLogger()->dispatcher->targets['mcpwrapper'] = new \craft\log\FileTarget([
+            'logFile' => $logPath,
+            'categories' => ['mcp-wrapper'],
+            'levels' => ['error', 'warning', 'info', 'trace'],
+            'logVars' => [],
+            'maxFileSize' => 10240, // 10MB
+            'maxLogFiles' => 5,
+        ]);
+        
+        Craft::info('MCP Wrapper logging configured: ' . $logPath, 'mcp-wrapper');
     }
 }
