@@ -335,36 +335,29 @@ class ManifestBuilderService extends Component
     private function getAllowedSectionsForSchema(string $token): array
     {
         try {
-            // Get all GraphQL schemas
-            $schemas = Craft::$app->getGql()->getSchemas();
+            // Find the GQL token record first
+            $gqlToken = \craft\models\GqlToken::find()->where(['accessToken' => $token])->one();
             
-            Craft::info("Total GraphQL schemas found: " . count($schemas), 'mcp-wrapper');
-            
-            // Find schema by token
-            $targetSchema = null;
-            foreach ($schemas as $schema) {
-                Craft::info("Checking schema: {$schema->name}", 'mcp-wrapper');
-                
-                // Generate token from schema UID (this is how Craft generates tokens)
-                $schemaToken = Craft::$app->getSecurity()->hashData($schema->uid);
-                
-                if ($schemaToken === $token) {
-                    $targetSchema = $schema;
-                    break;
-                }
-            }
-            
-            if (!$targetSchema) {
-                Craft::warning("Could not find GraphQL schema for token", 'mcp-wrapper');
+            if (!$gqlToken) {
+                Craft::warning("Could not find GQL token record", 'mcp-wrapper');
                 return []; // Empty array means allow all
             }
             
-            Craft::info("Found GraphQL schema: {$targetSchema->name} (uid: {$targetSchema->uid})", 'mcp-wrapper');
-            Craft::info("Schema scope: " . json_encode($targetSchema->scope), 'mcp-wrapper');
-            Craft::info("Schema is public: " . ($targetSchema->isPublic ? 'YES' : 'NO'), 'mcp-wrapper');
+            Craft::info("Found GQL token: {$gqlToken->name} (schema ID: {$gqlToken->schemaId})", 'mcp-wrapper');
+            
+            // Get the schema for this token
+            $schema = Craft::$app->getGql()->getSchemaById($gqlToken->schemaId);
+            
+            if (!$schema) {
+                Craft::warning("Could not find GraphQL schema for token's schema ID", 'mcp-wrapper');
+                return [];
+            }
+            
+            Craft::info("Found GraphQL schema: {$schema->name} (uid: {$schema->uid})", 'mcp-wrapper');
+            Craft::info("Schema scope: " . json_encode($schema->scope), 'mcp-wrapper');
             
             // Get the schema's scope (permissions)
-            $scope = $targetSchema->scope ?? [];
+            $scope = $schema->scope ?? [];
             if (empty($scope)) {
                 Craft::info("Schema has empty scope - this might be a public schema or misconfigured", 'mcp-wrapper');
                 return [];
