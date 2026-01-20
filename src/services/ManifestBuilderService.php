@@ -191,10 +191,17 @@ class ManifestBuilderService extends Component
     private function buildToolForSection(string $sectionHandle, string $schemaHandle): ?array
     {
         $section = Craft::$app->getEntries()->getSectionByHandle($sectionHandle);
-        if (!$section) return null;
+        if (!$section) {
+            Craft::warning("Section not found: {$sectionHandle}", 'mcp-wrapper');
+            return null;
+        }
 
+        Craft::info("Found section: {$sectionHandle}, getting entry types...", 'mcp-wrapper');
+        $entryTypes = $section->getEntryTypes();
+        Craft::info("Entry types type: " . gettype($entryTypes) . ", value: " . json_encode($entryTypes), 'mcp-wrapper');
+        
         $fields = [];
-        foreach ($section->getEntryTypes() as $entryType) {
+        foreach ($entryTypes as $entryType) {
             foreach ($entryType->getFieldLayout()->getCustomFields() as $field) {
                 $fields[] = $this->describeField($field);
             }
