@@ -127,7 +127,7 @@ class McpWrapper extends Plugin
         $logPath = Craft::getAlias('@storage/logs/mcpwrapper.log');
         
         // Add custom file target for mcp-wrapper category
-        Craft::getLogger()->dispatcher->targets['mcpwrapper'] = new \craft\log\FileTarget([
+        Craft::getLogger()->dispatcher->targets['mcpwrapper'] = new \yii\log\FileTarget([
             'logFile' => $logPath,
             'categories' => ['mcp-wrapper'],
             'levels' => ['error', 'warning', 'info', 'trace'],
