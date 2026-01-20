@@ -62,6 +62,10 @@ class ManifestBuilderService extends Component
         } catch (\Exception $e) {
             Craft::warning("Failed to generate manifest from Craft services, falling back to GraphQL introspection: {$e->getMessage()}", 'mcp-wrapper');
             
+            // Get allowed sections from the GraphQL schema
+            $allowedSections = $this->getAllowedSectionsForSchema($token);
+            Craft::info("Allowed sections for schema: " . implode(', ', $allowedSections), 'mcp-wrapper');
+            
             // Fallback to GraphQL introspection
             $schemaData = $this->introspectGraphQL($token);
             $types = $schemaData['types'] ?? [];
@@ -87,6 +91,12 @@ class ManifestBuilderService extends Component
                 if (str_ends_with($fieldName, 'Entries')) {
                     // Extract section handle (e.g., "servicesEntries" -> "services")
                     $sectionHandle = substr($fieldName, 0, -7); // Remove "Entries" suffix
+                    
+                    // Skip if this section is not allowed in the schema
+                    if (!empty($allowedSections) && !in_array($sectionHandle, $allowedSections)) {
+                        Craft::info("Skipping section '{$sectionHandle}' - not enabled in schema", 'mcp-wrapper');
+                        continue;
+                    }
                     
                     Craft::info("Processing GraphQL query field '{$fieldName}' -> section handle '{$sectionHandle}'", 'mcp-wrapper');
                     
@@ -296,6 +306,63 @@ class ManifestBuilderService extends Component
             }
         }
         return $filters;
+    }
+
+    /**
+     * Get allowed sections for a GraphQL schema by looking up scopes
+     */
+    private function getAllowedSectionsForSchema(string $token): array
+    {
+        try {
+            // Get all GraphQL schemas
+            $schemas = Craft::$app->getGql()->getSchemas();
+            
+            // Find schema by token
+            $targetSchema = null;
+            foreach ($schemas as $schema) {
+                if ($schema->accessToken === $token) {
+                    $targetSchema = $schema;
+                    break;
+                }
+            }
+            
+            if (!$targetSchema) {
+                Craft::warning("Could not find GraphQL schema for token", 'mcp-wrapper');
+                return []; // Empty array means allow all
+            }
+            
+            Craft::info("Found GraphQL schema: {$targetSchema->name} (uid: {$targetSchema->uid})", 'mcp-wrapper');
+            
+            // Get the schema's scope (permissions)
+            $scope = $targetSchema->scope ?? [];
+            if (empty($scope)) {
+                Craft::info("Schema has empty scope - allowing all sections", 'mcp-wrapper');
+                return [];
+            }
+            
+            // Parse scope to find enabled sections
+            // Scope format: ["sections.{uid}:read", "sections.{uid}:read", ...]
+            $allowedSections = [];
+            foreach ($scope as $permission) {
+                if (str_starts_with($permission, 'sections.') && str_ends_with($permission, ':read')) {
+                    // Extract section UID
+                    $sectionUid = substr($permission, 9, -5); // Remove "sections." and ":read"
+                    
+                    // Get section by UID
+                    $section = Craft::$app->getEntries()->getSectionByUid($sectionUid);
+                    if ($section) {
+                        $allowedSections[] = $section->handle;
+                        Craft::info("Schema allows section: {$section->handle} (uid: {$sectionUid})", 'mcp-wrapper');
+                    }
+                }
+            }
+            
+            return $allowedSections;
+            
+        } catch (\Exception $e) {
+            Craft::error("Error getting allowed sections: {$e->getMessage()}", 'mcp-wrapper');
+            return []; // Empty array means allow all on error
+        }
     }
 
     private function introspectGraphQL(string $token): array
