@@ -159,11 +159,15 @@ export default new bp.Integration({
         
         // For craft_get_office_contact_info, pass slug directly
         if (toolName === 'craft_get_office_contact_info') {
-          logger.forBot().info(`Getting office contact info for slug: ${queryArgs.slug}`)
+          const slug = typeof queryArgs.slug === 'string' ? queryArgs.slug : (Array.isArray(queryArgs.slug) ? queryArgs.slug[0] : queryArgs.slug)
           
-          const result = await client.callTool(toolName, {
-            slug: queryArgs.slug,
-          })
+          logger.forBot().info(`Getting office contact info for slug: ${slug} (type: ${typeof slug})`)
+          
+          if (!slug) {
+            throw new Error('slug parameter is required for craft_get_office_contact_info')
+          }
+          
+          const result = await client.callTool(toolName, { slug })
           
           logger.forBot().info(`Office contact info result: ${JSON.stringify(result).substring(0, 500)}`)
           

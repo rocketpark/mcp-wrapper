@@ -37,11 +37,11 @@ export default new IntegrationDefinition({
       description: 'Query content from a specific Craft CMS section with full Craft query parameters',
       input: {
         schema: z.object({
-          toolName: z.string().describe('Name of the MCP tool to call (e.g., query_news, query_topics)'),
+          toolName: z.string().describe('Name of the MCP tool to call (e.g., query_news, query_topics, craft_get_office_contact_info)'),
           // Common filters
           search: z.string().optional().describe('Full-text search query'),
           title: z.string().optional().describe('Filter by entry title'),
-          slug: z.array(z.string()).optional().describe('Filter by entry slugs'),
+          slug: z.union([z.string(), z.array(z.string())]).optional().describe('Single slug string (for craft_get_office_contact_info) or array of slugs (for filtering)'),
           id: z.array(z.number()).optional().describe('Filter by specific entry IDs'),
           // Status filters
           status: z.array(z.string()).optional().describe('Filter by status (live, pending, expired, disabled)'),

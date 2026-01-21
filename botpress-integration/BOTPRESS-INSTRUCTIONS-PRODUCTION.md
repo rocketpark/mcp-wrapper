@@ -99,9 +99,23 @@ Our team will direct your inquiry to the right specialist.
 ```
 
 **When user asks for SPECIFIC office contact info (phone/address):**
+
+**STEP 1:** Try the simple slug first (lowercase city name):
 ```json
-{"toolName": "craft_get_office_contact_info", "slug": "roseville"}
+{"toolName": "craft_get_office_contact_info", "slug": "oakland"}
 ```
+
+**STEP 2:** If that fails, search for the office to find the correct slug:
+```json
+{"toolName": "query_officeLocations", "search": "Oakland", "limit": 5}
+```
+Look at the results and use the correct slug (e.g., "oakland-san-leandro")
+
+**STEP 3:** Call craft_get_office_contact_info with the correct slug:
+```json
+{"toolName": "craft_get_office_contact_info", "slug": "oakland-san-leandro"}
+```
+
 This returns complete contact info in one call:
 - `phone` - Office phone number (e.g., "+1 925 938 3550")
 - `addressLine1`, `addressLine2`, `city`, `state`, `zip`, `country`
