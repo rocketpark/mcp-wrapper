@@ -52,66 +52,155 @@ class EntryTools
     }
 
     /**
-     * Search entries across all sections
+     * Query entries with full Craft parameter support
      */
     #[Tool(
         name: 'craft_search_entries',
-        description: 'Search entries by title/slug across all sections with advanced filtering',
+        description: 'Query entries using any Craft entry query parameters including custom fields. Supports all parameters from https://craftcms.com/docs/5.x/reference/element-types/entries.html#parameters',
         inputSchema: [
             'type' => 'object',
             'properties' => [
-                'search' => [
-                    'type' => 'string',
-                    'description' => 'Search term for title/slug',
-                ],
                 'section' => [
-                    'type' => 'string',
-                    'description' => 'Limit to specific section handle (optional)',
+                    'type' => ['string', 'array'],
+                    'description' => 'Section handle(s) to query',
+                ],
+                'type' => [
+                    'type' => ['string', 'array'],
+                    'description' => 'Entry type handle(s)',
+                ],
+                'slug' => [
+                    'type' => ['string', 'array'],
+                    'description' => 'Entry slug(s)',
                 ],
                 'status' => [
+                    'type' => ['string', 'array'],
+                    'description' => 'Entry status (live, pending, expired, disabled, or any)',
+                ],
+                'search' => [
                     'type' => 'string',
-                    'enum' => ['live', 'pending', 'expired', 'disabled'],
-                    'description' => 'Entry status filter (optional)',
+                    'description' => 'Full-text search term (only searches fields marked as searchable)',
+                ],
+                'title' => [
+                    'type' => 'string',
+                    'description' => 'Filter by exact or partial title match',
+                ],
+                'id' => [
+                    'type' => ['integer', 'array'],
+                    'description' => 'Entry ID(s)',
+                ],
+                'authorId' => [
+                    'type' => ['integer', 'array'],
+                    'description' => 'Filter by author ID(s)',
+                ],
+                'postDate' => [
+                    'type' => 'string',
+                    'description' => 'Filter by post date (e.g., ">= 2024-01-01", "< now")',
+                ],
+                'before' => [
+                    'type' => 'string',
+                    'description' => 'Entries posted before this date',
+                ],
+                'after' => [
+                    'type' => 'string',
+                    'description' => 'Entries posted after this date',
+                ],
+                'expiryDate' => [
+                    'type' => 'string',
+                    'description' => 'Filter by expiry date',
+                ],
+                'site' => [
+                    'type' => ['string', 'array'],
+                    'description' => 'Site handle(s)',
+                ],
+                'siteId' => [
+                    'type' => ['integer', 'array'],
+                    'description' => 'Site ID(s)',
+                ],
+                'unique' => [
+                    'type' => 'boolean',
+                    'description' => 'Whether to return unique entries across sites',
+                ],
+                'orderBy' => [
+                    'type' => 'string',
+                    'description' => 'Order results (e.g., "title", "postDate desc", "RAND()")',
                 ],
                 'limit' => [
                     'type' => 'integer',
-                    'description' => 'Maximum entries to return (default: 20)',
+                    'description' => 'Maximum entries to return (default: 20, use null for no limit)',
                     'default' => 20,
                 ],
+                'offset' => [
+                    'type' => 'integer',
+                    'description' => 'Number of entries to skip (for pagination)',
+                ],
+                'relatedTo' => [
+                    'type' => ['integer', 'array', 'object'],
+                    'description' => 'Filter by related elements (entry ID, array of IDs, or criteria object)',
+                ],
+                'ancestorOf' => [
+                    'type' => 'integer',
+                    'description' => 'Entries that are ancestors of this entry ID',
+                ],
+                'descendantOf' => [
+                    'type' => 'integer',
+                    'description' => 'Entries that are descendants of this entry ID',
+                ],
+                'level' => [
+                    'type' => 'integer',
+                    'description' => 'Structure level',
+                ],
+                'fields' => [
+                    'type' => 'object',
+                    'description' => 'Custom field filters as key-value pairs (e.g., {"myTextField": "value", "myNumberField": 42})',
+                    'additionalProperties' => true,
+                ],
             ],
-            'required' => ['search'],
+            'additionalProperties' => false,
         ],
         dangerous: false,
     )]
-    public function searchEntries(
-        string $search,
-        ?string $section = null,
-        ?string $status = null,
-        int $limit = 20
-    ): array {
-        return SafeExecution::run(function() use ($search, $section, $status, $limit) {
-            $query = Entry::find()
-                ->search($search)
-                ->limit($limit);
+    public function searchEntries(array $params = []): array
+    {
+        return SafeExecution::run(function() use ($params) {
+            $query = Entry::find();
             
-            if ($section) {
-                $query->section($section);
+            // Set default limit if not specified
+            if (!isset($params['limit'])) {
+                $query->limit(20);
             }
             
-            if ($status) {
-                $query->status($status);
+            // Extract custom fields (they need special handling)
+            $customFields = $params['fields'] ?? [];
+            unset($params['fields']);
+            
+            // Apply all standard Craft parameters
+            foreach ($params as $param => $value) {
+                if ($value !== null) {
+                    $query->{$param}($value);
+                }
+            }
+            
+            // Apply custom field filters
+            foreach ($customFields as $fieldHandle => $fieldValue) {
+                $query->{$fieldHandle}($fieldValue);
             }
             
             $entries = $query->all();
             
+            // Build metadata about the query
+            $metadata = array_filter([
+                'totalResults' => count($entries),
+                'limit' => $params['limit'] ?? 20,
+                'offset' => $params['offset'] ?? 0,
+                'section' => $params['section'] ?? null,
+                'type' => $params['type'] ?? null,
+                'orderBy' => $params['orderBy'] ?? null,
+            ]);
+            
             return Response::list('entries', array_map(
                 fn($entry) => $this->serializeEntry($entry),
                 $entries
-            ), [
-                'searchTerm' => $search,
-                'section' => $section,
-                'status' => $status,
-            ]);
+            ), $metadata);
         });
     }
 
