@@ -197,10 +197,10 @@ class EntryTools
                 'orderBy' => $params['orderBy'] ?? null,
             ]);
             
-            return Response::list('entries', array_map(
+            return Response::list('entries', array_values(array_filter(array_map(
                 fn($entry) => $this->serializeEntry($entry),
                 $entries
-            ), $metadata);
+            ))), $metadata);
         });
     }
 
@@ -254,24 +254,28 @@ class EntryTools
     /**
      * Serialize entry to array with all fields
      */
-    private function serializeEntry(Entry $entry): array
+    private function serializeEntry(?Entry $entry): ?array
     {
+        if (!$entry) {
+            return null;
+        }
+        
         $data = [
             'id' => $entry->id,
             'title' => $entry->title,
             'slug' => $entry->slug,
             'uri' => $entry->uri,
             'url' => $entry->url,
-            'section' => [
+            'section' => $entry->section ? [
                 'id' => $entry->section->id,
                 'handle' => $entry->section->handle,
                 'name' => $entry->section->name,
-            ],
-            'type' => [
+            ] : null,
+            'type' => $entry->type ? [
                 'id' => $entry->type->id,
                 'handle' => $entry->type->handle,
                 'name' => $entry->type->name,
-            ],
+            ] : null,
             'status' => $entry->status,
             'enabled' => $entry->enabled,
             'postDate' => $entry->postDate?->format('Y-m-d H:i:s'),
