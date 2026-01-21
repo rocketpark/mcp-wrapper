@@ -677,7 +677,7 @@ class McpServerService extends Component
         // Remove section filter since we're using section-specific field
         $filters = array_filter($filters, fn($f) => !str_contains($f, 'section:'));
 
-        // If we have inline fragments (entry type specific fields), wrap basic fields in the same fragments
+        // If we have inline fragments (entry type specific fields), use them
         if (!empty($fieldsList)) {
             return sprintf(
                 'query { %s(%s) { %s } }',
@@ -686,12 +686,34 @@ class McpServerService extends Component
                 $fieldsList  // This already includes "... on TypeName { id title slug ... }"
             );
         } else {
-            // Fallback for sections without custom fields
-            return sprintf(
-                'query { %s(%s) { id title slug uri dateCreated dateUpdated } }',
-                $sectionField,
-                implode(', ', $filters)
-            );
+            // Fallback: Build basic inline fragments for sections without custom fields
+            // This is needed because Craft GraphQL uses union types that require inline fragments
+            $section = Craft::$app->getEntries()->getSectionByHandle($sectionHandle);
+            $fallbackFragments = [];
+            
+            if ($section) {
+                foreach ($section->getEntryTypes() as $entryType) {
+                    $typeName = $entryType->handle . '_Entry';
+                    $fallbackFragments[] = "... on {$typeName} { id title slug uri dateCreated dateUpdated }";
+                }
+            }
+            
+            if (!empty($fallbackFragments)) {
+                return sprintf(
+                    'query { %s(%s) { %s } }',
+                    $sectionField,
+                    implode(', ', $filters),
+                    implode(' ', $fallbackFragments)
+                );
+            } else {
+                // Ultimate fallback - try without inline fragments (will likely fail for union types)
+                Craft::warning("No entry types found for section {$sectionHandle}, query may fail", 'mcp-wrapper');
+                return sprintf(
+                    'query { %s(%s) { id title slug uri dateCreated dateUpdated } }',
+                    $sectionField,
+                    implode(', ', $filters)
+                );
+            }
         }
     }
 
@@ -760,19 +782,9 @@ class McpServerService extends Component
                 continue;
             }
             
-            // Check if this entry type actually has entries
-            $entryCount = \craft\elements\Entry::find()
-                ->section($section->handle)
-                ->type($entryType->handle)
-                ->status(null)  // Include all statuses
-                ->count();
-                
-            if ($entryCount === 0) {
-                Craft::info("Skipping empty entry type: {$typeName} (no entries)", 'mcp-wrapper');
-                continue;
-            }
-            
-            Craft::info("Including type: {$typeName} in query ({$entryCount} entries)", 'mcp-wrapper');
+            // Include all entry types registered in GraphQL, regardless of entry count
+            // This ensures queries work even if sections are empty or entries are disabled
+            Craft::info("Including type: {$typeName} in query", 'mcp-wrapper');
 
             $fields = [];
             foreach ($entryType->getFieldLayout()->getCustomFields() as $field) {
