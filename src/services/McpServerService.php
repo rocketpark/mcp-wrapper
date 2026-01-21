@@ -688,13 +688,59 @@ class McpServerService extends Component
         } else {
             // Fallback: Build basic inline fragments for sections without custom fields
             // This is needed because Craft GraphQL uses union types that require inline fragments
-            $section = Craft::$app->getEntries()->getSectionByHandle($sectionHandle);
+            // We need to check what types are actually in the GraphQL schema, not just Craft
+            
             $fallbackFragments = [];
             
-            if ($section) {
-                foreach ($section->getEntryTypes() as $entryType) {
-                    $typeName = $entryType->handle . '_Entry';
-                    $fallbackFragments[] = "... on {$typeName} { id title slug uri dateCreated dateUpdated }";
+            try {
+                $token = $this->getSchemaToken($params);
+                $schema = $this->introspectGraphQLSchema($token);
+                $availableTypes = array_column($schema['types'], 'name');
+                
+                // Check if there's a union type for this section
+                $unionTypeName = $sectionHandle . 'SectionEntryUnion';
+                if (in_array($unionTypeName, $availableTypes)) {
+                    // Query the union type to get possible types
+                    $client = new \GuzzleHttp\Client([
+                        'base_uri' => Craft::$app->request->getHostInfo(),
+                        'timeout' => 10,
+                    ]);
+                    
+                    $introspectionQuery = sprintf(
+                        '{ __type(name: "%s") { possibleTypes { name } } }',
+                        $unionTypeName
+                    );
+                    
+                    $response = $client->post('/api', [
+                        'headers' => [
+                            'Authorization' => 'Bearer ' . $token,
+                            'Content-Type' => 'application/json',
+                        ],
+                        'json' => ['query' => $introspectionQuery],
+                    ]);
+                    
+                    $data = json_decode($response->getBody()->getContents(), true);
+                    $possibleTypes = $data['data']['__type']['possibleTypes'] ?? [];
+                    
+                    foreach ($possibleTypes as $type) {
+                        $typeName = $type['name'];
+                        $fallbackFragments[] = "... on {$typeName} { id title slug uri dateCreated dateUpdated }";
+                    }
+                    
+                    Craft::info("Built fallback fragments for {$sectionHandle} from union type: " . count($fallbackFragments) . " types", 'mcp-wrapper');
+                }
+            } catch (\Exception $e) {
+                Craft::warning("Failed to build fallback fragments from GraphQL schema: {$e->getMessage()}", 'mcp-wrapper');
+            }
+            
+            // If we couldn't get types from GraphQL, try from Craft as last resort
+            if (empty($fallbackFragments)) {
+                $section = Craft::$app->getEntries()->getSectionByHandle($sectionHandle);
+                if ($section) {
+                    foreach ($section->getEntryTypes() as $entryType) {
+                        $typeName = $entryType->handle . '_Entry';
+                        $fallbackFragments[] = "... on {$typeName} { id title slug uri dateCreated dateUpdated }";
+                    }
                 }
             }
             
