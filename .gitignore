@@ -10,25 +10,36 @@
 .history/
 .serena/
 .claude/
-composer.lock
+
+# Temporary/empty files
+id
+title
+typeId
+config.php
 
 # Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
 .codacy/
 
-# Ignore documentation and test files (temporary working files)
-TESTING-GUIDE.md
-TEST-RESULTS.md
-DEPLOYMENT-TEST-RESULTS.md
-PHASE-2-COMPLETE.md
-QUICK-REFERENCE.md
-IMPLEMENTATION-PROGRESS.md
+# Temporary documentation files
+*-TEMP.md
+*-DRAFT.md
+FIX-*.md
+DEPLOY-*.md
+PRODUCTION-*.md
+*-FIXES.md
+*-TEST-*.md
+*-CHECKLIST.md
+*-WORKFLOWS.md
+*-IMPLEMENTATION*.md
 
-# Ignore diagnostic scripts
+# Diagnostic and test scripts
 diagnose-*.sh
-test-implementation.php
+test-*.sh
+test-*.php
+test-*.js
+*.sql
 
-# Ignore backup files
+# Backup files
 *.backup
 src/**/*.backup
-# Cache bust Tue Jan 20 17:12:48 EST 2026
