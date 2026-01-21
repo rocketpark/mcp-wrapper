@@ -14,7 +14,7 @@ https://servicecurator.com/mcp/public
 # Test initialize
 curl -s -X POST 'https://servicecurator.com/mcp/public' \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc": "2.0", "method": "initialize", "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "test", "version": "1.0"}}, "id": 1}'
+  -d '{"jsonrpc": "2.0", "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "test", "version": "1.0"}}, "id": 1}'
 
 # Test tools/list  
 curl -s -X POST 'https://servicecurator.com/mcp/public' \

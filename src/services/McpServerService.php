@@ -14,9 +14,9 @@ use yii\web\Response;
  */
 class McpServerService extends Component
 {
-    private const MCP_VERSION = '2025-06-18';
+    private const MCP_VERSION = '2024-11-05';
     private const SERVER_NAME = 'craft-cms-mcp';
-    private const SERVER_VERSION = '1.0.0';
+    private const SERVER_VERSION = '2.0.0';
 
     /**
      * Handle incoming JSON-RPC 2.0 requests
@@ -92,13 +92,21 @@ class McpServerService extends Component
         return [
             'protocolVersion' => self::MCP_VERSION,
             'capabilities' => [
-                'tools' => (object) [], // Tools capability
-                'prompts' => (object) [], // Prompts capability
-                'resources' => (object) [], // Resources capability
+                'tools' => [
+                    'listChanged' => false, // We don't dynamically notify of tool list changes
+                ],
+                'prompts' => [
+                    'listChanged' => false, // We don't dynamically notify of prompt list changes
+                ],
+                'resources' => [
+                    'subscribe' => false, // We don't support resource subscriptions
+                    'listChanged' => false, // We don't dynamically notify of resource list changes
+                ],
             ],
             'serverInfo' => [
                 'name' => self::SERVER_NAME,
                 'version' => self::SERVER_VERSION,
+                'description' => 'Craft CMS Model Context Protocol server providing access to content, tools, and resources',
             ],
         ];
     }

@@ -52,6 +52,11 @@ class McpController extends Controller
     {
         $this->response->format = Response::FORMAT_JSON;
         
+        // Add security headers
+        $this->response->headers->set('X-Content-Type-Options', 'nosniff');
+        $this->response->headers->set('X-Frame-Options', 'DENY');
+        $this->response->headers->set('X-XSS-Protection', '1; mode=block');
+        
         try {
             // Parse JSON-RPC request
             $rawBody = Craft::$app->request->getRawBody();

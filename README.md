@@ -17,6 +17,7 @@ Enables AI assistants (Claude, ChatGPT, Botpress, etc.) to intelligently query y
 ## Live Example
 
 **Jensen Hughes AI Chatbot** powered by this plugin:
+
 - Visitors ask: "What services do you offer?"
 - Bot queries Craft CMS via MCP
 - Returns real, up-to-date service listings
@@ -24,6 +25,7 @@ Enables AI assistants (Claude, ChatGPT, Botpress, etc.) to intelligently query y
 ## Installation
 
 **Requirements:**
+
 - Craft CMS 5.0+
 - PHP 8.2+
 - Redis (recommended for caching)
@@ -81,11 +83,13 @@ Implements MCP specification `2025-06-18`:
 Plugin introspects your Craft CMS and auto-generates MCP tools:
 
 **Content Tools** (from GraphQL schema):
+
 - `query_news`, `query_products`, `query_pages`, etc.
 - One tool per section with full GraphQL query support
 - Pagination, search, filtering built-in
 
 **System Tools** (manual):
+
 - `craft_get_entry_by_id` - Fetch specific entries
 - `craft_search_entries` - Full-text search with filtering
 - `craft_get_entry_by_slug` - Get by section and slug
@@ -97,23 +101,29 @@ Plugin introspects your Craft CMS and auto-generates MCP tools:
 - `craft_clear_caches` ⚠️ (dangerous - disabled by default)
 - `craft_get_project_config_status` - Config sync status
 
-### Security Features
+#### Dangerous Tool Protection
+
 
 **1. Dangerous Tool Protection**
-```php
-'enableDangerousTools' => false
-```
+
+Blocks write/modify operations (cache clear, config rebuild, queue run).
+
+#### Tool Disabling
+
 Blocks write/modify operations (cache clear, config rebuild, queue run).
 
 **2. Tool Disabling**
-```php
-'disabledTools' => ['craft_read_logs', 'craft_get_queue_status']
-```
+
 Disable specific tools individually.
 
-**3. IP Allowlisting**
-```php
-'ipWhitelist' => [
+#### IP Allowlisting
+allowedIps' => [
+    '127.0.0.1',
+    '203.0.113.0/24',  // CIDR notation
+    '2001:db8::/32',   // IPv6 support
+]
+```
+Whitelist' => [
     '127.0.0.1',
     '203.0.113.0/24',  // CIDR notation
     '2001:db8::/32',   // IPv6 support
@@ -134,6 +144,7 @@ Configure different GraphQL schemas for different use cases:
 ```
 
 Each schema can have different:
+
 - Sections/entry types
 - Field visibility
 - Permission levels
@@ -143,15 +154,19 @@ Each schema can have different:
 ### Endpoints
 
 **MCP Server Endpoint** (JSON-RPC 2.0):
-```
+
+```text
 POST https://your-site.com/mcp/{schemaHandle}
 ```
+
 Example: `https://your-site.com/mcp/MCPSchema`
 
 **Manifest Endpoint** (Tool Discovery):
-```
+
+```text
 GET https://your-site.com/mcp/manifest/{schemaHandle}
 ```
+
 Example: `https://your-site.com/mcp/manifest/MCPSchema`
 
 ### MCP Client Integration

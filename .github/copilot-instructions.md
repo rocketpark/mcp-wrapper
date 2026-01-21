@@ -67,11 +67,15 @@ $toolRegistry->registerToolClass(EntryTools::class);
 ## Debugging Common Issues
 
 **Problem**: Production showing all 75 tools instead of filtered 18
-**Root cause**: GraphQL schema permissions out of sync between DB and project config
-**Fix**: `php craft project-config/apply` on production server
+**Root cause**: Fail-safe logic was "allow all" when GraphQL schema lookup failed. Production DB has empty schema scope while project config YAML has correct scope.
+**Fix Applied (commit 2204514)**: Changed fail-safe from "allow all" to "allow none" (secure by default)
+**Production Fix**: Run `php craft project-config/apply` to sync DB with YAML files
 
-**Problem**: Schema filtering not working
-**Check**: `storage/logs/mcpwrapper.log` for "Skipping section" messages. If missing, filtering code not running.
+**Problem**: Schema filtering not working / showing 0 or wrong number of tools  
+**Check**: `storage/logs/mcpwrapper.log` for messages:
+- "Could not find GQL token" = Token not in DB
+- "Schema has empty scope" = DB out of sync, run `php craft project-config/apply`
+- "Skipping section" messages = Filtering working correctly
 
 **Problem**: Composer not updating vendor code
 **Fix**: Add `--no-cache` to composer install in deployment script
