@@ -164,14 +164,14 @@ class EntryTools
         return SafeExecution::run(function() use ($params) {
             $query = Entry::find();
             
-            // Set default limit if not specified
-            if (!isset($params['limit'])) {
-                $query->limit(20);
-            }
-            
             // Extract custom fields (they need special handling)
             $customFields = $params['fields'] ?? [];
             unset($params['fields']);
+            
+            // Set default limit if not specified
+            if (!isset($params['limit'])) {
+                $params['limit'] = 20;
+            }
             
             // Apply all standard Craft parameters
             foreach ($params as $param => $value) {
@@ -185,11 +185,14 @@ class EntryTools
                 $query->{$fieldHandle}($fieldValue);
             }
             
+            // Get total count before limiting
+            $totalCount = $query->count();
+            
             $entries = $query->all();
             
             // Build metadata about the query
             $metadata = array_filter([
-                'totalResults' => count($entries),
+                'totalResults' => $totalCount,
                 'limit' => $params['limit'] ?? 20,
                 'offset' => $params['offset'] ?? 0,
                 'section' => $params['section'] ?? null,
