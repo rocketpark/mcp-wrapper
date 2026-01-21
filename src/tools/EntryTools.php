@@ -404,8 +404,9 @@ class EntryTools
             ];
 
             // Step 2: Get address details (if available)
-            if (isset($office->address) && count($office->address) > 0) {
-                $addressEntry = $office->address[0] ?? null;
+            $addressEntries = $office->address->all() ?? [];
+            if (count($addressEntries) > 0) {
+                $addressEntry = $addressEntries[0] ?? null;
                 
                 if ($addressEntry) {
                     $contactInfo['addressLine1'] = $addressEntry->addressLine1 ?? null;
@@ -434,8 +435,9 @@ class EntryTools
             }
 
             // Step 3: Get phone number from contactLinks (if available)
-            if (isset($office->contactLinks) && count($office->contactLinks) > 0) {
-                $contactLinksEntry = $office->contactLinks[0] ?? null;
+            $contactLinksEntries = $office->contactLinks->all() ?? [];
+            if (count($contactLinksEntries) > 0) {
+                $contactLinksEntry = $contactLinksEntries[0] ?? null;
                 
                 if ($contactLinksEntry && isset($contactLinksEntry->contactDetails)) {
                     // Extract phone from HTML: <a href="tel:+19259383550">+1 925 938 3550</a>
