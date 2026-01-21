@@ -93,7 +93,8 @@ class ManifestBuilderService extends Component
                     $sectionHandle = substr($fieldName, 0, -7); // Remove "Entries" suffix
                     
                     // Skip if this section is not allowed in the schema
-                    if (!empty($allowedSections) && !in_array($sectionHandle, $allowedSections)) {
+                    // null means allow all, empty array means allow none, populated array means check membership
+                    if ($allowedSections !== null && !in_array($sectionHandle, $allowedSections)) {
                         Craft::info("Skipping section '{$sectionHandle}' - not enabled in schema", 'mcp-wrapper');
                         continue;
                     }
@@ -167,14 +168,16 @@ class ManifestBuilderService extends Component
         
         // Get allowed sections for this schema
         $allowedSections = $this->getAllowedSectionsForSchema($token);
-        Craft::info("Schema '{$schemaHandle}' allows " . (empty($allowedSections) ? "ALL" : count($allowedSections)) . " sections", 'mcp-wrapper');
+        $sectionCount = $allowedSections === null ? "ALL" : (empty($allowedSections) ? "NONE (check project-config/apply)" : count($allowedSections));
+        Craft::info("Schema '{$schemaHandle}' allows {$sectionCount} sections", 'mcp-wrapper');
         
         $sections = Craft::$app->getEntries()->getAllSections();
         $tools = [];
         
         foreach ($sections as $section) {
             // Skip if this section is not allowed in the schema
-            if (!empty($allowedSections) && !in_array($section->handle, $allowedSections)) {
+            // null means allow all, empty array means allow none, populated array means check membership
+            if ($allowedSections !== null && !in_array($section->handle, $allowedSections)) {
                 Craft::info("Skipping section '{$section->handle}' - not enabled in schema '{$schemaHandle}'", 'mcp-wrapper');
                 continue;
             }
@@ -331,16 +334,17 @@ class ManifestBuilderService extends Component
 
     /**
      * Get allowed sections for a GraphQL schema by looking up scopes
+     * Returns null to indicate "allow all", empty array means "allow none", non-empty array means specific sections
      */
-    private function getAllowedSectionsForSchema(string $token): array
+    private function getAllowedSectionsForSchema(string $token): ?array
     {
         try {
             // Find the GQL token using Craft's service
             $gqlToken = Craft::$app->getGql()->getTokenByAccessToken($token);
             
             if (!$gqlToken) {
-                Craft::warning("Could not find GQL token", 'mcp-wrapper');
-                return []; // Empty array means allow all
+                Craft::error("Could not find GQL token - this will block all sections for security", 'mcp-wrapper');
+                return []; // Empty array means allow none (secure by default)
             }
             
             Craft::info("Found GQL token: {$gqlToken->name} (schema ID: {$gqlToken->schemaId})", 'mcp-wrapper');
@@ -349,7 +353,7 @@ class ManifestBuilderService extends Component
             $schema = Craft::$app->getGql()->getSchemaById($gqlToken->schemaId);
             
             if (!$schema) {
-                Craft::warning("Could not find GraphQL schema for token's schema ID", 'mcp-wrapper');
+                Craft::error("Could not find GraphQL schema for token's schema ID - blocking all sections", 'mcp-wrapper');
                 return [];
             }
             
@@ -359,8 +363,8 @@ class ManifestBuilderService extends Component
             // Get the schema's scope (permissions)
             $scope = $schema->scope ?? [];
             if (empty($scope)) {
-                Craft::info("Schema has empty scope - this might be a public schema or misconfigured", 'mcp-wrapper');
-                return [];
+                Craft::warning("Schema has empty scope - this might indicate project config is out of sync. Run: php craft project-config/apply", 'mcp-wrapper');
+                return []; // Empty scope means allow none (DB likely out of sync with project config)
             }
             
             // Parse scope to find enabled sections
@@ -384,7 +388,7 @@ class ManifestBuilderService extends Component
             
         } catch (\Exception $e) {
             Craft::error("Error getting allowed sections: {$e->getMessage()}", 'mcp-wrapper');
-            return []; // Empty array means allow all on error
+            return []; // Empty array means allow none on error (fail secure)
         }
     }
 

@@ -1,75 +1,102 @@
 # MCP Wrapper - Craft CMS Plugin
 
-## Project Overview
+## Architecture Overview
 
-This plugin generates MCP (Model Context Protocol) manifests for Craft CMS GraphQL APIs by introspecting GraphQL schemas and mapping Craft field types to MCP-compatible metadata. It enables AI/LLM tools to discover and interact with Craft CMS content.
+This plugin implements the Model Context Protocol (MCP) for Craft CMS, exposing content via JSON-RPC 2.0. It auto-generates tools from Craft sections AND allows manual tool registration via PHP attributes.
 
-**Core Architecture:**
-- `ManifestBuilderService`: Introspects GraphQL schemas, generates manifests with field/relationship metadata
-- `ManifestController`: Public API endpoint at `/actions/mcpwrapper/manifest/{schemaHandle}`
-- `UtilityController`: Admin-only CP utility for viewing/rebuilding manifests
-- File-based caching in `@storage/runtime/mcp/manifest-{schemaHandle}.json`
+**Data Flow:**
+1. Client → `/mcp/{schemaHandle}` (JSON-RPC endpoint)
+2. McpServerService → ToolRegistry → ManifestBuilderService
+3. Filters tools by GraphQL schema permissions (section UIDs from project config)
+4. Returns MCP-compliant tool list or executes tool calls
 
-## Configuration Pattern
+**Key Services:**
+- `ManifestBuilderService`: Generates tools from Craft sections, filters by GraphQL schema scope
+- `ToolRegistryService`: Combines auto-generated + manual tools (via #[Tool] attribute)
+- `McpServerService`: JSON-RPC 2.0 handler (initialize, tools/list, tools/call)
 
-Schema-to-token mapping in `config.php`:
+## Configuration (config/mcpwrapper.php)
 
 ```php
 'schemas' => [
-    'ai' => getenv('GQL_AI_TOKEN'),
-    'frontend' => getenv('GQL_FRONTEND_TOKEN'),
+    'MCPSchema' => getenv('MCP_GQLSCHEMA_TOKEN'),
+],
+'security' => [
+    'enableDangerousTools' => false,  // Production safety
+    'disabledTools' => [],
+    'ipWhitelist' => [],
 ]
 ```
 
-Each schema handle maps to a GraphQL bearer token. Manifests are accessible at `/actions/mcpwrapper/manifest/{schemaHandle}` (e.g., `/actions/mcpwrapper/manifest/ai`).
+**CRITICAL**: Schema filtering reads GraphQL schema scope from `config/project/graphql/schemas/{uid}.yaml`. If schema shows wrong sections, run `php craft project-config/apply` to sync DB with project config.
 
-## Key Components
+## Tool Development Pattern
 
-### Manifest Generation Flow
+**Auto-generated tools** (from Craft sections):
+- One tool per section: `query_{sectionHandle}`
+- Filtering happens in `ManifestBuilderService::getAllowedSectionsForSchema()` which parses `sections.{uid}:read` from GraphQL schema scope
+- See `getGeneratedTools()` for implementation
 
-1. **GraphQL Introspection** (`ManifestBuilderService::introspectGraphQL`): Uses Guzzle to query `/__schema` with bearer token
-2. **Field Type Mapping**: PlainText→string, Lightswitch→boolean, Date→datetime, Entries/Assets/Categories/Users/Tags→relation
-3. **Relationship Metadata Extraction**: Parses source restrictions (e.g., `section:news`, `volume:images`) from relational fields
-4. **Caching**: Writes JSON to `@storage/runtime/mcp/` directory
-
-### Cache Invalidation
-
-Auto-clears on these Craft events (see `Plugin.php`):
-- `ProjectConfig::EVENT_REBUILD`
-- `Gql::EVENT_AFTER_SAVE_SCHEMA`
-
-## Common Tasks
-
-### Testing Manifest Generation
-
-```bash
-# Via browser/curl with force rebuild
-curl http://your-site.test/actions/mcpwrapper/manifest/ai?force=1
-
-# Check cached manifest
-cat storage/runtime/mcp/manifest-ai.json
+**Manual tools** (src/tools/):
+```php
+#[Tool(
+    name: 'craft_get_entry_by_id',
+    description: 'Get entry by ID bypassing GraphQL',
+    inputSchema: ['type' => 'object', 'properties' => [...]],
+    dangerous: false
+)]
+public function getEntryById(int $id): array {
+    return SafeExecution::run(fn() => /* ... */);
+}
 ```
 
-### Adding New Field Type Mappings
+Register in `McpWrapper::registerToolClasses()`:
+```php
+$toolRegistry->registerToolClass(EntryTools::class);
+```
 
-Modify `ManifestBuilderService::mapFieldType()` match expression. Relationship fields (Entries, Assets, etc.) automatically extract source metadata via `extractSourceHandles()`.
+## Routing (src/McpWrapper.php)
 
-### Debugging Schema Issues
+```php
+'mcp/<schemaHandle>' => 'mcp-wrapper/mcp/index'           // JSON-RPC endpoint
+'mcp/manifest/<schemaHandle>' => 'mcp-wrapper/manifest/index'  // Tool discovery
+```
 
-The `introspectGraphQL()` method expects valid GraphQL tokens from `config.php`. Check:
-1. Token is set in environment variables
-2. GraphQL schema exists in Craft CP → GraphQL → Schemas
-3. Token has proper permissions for the schema
+**URLs:** `/mcp/MCPSchema` (NOT `/actions/mcp-wrapper/mcp/index?schemaHandle=X`)
 
-## Craft CMS Specifics
+## Debugging Common Issues
 
-- **PSR-4 Namespace**: `rocketpark\mcpwrapper` (defined in `composer.json`)
-- **Plugin Handle**: `mcp-wrapper` (used in URL routes)
-- **Plugin Class**: `rocketpark\mcpwrapper\McpWrapper` (bootstraps in `Plugin.php`)
-- **Module Access**: `Craft::$app->getModule('mcpwrapper')->get('manifestBuilder')`
+**Problem**: Production showing all 75 tools instead of filtered 18
+**Root cause**: GraphQL schema permissions out of sync between DB and project config
+**Fix**: `php craft project-config/apply` on production server
 
-## Dependencies
+**Problem**: Schema filtering not working
+**Check**: `storage/logs/mcpwrapper.log` for "Skipping section" messages. If missing, filtering code not running.
 
-- PHP 8.2+
-- Craft CMS 5.0+
-- Guzzle (for GraphQL introspection via HTTP)
+**Problem**: Composer not updating vendor code
+**Fix**: Add `--no-cache` to composer install in deployment script
+
+## Testing
+
+```bash
+# Local: List tools for MCPSchema
+curl -X POST "http://site.test/mcp/MCPSchema" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":1}'
+
+# Production: Check tool count (should be ~18, not 75)
+curl -s "https://site.com/mcp/MCPSchema" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":1}' | jq '.result.tools | length'
+
+# Force manifest rebuild
+curl "https://site.com/mcp/manifest/MCPSchema?force=1"
+```
+
+## Project Conventions
+
+- **Logging**: All info/warnings go to `storage/logs/mcpwrapper.log` (category: 'mcp-wrapper')
+- **Error handling**: Wrap tool execution in `SafeExecution::run()` for consistent error responses
+- **Config access**: `Craft::$app->getConfig()->getConfigFromFile('mcpwrapper')` NOT `Craft::$app->config`
+- **Service access**: Via Craft module system: `Craft::$app->getModule('mcp-wrapper')->get('serviceName')`
+- **Caching**: File-based at `@storage/runtime/mcp/manifest-{schema}.json`
