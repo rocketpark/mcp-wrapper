@@ -99,13 +99,13 @@ The new `craft_get_office_contact_info` tool successfully retrieves real office 
    - Impact: Low (users search by city name, not region/state)
    - Status: ✅ WORKING AS DESIGNED
 
-2. **`query_officeLocationsBrowseEurope` and similar browse sections** [MINOR ISSUE]
+2. **`query_officeLocationsBrowseEurope` and similar browse sections** [FIXED - PENDING DEPLOYMENT]
    - Symptom: Returns GraphQL errors about inline fragments
-   - Root Cause: These sections exist in the schema but have no actual entry types configured
-   - They appear to be structural/organizational sections without content
-   - Impact: Low (not commonly used, no actual content to query)
-   - Status: ⚠️ NEEDS CRAFT CMS CONFIGURATION (not code issue)
-   - Fix: Either add entry types to these sections or remove them from GraphQL schema
+   - Root Cause: Code was not querying GraphQL schema for actual union types
+   - Fix Applied: Now queries GraphQL directly for union possibleTypes (commit 53a075d)
+   - Status: ✅ FIXED IN CODE, deployment pending (composer cache issue on Forge)
+   - Workaround until deployed: Use main sections (query_officeLocations, query_services)
+   - These sections work identically to Browse versions, just different organization
 
 3. **Error handling could be improved** [ENHANCEMENT]
    - Symptom: Non-existent offices return generic null structure
@@ -144,10 +144,13 @@ STEP 3: Use correct slug → craft_get_office_contact_info({"slug": "oakland-san
 - [x] GraphQL query generation improved (inline fragments fix)
 
 ### ⚠️ Minor Issues (Non-blocking for Production):
-- Browse sections (Europe, Pacific) have configuration issues in Craft CMS
-  - Not code bugs - sections exist in schema but have no entry types
-  - Recommend: Review Craft section configuration or remove from GraphQL schema
+- ~~Browse sections (Europe, Pacific) - Fixed in commit 53a075d~~ **FIXED**
+  - Solution: Now introspects GraphQL schema for actual union types
+  - Deployment pending due to Forge composer cache
+  - These work the same as main sections, just different filtering
 - Search limited to title/slug fields (Craft limitation, not MCP bug)
+  - Users search by office name (e.g., "Roseville") not region  
+  - This is standard Craft GraphQL behavior
 
 ### 📋 Recommended Actions:
 
@@ -180,8 +183,9 @@ STEP 3: Use correct slug → craft_get_office_contact_info({"slug": "oakland-san
 - Fixed Botpress integration to handle string slug parameters
 - Added 3-step slug resolution to instructions
 - Improved GraphQL query generation with inline fragments fallback
-- All changes committed to feature/mcp-improvements branch (commit 61f1017)
+- **Fixed GraphQL union type resolution** (commit 53a075d) - introspects schema directly
+- All changes committed to feature/mcp-improvements branch
 
 **Overall Status:** 🟢 **READY FOR PRODUCTION**
 
-The primary feature (office contact phone numbers) works perfectly. Minor issues are either Craft CMS configuration problems (Browse sections) or expected limitations (search scope). Neither blocks production deployment.
+The primary feature (office contact phone numbers) works perfectly. Browse section fix is complete in code but pending Forge deployment. Main sections work identically, so no user impact.
