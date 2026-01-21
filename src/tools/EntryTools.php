@@ -310,6 +310,11 @@ class EntryTools
         if ($value === null) {
             return null;
         }
+        
+        // Handle scalar types (bool, int, float, string)
+        if (is_scalar($value)) {
+            return $value;
+        }
 
         // Handle arrays
         if (is_array($value)) {
@@ -317,7 +322,7 @@ class EntryTools
         }
 
         // Handle element queries (relations)
-        if (method_exists($value, 'all')) {
+        if (is_object($value) && method_exists($value, 'all')) {
             $elements = $value->all();
             return array_map(function($element) {
                 return [
