@@ -351,4 +351,105 @@ class EntryTools
 
         return $value;
     }
+
+    /**
+     * Get office contact information (phone, address, etc.) in one call
+     */
+    #[Tool(
+        name: 'craft_get_office_contact_info',
+        description: 'Get complete contact information for an office location including phone number, address, and contact form URL. This does the nested lookups automatically.',
+        inputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'slug' => [
+                    'type' => 'string',
+                    'description' => 'Office location slug (e.g., "roseville", "syracuse", "oakland")',
+                ],
+            ],
+            'required' => ['slug'],
+        ],
+        dangerous: false,
+    )]
+    public function getOfficeContactInfo(string $slug): array
+    {
+        return SafeExecution::run(function() use ($slug) {
+            // Step 1: Get the office entry
+            $office = Entry::find()
+                ->section('officeLocations')
+                ->slug($slug)
+                ->one();
+            
+            if (!$office) {
+                return Response::notFound("Office location '{$slug}' not found");
+            }
+
+            $contactInfo = [
+                'slug' => $slug,
+                'title' => $office->title,
+                'uri' => $office->uri,
+                'phone' => null,
+                'address' => null,
+                'addressLine1' => null,
+                'addressLine2' => null,
+                'city' => null,
+                'state' => null,
+                'zip' => null,
+                'country' => null,
+                'latitude' => null,
+                'longitude' => null,
+                'googleMapsUrl' => null,
+                'contactFormUrl' => "https://www.jensenhughes.com/contact/office-locations/form/{$slug}",
+                'officeDetailsUrl' => $office->url ?? "https://www.jensenhughes.com/{$office->uri}",
+                'officeSummary' => $office->officeSummary ?? null,
+            ];
+
+            // Step 2: Get address details (if available)
+            if (isset($office->address) && count($office->address) > 0) {
+                $addressEntry = $office->address[0] ?? null;
+                
+                if ($addressEntry) {
+                    $contactInfo['addressLine1'] = $addressEntry->addressLine1 ?? null;
+                    $contactInfo['addressLine2'] = $addressEntry->addressLine2 ?? null;
+                    $contactInfo['city'] = $addressEntry->city ?? null;
+                    $contactInfo['state'] = $addressEntry->state ?? null;
+                    $contactInfo['zip'] = $addressEntry->zip ?? null;
+                    $contactInfo['country'] = $addressEntry->country ?? null;
+                    $contactInfo['latitude'] = $addressEntry->latitude ?? null;
+                    $contactInfo['longitude'] = $addressEntry->longitude ?? null;
+
+                    // Build formatted address
+                    $addressParts = array_filter([
+                        $addressEntry->addressLine1 ?? null,
+                        $addressEntry->addressLine2 ?? null,
+                        trim(($addressEntry->city ?? '') . ', ' . ($addressEntry->state ?? '') . ' ' . ($addressEntry->zip ?? '')),
+                        $addressEntry->country ?? null,
+                    ]);
+                    $contactInfo['address'] = implode("\n", $addressParts);
+
+                    // Build Google Maps URL from lat/long
+                    if ($addressEntry->latitude && $addressEntry->longitude) {
+                        $contactInfo['googleMapsUrl'] = "https://www.google.com/maps?q={$addressEntry->latitude},{$addressEntry->longitude}";
+                    }
+                }
+            }
+
+            // Step 3: Get phone number from contactLinks (if available)
+            if (isset($office->contactLinks) && count($office->contactLinks) > 0) {
+                $contactLinksEntry = $office->contactLinks[0] ?? null;
+                
+                if ($contactLinksEntry && isset($contactLinksEntry->contactDetails)) {
+                    // Extract phone from HTML: <a href="tel:+19259383550">+1 925 938 3550</a>
+                    $html = $contactLinksEntry->contactDetails;
+                    if (preg_match('/>([^<]+)<\/a>/', $html, $matches)) {
+                        $contactInfo['phone'] = trim($matches[1]);
+                    } elseif (preg_match('/tel:([^"]+)/', $html, $matches)) {
+                        // Fallback: extract from href
+                        $contactInfo['phone'] = trim($matches[1]);
+                    }
+                }
+            }
+
+            return Response::found('contactInfo', $contactInfo);
+        });
+    }
 }
