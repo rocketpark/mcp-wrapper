@@ -157,6 +157,21 @@ export default new bp.Integration({
       try {
         logger.forBot().info(`Querying ${toolName} with args: ${JSON.stringify(queryArgs)}`)
         
+        // For craft_get_office_contact_info, pass slug directly
+        if (toolName === 'craft_get_office_contact_info') {
+          logger.forBot().info(`Getting office contact info for slug: ${queryArgs.slug}`)
+          
+          const result = await client.callTool(toolName, {
+            slug: queryArgs.slug,
+          })
+          
+          logger.forBot().info(`Office contact info result: ${JSON.stringify(result).substring(0, 500)}`)
+          
+          return {
+            content: result.content || [],
+          }
+        }
+        
         // For office locations with search terms, fetch all and filter by region
         if (toolName === 'query_officeLocations' && queryArgs.search) {
           const searchTerm = queryArgs.search.toLowerCase()
