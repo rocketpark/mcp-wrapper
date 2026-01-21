@@ -169,6 +169,13 @@ class ToolRegistryService extends Component
         // Use reflection to map named arguments to method parameters
         $method = new \ReflectionMethod($className, $methodName);
         $params = $method->getParameters();
+        
+        // Special case: if method has exactly one array parameter,
+        // pass all arguments as that array (for flexible parameter tools)
+        if (count($params) === 1 && $params[0]->getType()?->getName() === 'array') {
+            return $instance->$methodName($arguments);
+        }
+        
         $orderedArgs = [];
         
         // Map named arguments to positional arguments
