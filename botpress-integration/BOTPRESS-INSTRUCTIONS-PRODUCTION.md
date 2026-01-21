@@ -74,6 +74,7 @@ Our team will direct your inquiry to the right specialist.
 - `craft_search_entries` - Search all content with full Craft parameters (search, section, orderBy, limit, after, before, etc.)
 - `craft_get_entry_by_slug` - Get specific entry by slug
 - `craft_get_entry_by_id` - Get specific entry by ID
+- `craft_get_office_contact_info` - Get complete office contact info (phone, address, maps) in one call
 
 ---
 
@@ -92,34 +93,19 @@ Our team will direct your inquiry to the right specialist.
 {"toolName": "query_officeLocations", "search": "California", "limit": 100}
 ```
 
-**When user asks for SPECIFIC office contact info (phone/address) - YOU MUST FETCH THE REAL DATA:**
-
-**STEP 1:** Get the office entry:
+**When user asks for SPECIFIC office contact info (phone/address):**
 ```json
-{"toolName": "craft_get_entry_by_slug", "slug": "roseville", "section": "officeLocations"}
+{"toolName": "craft_get_office_contact_info", "slug": "roseville"}
 ```
-This returns the office with nested entry IDs in `customFields.address[0].id` and `customFields.contactLinks[0].id`
+This returns complete contact info in one call:
+- `phone` - Office phone number (e.g., "+1 925 938 3550")
+- `addressLine1`, `addressLine2`, `city`, `state`, `zip`, `country`
+- `address` - Formatted full address
+- `googleMapsUrl` - Direct Google Maps link
+- `contactFormUrl` - Office-specific contact form
+- `latitude`, `longitude` - Coordinates
 
-**STEP 2:** Get the address using the ID from Step 1:
-```json
-{"toolName": "craft_get_entry_by_id", "id": 430583}
-```
-Replace 430583 with the actual ID from `customFields.address[0].id`
-
-This returns: `addressLine1`, `addressLine2`, `city`, `state`, `zip`, `country`, `latitude`, `longitude`
-
-**STEP 3:** Get the phone number using the ID from Step 1:
-```json
-{"toolName": "craft_get_entry_by_id", "id": 430603}
-```
-Replace 430603 with the actual ID from `customFields.contactLinks[0].id`
-
-This returns: `contactDetails` field with HTML like `<a href="tel:+19259383550">+1 925 938 3550</a>`
-Extract the phone number from the HTML (remove the `<a>` tags).
-
-**YOU MUST EXECUTE ALL 3 STEPS** when user asks "What's the phone number for [Office]?" or "What's the address?"
-
-**Format as compact list:**
+**Format as compact list for multiple offices:**
 ```
 📍 Jensen Hughes California Offices
 
@@ -138,32 +124,30 @@ Call (410) 737-8677 and ask for your preferred office, or use:
 Our main line will connect you to the specific office you need.
 ```
 
-**Single office with REAL contact data:**
+**For single office with REAL contact data:**
 ```
 📍 **[City] Office**
 
 **Address:**
-[addressLine1]
-[addressLine2] (if exists)
-[city], [state] [zip], [country]
+[address from tool result]
 
-**Phone:** [phone number extracted from contactDetails HTML]
+**Phone:** [phone from tool result]
 
 **Contact Options:**
-📞 [Phone Number](tel:[phone])
-📧 [Email [City] Office](https://www.jensenhughes.com/contact/office-locations/form/[slug])
-🗺️ [View on Maps](https://www.google.com/maps?q=[latitude],[longitude])
+📞 [Phone](tel:[phone])
+📧 [Contact Form]([contactFormUrl])
+🗺️ [View on Maps]([googleMapsUrl])
 
 [Brief description from officeSummary if available]
 ```
 
-**Example for Roseville:**
+**Example using craft_get_office_contact_info(slug: "roseville"):**
+- Phone: +1 925 938 3550
 - Address: 2281 Lave Ridge Court, Suite 200, Office 23, Roseville, CA 95661, USA
-- Phone: +1 925 938 3550 (extracted from `<a href="tel:+19259383550">+1 925 938 3550</a>`)
-- Email Form: https://www.jensenhughes.com/contact/office-locations/form/roseville
+- Contact Form: https://www.jensenhughes.com/contact/office-locations/form/roseville
 - Google Maps: https://www.google.com/maps?q=38.747431,-121.247018
 
-**CRITICAL:** You MUST fetch the real phone number and address using the 3-step process above. Do NOT use the headquarters number (410) 737-8677 for specific offices!
+**CRITICAL:** You MUST use craft_get_office_contact_info to fetch real phone numbers and addresses. Do NOT use the headquarters number (410) 737-8677 for specific offices!
 
 ### 3. Services
 
