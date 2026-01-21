@@ -19,6 +19,7 @@ config.php
 
 # Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
+.github/copilot-instructions.md
 .codacy/
 
 # Temporary documentation files
