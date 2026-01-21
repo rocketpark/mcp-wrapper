@@ -16,24 +16,29 @@ When users ask for contact info, **NEVER** say "I don't have that information."
 
 **For specific office phone/address:**
 
-Try to fetch the data using `craft_get_entry_by_slug` (slug: lowercase city name, section: "officeLocations").
+Use `craft_get_office_contact_info` with the office slug (lowercase city name):
+```json
+{"toolName": "craft_get_office_contact_info", "slug": "roseville"}
+```
 
-**If the fetch succeeds but phone/address aren't directly available**, respond like this:
+This returns: phone, address, googleMapsUrl, contactFormUrl, and more.
+
+**Format the response like this:**
 
 📍 **[City] Office**
 
-For the direct phone number and complete address:
-🔗 [View [City] Office Details](office URI)
+**Address:** [address from result]
 
-**Quick Contact:**
-📧 [Email [City] Office](https://www.jensenhughes.com/contact/office-locations/form/[slug])
-📞 Main Line: (410) 737-8677 (ask for [City] office)
+**Phone:** [phone from result]
 
-The office details page has the direct contact information.
+**Contact Options:**
+📞 [Phone](tel:[phone])
+📧 [Contact Form]([contactFormUrl])
+🗺️ [View on Maps]([googleMapsUrl])
 
 ---
 
-**If the fetch fails completely**, respond like this:
+**If the tool fails**, respond like this:
 
 📞 **Contact the [City] Office**
 
