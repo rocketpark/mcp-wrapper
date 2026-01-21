@@ -87,17 +87,15 @@ Plugin introspects your Craft CMS and auto-generates MCP tools:
 
 **System Tools** (manual):
 - `craft_get_entry_by_id` - Fetch specific entries
-- `craft_search_entries` - Full-text search
-- `craft_get_entry_by_slug` - Get by slug
+- `craft_search_entries` - Full-text search with filtering
+- `craft_get_entry_by_slug` - Get by section and slug
 - `craft_get_system_info` - Craft version, PHP, database info
-- `craft_list_plugins` - Installed plugins
+- `craft_list_plugins` - Installed plugins with status
 - `craft_get_queue_status` - Background job status
-- `craft_read_logs` - Application logs
+- `craft_read_logs` - Application logs (with filtering)
 - `craft_get_cache_info` - Cache statistics
-- `craft_get_project_config_status` - Config sync status
 - `craft_clear_caches` ⚠️ (dangerous - disabled by default)
-- `craft_rebuild_config` ⚠️ (dangerous - disabled by default)
-- `craft_run_queue` ⚠️ (dangerous - disabled by default)
+- `craft_get_project_config_status` - Config sync status
 
 ### Security Features
 
@@ -142,13 +140,19 @@ Each schema can have different:
 
 ## Usage
 
-### Endpoint
+### Endpoints
 
+**MCP Server Endpoint** (JSON-RPC 2.0):
 ```
 POST https://your-site.com/mcp/{schemaHandle}
 ```
-
 Example: `https://your-site.com/mcp/MCPSchema`
+
+**Manifest Endpoint** (Tool Discovery):
+```
+GET https://your-site.com/mcp/manifest/{schemaHandle}
+```
+Example: `https://your-site.com/mcp/manifest/MCPSchema`
 
 ### MCP Client Integration
 
@@ -220,12 +224,11 @@ See [TESTING.md](./TESTING.md) for comprehensive testing guide.
 
 ## Documentation
 
-- **[TESTING.md](./TESTING.md)** - Complete testing guide with scripts and scenarios
-- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Deployment and configuration instructions
 - **[QUICK-START.md](./QUICK-START.md)** - Quick start guide for developers
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Deployment and configuration instructions
+- **[TESTING.md](./TESTING.md)** - Complete testing guide
 - **[FIELD-PRIVACY-GUIDE.md](./FIELD-PRIVACY-GUIDE.md)** - Security and privacy best practices
-- **[BOTPRESS-STAGING-TEST-CHECKLIST.md](./BOTPRESS-STAGING-TEST-CHECKLIST.md)** - Botpress integration testing
-- **[BOTPRESS-TEST-WORKFLOWS.md](./BOTPRESS-TEST-WORKFLOWS.md)** - Bot testing workflows
+- **[BOTPRESS-BOT-INSTRUCTIONS-V2.md](./BOTPRESS-BOT-INSTRUCTIONS-V2.md)** - Botpress integration guide
 - **[CHANGELOG.md](./CHANGELOG.md)** - Version history
 
 ## Architecture

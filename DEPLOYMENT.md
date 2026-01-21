@@ -5,21 +5,22 @@
 A working MCP server is deployed at:
 
 ```text
-https://servicecurator.com/actions/mcp-wrapper/mcp/index?schemaHandle=public
+https://servicecurator.com/mcp/public
 ```
 
 **Quick test:**
 
 ```bash
 # Test initialize
-curl -s -X POST 'https://servicecurator.com/actions/mcp-wrapper/mcp/index?schemaHandle=public' \
+curl -s -X POST 'https://servicecurator.com/mcp/public' \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc": "2.0", "method": "initialize", "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "test", "version": "1.0"}}, "id": 1}'
 
 # Test tools/list  
-curl -s -X POST 'https://servicecurator.com/actions/mcp-wrapper/mcp/index?schemaHandle=public' \
+curl -s -X POST 'https://servicecurator.com/mcp/public' \
   -H 'Content-Type: application/json' \
-  -d '{"jsonrpc": "2.0", "method": "tools/list", "params": {"schemaHandle": "public"}, "id": 2}'
+  -d '{"jsonrpc": "2.0", "method": "tools/list", "params": {}, "id": 2}'
+```
 ```
 
 ## For Laravel Forge / Production Craft Sites
@@ -133,14 +134,16 @@ Go to Craft CP → GraphQL → Schemas and ensure your public or private schema 
 The MCP server will be available at:
 
 ```text
-POST https://your-site.com/actions/mcp-wrapper/mcp/index?schemaHandle=public
+POST https://your-site.com/mcp/{schemaHandle}
 ```
+
+Example: `https://your-site.com/mcp/public`
 
 **Test with curl:**
 
 ```bash
 # Initialize MCP session
-curl -X POST 'https://your-site.com/actions/mcp-wrapper/mcp/index?schemaHandle=public' \
+curl -X POST 'https://your-site.com/mcp/public' \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -157,17 +160,17 @@ curl -X POST 'https://your-site.com/actions/mcp-wrapper/mcp/index?schemaHandle=p
 # {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{"listChanged":false}},"serverInfo":{"name":"craft-cms-mcp","version":"1.0.0"}}}
 
 # List available tools (one per section)
-curl -X POST 'https://your-site.com/actions/mcp-wrapper/mcp/index?schemaHandle=public' \
+curl -X POST 'https://your-site.com/mcp/public' \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
     "id": 2,
     "method": "tools/list",
-    "params": {"schemaHandle": "public"}
+    "params": {}
   }'
 
 # Call a tool to query entries
-curl -X POST 'https://your-site.com/actions/mcp-wrapper/mcp/index?schemaHandle=public' \
+curl -X POST 'https://your-site.com/mcp/public' \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -175,8 +178,7 @@ curl -X POST 'https://your-site.com/actions/mcp-wrapper/mcp/index?schemaHandle=p
     "method": "tools/call",
     "params": {
       "name": "query_news",
-      "arguments": {"limit": 5},
-      "schemaHandle": "public"
+      "arguments": {"limit": 5}
     }
   }'
 ```
@@ -195,7 +197,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
       "args": [
         "-y",
         "mcp-remote",
-        "https://your-site.com/actions/mcp-wrapper/mcp/index?schemaHandle=public"
+        "https://your-site.com/mcp/public"
       ]
     }
   }

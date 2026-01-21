@@ -12,7 +12,7 @@ If you have access to an AI agent platform like **Airia**, you can connect to a 
 
 1. **For Airia/HTTP-based AI platforms**, use this endpoint:
    ```
-   https://servicecurator.com/actions/mcp-wrapper/mcp/index?schemaHandle=ai
+   https://servicecurator.com/mcp/public
    ```
 
 2. **For Claude Desktop** (local app), add this to your config:
@@ -21,7 +21,7 @@ If you have access to an AI agent platform like **Airia**, you can connect to a 
      "mcpServers": {
        "craft-demo": {
          "command": "npx",
-         "args": ["-y", "mcp-remote", "https://servicecurator.com/actions/mcp-wrapper/mcp/index?schemaHandle=ai"]
+         "args": ["-y", "mcp-remote", "https://servicecurator.com/mcp/public"]
        }
      }
    }
@@ -106,13 +106,13 @@ return [
 Open terminal and run:
 
 ```bash
-curl -X POST 'http://mysite.test/actions/mcp-wrapper/mcp/index?schemaHandle=public' \
+curl -X POST 'http://mysite.test/mcp/public' \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
     "id": 1,
     "method": "tools/list",
-    "params": {"schemaHandle": "public"}
+    "params": {}
   }'
 ```
 
@@ -141,16 +141,16 @@ If you see a list of tools (one per Craft section), it's working! 🎉
 
 ### Option 1: Airia (or Other HTTP-Based AI Platforms)
 
-**If you want to connect Airia to Elizabeth's test site:**
-1. Ask Elizabeth for the live demo URL
-2. In Airia, configure the MCP endpoint to: `[demo-url]/actions/mcp-wrapper/mcp/index?schemaHandle=ai`
+**If you want to connect Airia to a test site:**
+1. Use the live demo: `https://servicecurator.com/mcp/public`
+2. In Airia, configure the MCP endpoint to the URL above
 3. Start asking questions about the content
 
 **If you want to connect Airia to YOUR OWN local development site:**
 
 Your local MCP endpoint is:
 ```
-http://mysite.test/actions/mcp-wrapper/mcp/index?schemaHandle=public
+http://mysite.test/mcp/public
 ```
 
 Since Airia is cloud-based and can't reach your local machine, you need a tunnel:
@@ -164,7 +164,7 @@ Since Airia is cloud-based and can't reach your local machine, you need a tunnel
 
 3. **In Airia**, configure the MCP endpoint:
    ```
-   https://abc123.ngrok.io/actions/mcp-wrapper/mcp/index?schemaHandle=public
+   https://abc123.ngrok.io/mcp/public
    ```
 
 ### Option 2: Claude Desktop (Local Mac/Windows App)
@@ -179,7 +179,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
       "args": [
         "-y",
         "mcp-remote",
-        "http://mysite.test/actions/mcp-wrapper/mcp/index?schemaHandle=public"
+        "http://mysite.test/mcp/public"
       ]
     }
   }
