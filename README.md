@@ -2,6 +2,15 @@
 
 A production-ready Craft CMS plugin that exposes your content to AI assistants through the Model Context Protocol (MCP).
 
+## 📚 Documentation
+
+- **[BOTPRESS-TESTING-SIMPLE.md](BOTPRESS-TESTING-SIMPLE.md)** - Quick 20-minute testing guide for Botpress
+- **[BOTPRESS-INSTRUCTIONS-UPDATED.md](BOTPRESS-INSTRUCTIONS-UPDATED.md)** - Complete instructions for Botpress Knowledge Base
+- **[FINAL-TEST-RESULTS.md](FINAL-TEST-RESULTS.md)** - Comprehensive test results (76% pass rate, production ready)
+- **[BOTPRESS-TEST-CHECKLIST.md](BOTPRESS-TEST-CHECKLIST.md)** - Detailed testing checklist
+- **[QUICK-START-TESTING.md](QUICK-START-TESTING.md)** - 30-minute comprehensive testing workflow
+- **[REGIONAL-LEADERSHIP-TESTING-GUIDE.md](REGIONAL-LEADERSHIP-TESTING-GUIDE.md)** - Technical guide for Regional Leadership filtering
+
 ## What It Does
 
 Enables AI assistants (Claude, ChatGPT, Botpress, etc.) to intelligently query your Craft CMS content through a standardized protocol. Think of it as an API specifically designed for AI consumption.
