@@ -71,17 +71,42 @@ class McpServerService extends Component
 
     /**
      * Build JSON-RPC error response
+     * Sanitizes error messages in production to prevent information leakage
      */
     private function errorResponse(?int $id, \Exception $e): array
     {
+        // In production, sanitize error messages to prevent information leakage
+        $message = Craft::$app->config->general->devMode
+            ? $e->getMessage()
+            : $this->sanitizeErrorMessage($e);
+
         return [
             'jsonrpc' => '2.0',
             'id' => $id,
             'error' => [
                 'code' => $e->getCode() ?: -32603,
-                'message' => $e->getMessage(),
+                'message' => $message,
             ],
         ];
+    }
+
+    /**
+     * Sanitize error message for production
+     * Only expose safe, user-friendly messages
+     */
+    private function sanitizeErrorMessage(\Exception $e): string
+    {
+        $code = $e->getCode();
+
+        // Map known error codes to safe messages
+        return match ($code) {
+            -32700 => 'Parse error: Invalid JSON',
+            -32600 => 'Invalid request format',
+            -32601 => 'Method not found',
+            -32602 => 'Invalid parameters',
+            -32603 => 'An internal error occurred',
+            default => 'An error occurred while processing your request',
+        };
     }
 
     /**
@@ -546,6 +571,14 @@ class McpServerService extends Component
      */
     private function buildGraphQLQuery(string $sectionHandle, array $args, array $params = []): string
     {
+        // Validate section handle
+        if (!$this->isValidHandle($sectionHandle)) {
+            throw new \Exception("Invalid section handle: '{$sectionHandle}'", -32602);
+        }
+
+        // Validate and sanitize all arguments
+        $args = $this->validateQueryArgs($args);
+
         $limit = min(100, max(1, (int) ($args['limit'] ?? 10)));
         $offset = max(0, (int) ($args['offset'] ?? 0));
 
@@ -1063,5 +1096,132 @@ class McpServerService extends Component
             
             return true;
         }));
+    }
+
+    // ============================================================
+    // Input Validation Methods
+    // ============================================================
+
+    /**
+     * Maximum allowed items in array parameters to prevent DoS
+     */
+    private const MAX_ARRAY_ITEMS = 100;
+
+    /**
+     * Maximum string length for text parameters
+     */
+    private const MAX_STRING_LENGTH = 500;
+
+    /**
+     * Validate and sanitize query arguments
+     * Applies limits and character validation to prevent injection/DoS
+     *
+     * @param array $args Raw arguments from request
+     * @return array Validated and sanitized arguments
+     * @throws \Exception If validation fails
+     */
+    private function validateQueryArgs(array $args): array
+    {
+        $validated = [];
+
+        // Validate array parameters (limit length)
+        $arrayParams = ['id', 'uid', 'slug', 'uri', 'type', 'typeId', 'status', 'relatedTo', 'authorId', 'authorGroup', 'site', 'siteId'];
+        foreach ($arrayParams as $param) {
+            if (isset($args[$param]) && is_array($args[$param])) {
+                if (count($args[$param]) > self::MAX_ARRAY_ITEMS) {
+                    throw new \Exception("Parameter '{$param}' exceeds maximum of " . self::MAX_ARRAY_ITEMS . " items", -32602);
+                }
+                $validated[$param] = array_slice($args[$param], 0, self::MAX_ARRAY_ITEMS);
+            } elseif (isset($args[$param])) {
+                $validated[$param] = $args[$param];
+            }
+        }
+
+        // Validate string parameters (limit length, sanitize)
+        $stringParams = ['title', 'search', 'orderBy', 'dateCreated', 'dateUpdated', 'postDate', 'expiryDate', 'before', 'after'];
+        foreach ($stringParams as $param) {
+            if (isset($args[$param]) && is_string($args[$param])) {
+                $value = $args[$param];
+                if (strlen($value) > self::MAX_STRING_LENGTH) {
+                    throw new \Exception("Parameter '{$param}' exceeds maximum length of " . self::MAX_STRING_LENGTH, -32602);
+                }
+                $validated[$param] = $this->sanitizeStringInput($value);
+            }
+        }
+
+        // Validate handle parameters (alphanumeric + underscore/hyphen only)
+        if (isset($args['type']) && is_array($args['type'])) {
+            foreach ($args['type'] as $type) {
+                if (!$this->isValidHandle($type)) {
+                    throw new \Exception("Invalid entry type handle: '{$type}'. Only alphanumeric characters, underscores, and hyphens are allowed.", -32602);
+                }
+            }
+            $validated['type'] = $args['type'];
+        }
+
+        if (isset($args['status']) && is_array($args['status'])) {
+            $allowedStatuses = ['live', 'pending', 'expired', 'disabled', 'enabled', 'archived'];
+            foreach ($args['status'] as $status) {
+                if (!in_array($status, $allowedStatuses, true)) {
+                    throw new \Exception("Invalid status: '{$status}'. Allowed: " . implode(', ', $allowedStatuses), -32602);
+                }
+            }
+            $validated['status'] = $args['status'];
+        }
+
+        // Validate integer parameters
+        $intParams = ['limit', 'offset', 'ancestorOf', 'descendantOf', 'siblingOf', 'prevSiblingOf', 'nextSiblingOf', 'positionedAfter', 'positionedBefore'];
+        foreach ($intParams as $param) {
+            if (isset($args[$param])) {
+                $validated[$param] = (int) $args[$param];
+            }
+        }
+
+        // Validate boolean parameters
+        $boolParams = ['archived', 'trashed', 'inReverse', 'fixedOrder', 'unique'];
+        foreach ($boolParams as $param) {
+            if (isset($args[$param])) {
+                $validated[$param] = (bool) $args[$param];
+            }
+        }
+
+        return $validated;
+    }
+
+    /**
+     * Check if a string is a valid Craft handle
+     * Handles should be alphanumeric with underscores/hyphens only
+     */
+    private function isValidHandle(string $handle): bool
+    {
+        return preg_match('/^[a-zA-Z][a-zA-Z0-9_-]*$/', $handle) === 1;
+    }
+
+    /**
+     * Sanitize string input for GraphQL queries
+     * Removes potentially dangerous characters while preserving functionality
+     */
+    private function sanitizeStringInput(string $input): string
+    {
+        // Remove null bytes
+        $input = str_replace("\0", '', $input);
+
+        // Remove GraphQL-specific injection attempts
+        // Block directives, fragments, and query manipulation
+        $dangerousPatterns = [
+            '/@\w+\s*\(/',      // Directives like @skip(
+            '/\.\.\.\s*on\s+/', // Inline fragments
+            '/__\w+/',          // Introspection fields like __schema
+            '/\{.*\{/',         // Nested query attempts
+        ];
+
+        foreach ($dangerousPatterns as $pattern) {
+            if (preg_match($pattern, $input)) {
+                Craft::warning("Potentially malicious input blocked: {$input}", 'mcp-wrapper');
+                throw new \Exception('Invalid characters in input parameter', -32602);
+            }
+        }
+
+        return $input;
     }
 }
