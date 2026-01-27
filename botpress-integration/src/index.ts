@@ -176,6 +176,71 @@ export default new bp.Integration({
           }
         }
         
+        // CRITICAL: For team members, ALWAYS filter to Regional Leadership only
+        // This ensures only the 59 Regional Leaders are shown, not all 101 team members
+        if (toolName === 'query_ourTeam') {
+          const searchTerm = (queryArgs.search || '').toLowerCase()
+          logger.forBot().info(`Team member query - filtering to Regional Leadership only`)
+
+          // Get all team members to filter
+          const result = await client.callTool(toolName, {
+            limit: 200, // Get all to filter properly
+            offset: 0,
+          })
+
+          if (result?.content?.[0]?.text) {
+            const data = JSON.parse(result.content[0].text)
+            const allMembers = data.entries || []
+
+            // Filter to ONLY Regional Leadership members
+            const regionalLeaders = allMembers.filter((member: any) => {
+              const types = member.teamMemberType || []
+              return types.some((t: any) => {
+                const title = (t.title || '').toLowerCase()
+                return title.includes('regional leadership')
+              })
+            })
+
+            logger.forBot().info(`Found ${regionalLeaders.length} Regional Leaders from ${allMembers.length} total team members`)
+
+            // If search term provided, filter Regional Leaders by search
+            let filtered = regionalLeaders
+            if (searchTerm) {
+              filtered = regionalLeaders.filter((member: any) => {
+                const searchableText = [
+                  member.title || '',
+                  member.role || '',
+                  member.summary || '',
+                  member.fullName || '',
+                  ...(member.expertiseAreas || []).map((e: any) => e.title || ''),
+                ].join(' ').toLowerCase()
+
+                return searchableText.includes(searchTerm)
+              })
+              logger.forBot().info(`After search filter: ${filtered.length} Regional Leaders match "${searchTerm}"`)
+            }
+
+            // Apply pagination
+            const limit = queryArgs.limit || 10
+            const offset = queryArgs.offset || 0
+            const paginatedResults = filtered.slice(offset, offset + limit)
+
+            return {
+              content: [{
+                type: 'text',
+                text: JSON.stringify({
+                  entries: paginatedResults,
+                  _meta: {
+                    totalRegionalLeaders: regionalLeaders.length,
+                    matchingSearch: filtered.length,
+                    returned: paginatedResults.length
+                  }
+                })
+              }],
+            }
+          }
+        }
+
         // For office locations with search terms, fetch all and filter by region
         if (toolName === 'query_officeLocations' && queryArgs.search) {
           const searchTerm = queryArgs.search.toLowerCase()
@@ -287,6 +352,9 @@ export default new bp.Integration({
      */
     intelligentSearch: async ({ ctx, input, logger }) => {
       const { mcpServerUrl, schemaHandle } = ctx.configuration
+      if (!mcpServerUrl || !schemaHandle) {
+        throw new Error('MCP Server URL and Schema Handle are required')
+      }
       const client = new MCPClient(mcpServerUrl, schemaHandle, logger)
       
       try {
@@ -349,6 +417,9 @@ export default new bp.Integration({
      */
     answerQuestion: async ({ ctx, input, logger }) => {
       const { mcpServerUrl, schemaHandle } = ctx.configuration
+      if (!mcpServerUrl || !schemaHandle) {
+        throw new Error('MCP Server URL and Schema Handle are required')
+      }
       const client = new MCPClient(mcpServerUrl, schemaHandle, logger)
       
       try {
