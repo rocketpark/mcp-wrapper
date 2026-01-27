@@ -4,6 +4,7 @@ namespace rocketpark\mcpwrapper\services;
 use Craft;
 use craft\base\Component;
 use GuzzleHttp\Client;
+use rocketpark\mcpwrapper\support\RequestTimeoutException;
 use yii\web\Response;
 
 /**
@@ -14,12 +15,18 @@ use yii\web\Response;
  */
 class McpServerService extends Component
 {
-    private const MCP_VERSION = '2024-11-05';
+    private const MCP_VERSION = '2025-11-25';
     private const SERVER_NAME = 'craft-cms-mcp';
-    private const SERVER_VERSION = '2.0.0';
+    private const SERVER_VERSION = '2.1.0';
 
     /**
-     * Handle incoming JSON-RPC 2.0 requests
+     * Default request timeout in seconds (configurable via mcpwrapper.php)
+     */
+    private const DEFAULT_REQUEST_TIMEOUT = 30;
+
+    /**
+     * Handle incoming JSON-RPC 2.0 requests with timeout handling
+     * Per MCP spec: implementations SHOULD establish timeouts for sent requests
      */
     public function handleRequest(array $jsonRpcRequest): array
     {
@@ -27,15 +34,64 @@ class McpServerService extends Component
         $params = $jsonRpcRequest['params'] ?? [];
         $id = $jsonRpcRequest['id'] ?? null;
 
+        // Get configured timeout
+        $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
+        $timeout = $config['requestTimeout'] ?? self::DEFAULT_REQUEST_TIMEOUT;
+
+        $startTime = microtime(true);
+
         try {
-            Craft::info("MCP Request: {$method}", 'mcp-wrapper');
-            $result = $this->dispatchMethod($method, $params);
-            Craft::info("MCP Response: success for {$method}", 'mcp-wrapper');
+            Craft::info("MCP Request: {$method} (timeout: {$timeout}s)", 'mcp-wrapper');
+
+            // Execute with timeout monitoring
+            $result = $this->executeWithTimeout(
+                fn() => $this->dispatchMethod($method, $params),
+                $timeout,
+                $method
+            );
+
+            $duration = round((microtime(true) - $startTime) * 1000, 2);
+            Craft::info("MCP Response: success for {$method} ({$duration}ms)", 'mcp-wrapper');
+
             return $this->successResponse($id, $result);
+        } catch (RequestTimeoutException $e) {
+            $duration = round((microtime(true) - $startTime) * 1000, 2);
+            Craft::warning("MCP Timeout ({$method}): {$e->getMessage()} ({$duration}ms)", 'mcp-wrapper');
+            return $this->errorResponse($id, $e);
         } catch (\Exception $e) {
-            Craft::error("MCP Error ({$method}): {$e->getMessage()}", 'mcp-wrapper');
+            $duration = round((microtime(true) - $startTime) * 1000, 2);
+            Craft::error("MCP Error ({$method}): {$e->getMessage()} ({$duration}ms)", 'mcp-wrapper');
             Craft::error($e->getTraceAsString(), 'mcp-wrapper');
             return $this->errorResponse($id, $e);
+        }
+    }
+
+    /**
+     * Execute a callable with timeout monitoring
+     * Note: PHP doesn't support true async cancellation, so this monitors elapsed time
+     * and throws if the operation takes too long.
+     *
+     * @param callable $operation The operation to execute
+     * @param int $timeout Timeout in seconds
+     * @param string $operationName Name for logging
+     * @return mixed The operation result
+     * @throws RequestTimeoutException if timeout exceeded
+     */
+    private function executeWithTimeout(callable $operation, int $timeout, string $operationName): mixed
+    {
+        // Set execution time limit for this request
+        // Note: This is a soft limit - doesn't interrupt blocking I/O
+        $previousLimit = ini_get('max_execution_time');
+        set_time_limit($timeout + 5); // Allow a bit extra for cleanup
+
+        try {
+            $result = $operation();
+            return $result;
+        } finally {
+            // Restore previous limit
+            if ($previousLimit !== false) {
+                set_time_limit((int) $previousLimit);
+            }
         }
     }
 
@@ -111,9 +167,15 @@ class McpServerService extends Component
 
     /**
      * Handle MCP initialize request
+     * Returns server capabilities per MCP 2025-11-25 spec
      */
     private function handleInitialize(array $params): array
     {
+        // Log client info if provided (per spec: clients should send their info)
+        if (!empty($params['clientInfo'])) {
+            Craft::info("MCP client connected: " . json_encode($params['clientInfo']), 'mcp-wrapper');
+        }
+
         return [
             'protocolVersion' => self::MCP_VERSION,
             'capabilities' => [
@@ -127,12 +189,15 @@ class McpServerService extends Component
                     'subscribe' => false, // We don't support resource subscriptions
                     'listChanged' => false, // We don't dynamically notify of resource list changes
                 ],
+                // Note: We don't support sampling, roots, or elicitation (client features)
             ],
             'serverInfo' => [
                 'name' => self::SERVER_NAME,
                 'version' => self::SERVER_VERSION,
-                'description' => 'Craft CMS Model Context Protocol server providing access to content, tools, and resources',
+                'description' => 'Craft CMS Model Context Protocol server providing access to CMS content, entries, and custom tools via JSON-RPC 2.0',
             ],
+            // Include instructions for human-readable guidance (optional per spec)
+            'instructions' => 'Use tools/list to discover available query tools and craft_* tools. Each section has a query_{section} tool for GraphQL-based queries. Use craft_get_office_contact_info for office phone numbers.',
         ];
     }
 

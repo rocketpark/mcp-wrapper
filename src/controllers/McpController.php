@@ -229,6 +229,145 @@ class McpController extends Controller
     }
     
     /**
+     * Metrics endpoint for monitoring (Prometheus-compatible format)
+     * Returns basic MCP server metrics
+     *
+     * GET /mcp/metrics - Returns metrics in Prometheus text format
+     */
+    public function actionMetrics(): Response
+    {
+        $this->response->format = Response::FORMAT_RAW;
+        $this->response->headers->set('Content-Type', 'text/plain; version=0.0.4');
+
+        $metrics = [];
+
+        // Server info
+        $metrics[] = '# HELP mcp_server_info MCP server information';
+        $metrics[] = '# TYPE mcp_server_info gauge';
+        $metrics[] = 'mcp_server_info{version="2.1.0",protocol="2025-11-25"} 1';
+
+        // Rate limit status (if available)
+        $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
+        $rateLimit = $config['security']['rateLimit'] ?? 100;
+        $metrics[] = '# HELP mcp_rate_limit_max Maximum requests per window';
+        $metrics[] = '# TYPE mcp_rate_limit_max gauge';
+        $metrics[] = "mcp_rate_limit_max {$rateLimit}";
+
+        // Schema count
+        $schemas = $config['schemas'] ?? [];
+        $metrics[] = '# HELP mcp_schemas_total Total number of configured schemas';
+        $metrics[] = '# TYPE mcp_schemas_total gauge';
+        $metrics[] = 'mcp_schemas_total ' . count($schemas);
+
+        // Tools count (if registry is available)
+        try {
+            $toolRegistry = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('toolRegistry');
+            $manualTools = $toolRegistry->discoverManualTools();
+            $metrics[] = '# HELP mcp_manual_tools_total Total number of manual tools registered';
+            $metrics[] = '# TYPE mcp_manual_tools_total gauge';
+            $metrics[] = 'mcp_manual_tools_total ' . count($manualTools);
+        } catch (\Exception $e) {
+            // Skip if unavailable
+        }
+
+        // Server uptime approximation (using PHP's process start time)
+        $metrics[] = '# HELP mcp_server_start_time_seconds Unix timestamp of server start';
+        $metrics[] = '# TYPE mcp_server_start_time_seconds gauge';
+        $metrics[] = 'mcp_server_start_time_seconds ' . ($_SERVER['REQUEST_TIME'] ?? time());
+
+        return $this->response->setData(implode("\n", $metrics) . "\n");
+    }
+
+    /**
+     * Health check endpoint for monitoring
+     * Returns server health status with optional detailed checks
+     *
+     * GET /mcp/health - Quick health check
+     * GET /mcp/health?detailed=1 - Detailed health with component checks
+     */
+    public function actionHealth(): Response
+    {
+        $this->response->format = Response::FORMAT_JSON;
+        $detailed = (bool) Craft::$app->request->getQueryParam('detailed', false);
+
+        $health = [
+            'status' => 'healthy',
+            'timestamp' => date('c'),
+            'version' => '2.1.0',
+            'protocolVersion' => '2025-11-25',
+        ];
+
+        if ($detailed) {
+            $checks = [];
+            $overallHealthy = true;
+
+            // Check 1: Cache availability
+            try {
+                $cacheKey = 'mcp_health_check_' . time();
+                Craft::$app->cache->set($cacheKey, 'test', 5);
+                $cacheValue = Craft::$app->cache->get($cacheKey);
+                Craft::$app->cache->delete($cacheKey);
+                $checks['cache'] = [
+                    'status' => $cacheValue === 'test' ? 'healthy' : 'degraded',
+                    'message' => $cacheValue === 'test' ? 'Cache operational' : 'Cache read/write mismatch',
+                ];
+            } catch (\Exception $e) {
+                $checks['cache'] = ['status' => 'unhealthy', 'message' => 'Cache unavailable'];
+                $overallHealthy = false;
+            }
+
+            // Check 2: Database connectivity
+            try {
+                Craft::$app->db->createCommand('SELECT 1')->queryScalar();
+                $checks['database'] = ['status' => 'healthy', 'message' => 'Database connected'];
+            } catch (\Exception $e) {
+                $checks['database'] = ['status' => 'unhealthy', 'message' => 'Database unavailable'];
+                $overallHealthy = false;
+            }
+
+            // Check 3: GraphQL schema availability
+            try {
+                $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
+                $schemas = $config['schemas'] ?? [];
+                $checks['schemas'] = [
+                    'status' => count($schemas) > 0 ? 'healthy' : 'degraded',
+                    'message' => count($schemas) . ' schema(s) configured',
+                    'count' => count($schemas),
+                ];
+            } catch (\Exception $e) {
+                $checks['schemas'] = ['status' => 'degraded', 'message' => 'Config unavailable'];
+            }
+
+            // Check 4: Tool registry
+            try {
+                $toolRegistry = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('toolRegistry');
+                $tools = $toolRegistry->discoverManualTools();
+                $checks['tools'] = [
+                    'status' => 'healthy',
+                    'message' => count($tools) . ' manual tool(s) registered',
+                    'count' => count($tools),
+                ];
+            } catch (\Exception $e) {
+                $checks['tools'] = ['status' => 'degraded', 'message' => 'Tool registry error'];
+            }
+
+            $health['checks'] = $checks;
+            $health['status'] = $overallHealthy ? 'healthy' : 'degraded';
+        }
+
+        // Set appropriate status code
+        $statusCode = match ($health['status']) {
+            'healthy' => 200,
+            'degraded' => 200, // Still operational
+            'unhealthy' => 503,
+            default => 200,
+        };
+
+        $this->response->statusCode = $statusCode;
+        return $this->asJson($health);
+    }
+
+    /**
      * Messages endpoint for client-to-server communication in SSE transport
      */
     public function actionMessages()
