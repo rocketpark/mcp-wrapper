@@ -1,0 +1,21 @@
+{
+  "intelephense.diagnostics.undefinedTypes": false,
+  "intelephense.diagnostics.undefinedMethods": false,
+  "intelephense.diagnostics.undefinedProperties": false,
+  "intelephense.diagnostics.undefinedFunctions": false,
+  "intelephense.environment.phpVersion": "8.2.0",
+  "sonarlint.rules": {
+    "php:S112": {
+      "level": "off"
+    },
+    "php:S1142": {
+      "level": "off"
+    },
+    "php:S3776": {
+      "level": "off"
+    },
+    "php:S1131": {
+      "level": "off"
+    }
+  }
+}

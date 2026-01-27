@@ -5,7 +5,7 @@ A production-ready Craft CMS plugin that exposes your content to AI assistants t
 ## 📚 Documentation
 
 - **[BOTPRESS-TESTING-SIMPLE.md](BOTPRESS-TESTING-SIMPLE.md)** - Quick 20-minute testing guide for Botpress
-- **[BOTPRESS-INSTRUCTIONS-UPDATED.md](BOTPRESS-INSTRUCTIONS-UPDATED.md)** - Complete instructions for Botpress Knowledge Base
+- **[botpress-integration/BOTPRESS-INSTRUCTIONS-PRODUCTION.md](botpress-integration/BOTPRESS-INSTRUCTIONS-PRODUCTION.md)** - Complete instructions for Botpress Knowledge Base
 - **[FINAL-TEST-RESULTS.md](FINAL-TEST-RESULTS.md)** - Comprehensive test results (76% pass rate, production ready)
 - **[BOTPRESS-TEST-CHECKLIST.md](BOTPRESS-TEST-CHECKLIST.md)** - Detailed testing checklist
 - **[QUICK-START-TESTING.md](QUICK-START-TESTING.md)** - 30-minute comprehensive testing workflow
