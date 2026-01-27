@@ -1,5 +1,5 @@
 # Session: mcp-wrapper
-Updated: 2026-01-27T15:30:00.000Z
+Updated: 2026-01-27T14:34:21.683Z
 
 ## Goal
 Maintain and improve a production Craft CMS plugin that exposes content to AI assistants (particularly Botpress) via the Model Context Protocol (MCP). Success = stable plugin operation on Jensen Hughes production site with proper Regional Leadership filtering, accurate phone numbers, and privacy protection.
@@ -63,7 +63,13 @@ Maintain and improve a production Craft CMS plugin that exposes content to AI as
     - Added IPv6 CIDR support to IpValidator
     - Added request timeout handling with configurable limits
     - Server version bumped to 2.1.0
-- Now: [→] Deploy improvements, add unit tests
+  - [x] Unit Tests (2026-01-27):
+    - IPv6 CIDR validation tests (32 tests) - tests/test-ip-validator-ipv6.php
+    - RequestTimeoutException tests (10 tests) - tests/test-request-timeout-exception.php
+    - Test runner script - tests/run-all-tests.sh
+    - Updated test-mcp-endpoint.sh for v2.1.0 protocol/version
+    - All 57 unit tests passing
+- Now: [→] Deploy v2.1.0 improvements to production
 - Next: Monitor production, consider OAuth support per MCP 2025-11-25 spec
 
 ## Working Set
@@ -83,8 +89,14 @@ Maintain and improve a production Craft CMS plugin that exposes content to AI as
 - `botpress-integration/package.json` - Dependencies (@botpress/sdk, node-fetch)
 
 ### Testing
-- `test-mcp-endpoint.sh` - Full endpoint testing suite
+- `test-mcp-endpoint.sh` - Full endpoint testing suite (updated for v2.1.0)
 - `test-regional-leadership-filter.sh` - Specific Regional Leadership filtering tests
+- `tests/run-all-tests.sh` - Unit test runner (57 tests total)
+- `tests/test-ip-validator.php` - IPv4 validation tests (9 tests)
+- `tests/test-ip-validator-ipv6.php` - IPv6 CIDR validation tests (32 tests)
+- `tests/test-request-timeout-exception.php` - Timeout exception tests (10 tests)
+- `tests/test-tool-registry.php` - Tool discovery tests (3 tests)
+- `tests/test-argument-mapping.php` - Argument mapping tests (3 tests)
 - `FINAL-TEST-RESULTS.md` - Comprehensive test results (76% pass rate)
 
 ### Documentation

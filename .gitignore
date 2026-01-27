@@ -34,11 +34,11 @@ PRODUCTION-*.md
 *-WORKFLOWS.md
 *-IMPLEMENTATION*.md
 
-# Diagnostic and test scripts
-diagnose-*.sh
-test-*.sh
-test-*.php
-test-*.js
+# Diagnostic and test scripts (root level only)
+/diagnose-*.sh
+/test-*.sh
+/test-*.php
+/test-*.js
 *.sql
 
 # Backup files
