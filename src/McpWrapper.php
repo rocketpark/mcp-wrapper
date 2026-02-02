@@ -8,6 +8,7 @@ use craft\events\RegisterUrlRulesEvent;
 use craft\services\Utilities;
 use craft\web\UrlManager;
 use rocketpark\mcpwrapper\utilities\McpManifestUtility;
+use rocketpark\mcpwrapper\utilities\McpAnalyticsUtility;
 use yii\base\Event;
 
 use rocketpark\mcpwrapper\services\ManifestBuilderService;
@@ -92,6 +93,10 @@ class McpWrapper extends Plugin
                 $event->rules['utilities/mcp-wrapper/rebuild/<schema:[a-zA-Z0-9_-]+>'] = 'mcp-wrapper/utility/rebuild';
                 // Allow standard action routes for utility controller
                 $event->rules['actions/mcp-wrapper/utility/<action:\w+>'] = 'mcp-wrapper/utility/<action>';
+                
+                // Analytics dashboard routes
+                $event->rules['mcp-wrapper/analytics'] = 'mcp-wrapper/analytics/index';
+                $event->rules['mcp-wrapper/analytics/<schemaHandle:[a-zA-Z0-9_-]+>'] = 'mcp-wrapper/analytics/index';
             }
         );
 
@@ -99,7 +104,10 @@ class McpWrapper extends Plugin
         Event::on(
             Utilities::class,
             Utilities::EVENT_REGISTER_UTILITIES,
-            fn(RegisterComponentTypesEvent $e) => $e->types[] = McpManifestUtility::class
+            function(RegisterComponentTypesEvent $e) {
+                $e->types[] = McpManifestUtility::class;
+                $e->types[] = McpAnalyticsUtility::class;
+            }
         );
 
         // Auto-clear cache when project config changes

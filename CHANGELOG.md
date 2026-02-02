@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2.6.0 - 2026-02-02
+
+### Added - Performance Dashboard
+
+- **Performance Dashboard**: Visual analytics dashboard in Craft CP
+  - Real-time metrics: Total requests, success rate, avg response time, cache hit rate
+  - Tool usage analytics with error rates and duration breakdowns
+  - Slowest requests table for performance optimization
+  - Recent errors tracker with timestamps and details
+  - CSV export functionality for external analysis
+  - Multi-schema support with filtering by GraphQL schema
+  - Time range selector (1, 7, 30, 90 days)
+
+- **AnalyticsController**: New controller for dashboard and API endpoints
+  - `actionIndex()`: Render dashboard template
+  - `actionData()`: JSON API for dashboard data
+  - `actionExport()`: CSV export functionality
+
+- **McpAnalyticsUtility**: CP utility for easy dashboard access
+  - Appears in Utilities menu as "MCP Analytics"
+  - Redirects to full analytics dashboard
+
+- **Enhanced RequestLoggerService**: Added `getAnalytics($days, $schemaHandle)` method
+  - Parses mcp-requests.log for historical data analysis
+  - Calculates success rates, cache hit rates from request durations
+  - Returns dashboard-ready data structure
+  - Supports schema filtering for multi-schema setups
+
+### Changed
+
+- Dashboard accessible via Utilities → MCP Analytics or `/admin/mcp-wrapper/analytics`
+- Route registration updated in McpWrapper.php for analytics endpoints
+- Analytics auto-refresh on schema/date range changes
+
 ## 2.5.0 - 2026-02-02
 
 ### Added - Webhook Support

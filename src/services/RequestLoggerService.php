@@ -113,16 +113,23 @@ class RequestLoggerService extends Component
      * Get analytics summary from logs
      * 
      * @param int $days Number of days to analyze (default: 7)
+     * @param string|null $schemaHandle Filter by schema (null = all schemas)
      * @return array Analytics data
      */
-    public function getAnalytics(int $days = 7): array
+    public function getAnalytics(int $days = 7, ?string $schemaHandle = null): array
     {
         $logPath = Craft::getAlias('@storage/logs/mcp-requests.log');
         
         if (!file_exists($logPath)) {
             return [
+                'total_requests' => 0,
+                'success_rate' => 0,
+                'avg_duration_ms' => 0,
+                'cache_hit_rate' => 0,
+                'top_tools' => [],
+                'slowest_requests' => [],
+                'recent_errors' => [],
                 'error' => 'No request logs found',
-                'path' => $logPath,
             ];
         }
         
@@ -134,10 +141,13 @@ class RequestLoggerService extends Component
             'successful_requests' => 0,
             'failed_requests' => 0,
             'total_duration_ms' => 0,
+            'cache_hits' => 0,
+            'cache_checks' => 0,
             'by_tool' => [],
             'by_method' => [],
             'by_error_code' => [],
             'slowest_requests' => [],
+            'recent_errors' => [],
         ];
         
         foreach ($lines as $line) {
@@ -151,6 +161,11 @@ class RequestLoggerService extends Component
                 $entryTime = strtotime($entry['timestamp']);
                 if ($entryTime < $cutoff) continue;
                 
+                // Filter by schema if specified
+                if ($schemaHandle && ($entry['schema'] ?? '') !== $schemaHandle) {
+                    continue;
+                }
+                
                 $stats['total_requests']++;
                 
                 if ($entry['success']) {
@@ -159,9 +174,23 @@ class RequestLoggerService extends Component
                     $stats['failed_requests']++;
                     $code = $entry['error_code'] ?? 'unknown';
                     $stats['by_error_code'][$code] = ($stats['by_error_code'][$code] ?? 0) + 1;
+                    
+                    // Track recent errors
+                    $stats['recent_errors'][] = [
+                        'tool' => $entry['tool'] ?? $entry['method'],
+                        'error_code' => $entry['error_code'] ?? 'unknown',
+                        'error_message' => $entry['error_message'] ?? 'Unknown error',
+                        'timestamp' => $entry['timestamp'],
+                    ];
                 }
                 
                 $stats['total_duration_ms'] += $entry['duration_ms'];
+                
+                // Track cache usage (look for cache-related info in log or infer from very fast responses)
+                if ($entry['duration_ms'] < 10) {
+                    $stats['cache_hits']++;
+                }
+                $stats['cache_checks']++;
                 
                 // By method
                 $method = $entry['method'];
@@ -193,27 +222,47 @@ class RequestLoggerService extends Component
             }
         }
         
-        // Calculate averages
+        // Calculate averages and rates
         if ($stats['total_requests'] > 0) {
             $stats['avg_duration_ms'] = round($stats['total_duration_ms'] / $stats['total_requests'], 2);
+            $stats['success_rate'] = round(($stats['successful_requests'] / $stats['total_requests']) * 100, 1);
+        } else {
+            $stats['avg_duration_ms'] = 0;
+            $stats['success_rate'] = 0;
+        }
+        
+        if ($stats['cache_checks'] > 0) {
+            $stats['cache_hit_rate'] = round(($stats['cache_hits'] / $stats['cache_checks']) * 100, 1);
+        } else {
+            $stats['cache_hit_rate'] = 0;
         }
         
         foreach ($stats['by_method'] as $method => &$data) {
             $data['avg_ms'] = round($data['total_ms'] / $data['count'], 2);
         }
         
-        foreach ($stats['by_tool'] as $tool => &$data) {
-            $data['avg_ms'] = round($data['total_ms'] / $data['count'], 2);
-            $data['error_rate'] = round(($data['errors'] / $data['count']) * 100, 1) . '%';
+        // Build top_tools array for dashboard
+        $topTools = [];
+        foreach ($stats['by_tool'] as $tool => $data) {
+            $topTools[] = [
+                'tool' => $tool,
+                'count' => $data['count'],
+                'avg_duration_ms' => round($data['total_ms'] / $data['count'], 2),
+                'error_rate' => round(($data['errors'] / $data['count']) * 100, 1),
+            ];
         }
         
         // Sort slowest requests
         usort($stats['slowest_requests'], fn($a, $b) => $b['duration_ms'] <=> $a['duration_ms']);
         $stats['slowest_requests'] = array_slice($stats['slowest_requests'], 0, 10);
         
-        // Sort by usage
-        uasort($stats['by_tool'], fn($a, $b) => $b['count'] <=> $a['count']);
-        uasort($stats['by_method'], fn($a, $b) => $b['count'] <=> $a['count']);
+        // Sort recent errors by timestamp (newest first)
+        usort($stats['recent_errors'], fn($a, $b) => strtotime($b['timestamp']) <=> strtotime($a['timestamp']));
+        $stats['recent_errors'] = array_slice($stats['recent_errors'], 0, 10);
+        
+        // Sort top tools by usage
+        usort($topTools, fn($a, $b) => $b['count'] <=> $a['count']);
+        $stats['top_tools'] = array_slice($topTools, 0, 10);
         
         return $stats;
     }

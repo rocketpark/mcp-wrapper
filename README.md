@@ -263,6 +263,17 @@ Notify external systems when content changes:
 ]
 ```
 
+**8. Performance Dashboard** ✨ NEW
+
+Visual analytics in Craft CP:\n- **Real-time Metrics**: Total requests, success rate, avg response time, cache hit rate
+- **Tool Usage**: Most-used tools with error rates and duration
+- **Performance Insights**: Slowest requests, optimization opportunities
+- **Error Tracking**: Recent errors with timestamps
+- **CSV Export**: Download analytics data
+- **Multi-Schema**: Filter by GraphQL schema
+
+Access via **Utilities → MCP Analytics** or `/admin/mcp-wrapper/analytics`.
+
 ### Multi-Schema Support
 
 Configure different GraphQL schemas for different use cases:
