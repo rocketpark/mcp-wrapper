@@ -146,7 +146,28 @@
 
 ---
 
-### WEEK 2 - MEDIUM PRIORITY (ROBUSTNESS)
+### WEEK 2 - MEDIUM PRIORITY (ROBUSTNESS) ✅ IMPLEMENTED v2.3.0
+
+#### 5. Output Schemas ✅ COMPLETE
+**Status:** IMPLEMENTED (Feb 2, 2026)
+**Impact:** MCP spec compliance, better AI parsing
+**Files:**
+- Updated `src/attributes/Tool.php` with outputSchema parameter
+- Updated all 11 manual tools with JSON output schemas
+- Updated `ToolRegistryService` to include schemas in tool definitions
+
+#### 6. Enhanced Annotations ✅ COMPLETE  
+**Status:** IMPLEMENTED (Feb 2, 2026)
+**Impact:** Better AI decision-making, performance awareness
+**Files:**
+- Added `costHint` property to Tool attribute (low/medium/high)
+- Added `confidentialityHint` property (none/low/medium/high)
+- Added `destructiveHint` annotation for dangerous operations
+- All manual tools now have appropriate hints
+
+---
+
+### MONTH 2 - QUALITY & FUTURE-PROOFING (DEFERRED)
 
 #### 1. Tool Result Caching (ARCHIVED - IMPLEMENTED ABOVE)
 
