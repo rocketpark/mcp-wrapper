@@ -37,6 +37,7 @@ run_test "test-ip-validator-ipv6.php" "IP Validator (IPv6 CIDR)"
 run_test "test-request-timeout-exception.php" "RequestTimeoutException"
 run_test "test-tool-registry.php" "Tool Registry"
 run_test "test-argument-mapping.php" "Argument Mapping"
+run_test "test-graphql-sanitization.php" "GraphQL Sanitization"
 
 echo "========================================"
 echo "Test Suite Complete"

@@ -4,6 +4,7 @@ namespace rocketpark\mcpwrapper\services;
 use Craft;
 use craft\base\Component;
 use GuzzleHttp\Client;
+use rocketpark\mcpwrapper\support\GraphQLSanitizer;
 use rocketpark\mcpwrapper\support\RequestTimeoutException;
 use yii\web\Response;
 
@@ -1190,29 +1191,14 @@ class McpServerService extends Component
     /**
      * Escape a string for safe use in GraphQL queries
      *
-     * GraphQL strings use JSON-style escaping. This is more secure than addslashes()
-     * which doesn't handle Unicode escapes, newlines properly, or GraphQL-specific injection vectors.
+     * Delegates to GraphQLSanitizer for secure JSON-based escaping.
      *
      * @param string $value The string to escape
      * @return string The escaped string (without surrounding quotes)
      */
     private function escapeGraphQLString(string $value): string
     {
-        // Use JSON encoding which properly escapes:
-        // - Quotes (" → \")
-        // - Backslashes (\ → \\)
-        // - Newlines, tabs, carriage returns (\n, \t, \r)
-        // - Unicode characters (properly encoded)
-        // - Control characters
-        $encoded = json_encode($value, JSON_UNESCAPED_UNICODE);
-
-        // json_encode returns false on encoding failure
-        if ($encoded === false) {
-            throw new \Exception('Invalid characters in input parameter', -32602);
-        }
-
-        // Remove the surrounding quotes that json_encode adds
-        return substr($encoded, 1, -1);
+        return GraphQLSanitizer::escapeGraphQLString($value);
     }
 
     /**
@@ -1298,24 +1284,17 @@ class McpServerService extends Component
 
     /**
      * Check if a string is a valid Craft handle
-     * Handles should be alphanumeric with underscores/hyphens only
+     * Delegates to GraphQLSanitizer for validation.
      */
     private function isValidHandle(string $handle): bool
     {
-        return preg_match('/^[a-zA-Z][a-zA-Z0-9_-]*$/', $handle) === 1;
+        return GraphQLSanitizer::isValidHandle($handle);
     }
 
     /**
      * Sanitize string input for GraphQL queries
      *
-     * Uses a whitelist approach: only allows characters that are known to be safe
-     * for the expected input types (search terms, titles, dates, etc.)
-     *
-     * Allowed characters:
-     * - Alphanumeric (a-z, A-Z, 0-9)
-     * - Common punctuation (space, comma, period, hyphen, apostrophe, colon)
-     * - Date/time characters (T, Z, +, /)
-     * - Unicode letters (for international names/content)
+     * Delegates to GraphQLSanitizer for whitelist-based validation.
      *
      * @param string $input The input string to sanitize
      * @return string The sanitized string
@@ -1323,44 +1302,8 @@ class McpServerService extends Component
      */
     private function sanitizeStringInput(string $input): string
     {
-        // Remove null bytes (always dangerous)
-        $input = str_replace("\0", '', $input);
-
-        // Whitelist pattern: allows safe characters for search/filter values
-        // - \p{L} = Unicode letters (for international content)
-        // - \p{N} = Unicode numbers
-        // - \s = whitespace (space, tab, newline)
-        // - Common safe punctuation: . , - ' " : ; ! ? @ # $ % & * ( ) + = / \ | < >
-        // - Date separators: T Z (ISO dates)
-        //
-        // Explicitly BLOCKS:
-        // - Backticks (`) - used in template literals
-        // - Curly braces { } - GraphQL query syntax
-        // - Square brackets [ ] - GraphQL array syntax
-        // - Triple dots ... - GraphQL fragments
-        $safePattern = '/^[\p{L}\p{N}\s.,\-\'"":;!?@#$%&*()+_=\/\\\\|<>TZ]+$/u';
-
-        if (!preg_match($safePattern, $input)) {
-            // Log the violation (truncated to prevent log injection)
-            $truncatedInput = mb_substr($input, 0, 100);
-            Craft::warning("Input contains disallowed characters: {$truncatedInput}", 'mcp-wrapper');
-            throw new \Exception('Input contains invalid characters', -32602);
-        }
-
-        // Additional check: block GraphQL-specific patterns that could slip through
-        // These use multi-character sequences that the single-char whitelist might miss
-        $dangerousSequences = [
-            '...',      // Fragment spread
-            '__',       // Introspection (double underscore)
-        ];
-
-        foreach ($dangerousSequences as $sequence) {
-            if (str_contains($input, $sequence)) {
-                Craft::warning("Input contains dangerous sequence '{$sequence}'", 'mcp-wrapper');
-                throw new \Exception('Input contains invalid character sequence', -32602);
-            }
-        }
-
-        return $input;
+        return GraphQLSanitizer::sanitizeStringInput($input, function($message, $category) {
+            Craft::warning($message, $category);
+        });
     }
 }
