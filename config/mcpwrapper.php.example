@@ -66,4 +66,32 @@ return [
         'craft_get_queue_status',  // Queue status is real-time
         'craft_get_cache_info',    // Cache info shouldn't be cached
     ],
+    
+    // Webhooks
+    // Send HTTP POST notifications when content changes
+    // Useful for external integrations (Botpress, Slack, etc.)
+    'webhooks' => [
+        // Example: Notify external system when entries change
+        // [
+        //     'url' => 'https://your-app.com/webhooks/mcp',
+        //     'secret' => getenv('MCP_WEBHOOK_SECRET'),  // For signature verification
+        //     'timeout' => 5,                             // Request timeout in seconds
+        //     
+        //     // Filters (optional)
+        //     'events' => ['entry.saved', 'entry.deleted'], // Which events to send
+        //     'sections' => ['news', 'blog'],               // Which sections to monitor
+        //     'statuses' => ['live'],                       // Only live entries
+        // ],
+        
+        // Example: Botpress integration
+        // [
+        //     'url' => 'https://webhook.botpress.cloud/abc123',
+        //     'events' => ['entry.saved'],
+        //     'sections' => ['news', 'projects'],
+        // ],
+    ],
+    
+    // Webhook Queue
+    // Process webhooks asynchronously to avoid blocking entry saves
+    'webhookUseQueue' => true,  // false = send immediately (synchronous)
 ];

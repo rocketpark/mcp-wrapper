@@ -17,8 +17,11 @@ use rocketpark\mcpwrapper\services\PromptRegistryService;
 use rocketpark\mcpwrapper\services\ResourceRegistryService;
 use rocketpark\mcpwrapper\services\ToolCacheService;
 use rocketpark\mcpwrapper\services\RequestLoggerService;
+use rocketpark\mcpwrapper\services\WebhookService;
 use rocketpark\mcpwrapper\tools\EntryTools;
 use rocketpark\mcpwrapper\tools\SystemTools;
+use craft\elements\Entry;
+use craft\events\ModelEvent;
 
 class McpWrapper extends Plugin
 {
@@ -51,6 +54,7 @@ class McpWrapper extends Plugin
                 'resourceRegistry' => ResourceRegistryService::class,
                 'toolCache' => ToolCacheService::class,
                 'requestLogger' => RequestLoggerService::class,
+                'webhook' => WebhookService::class,
             ],
         ];
     }
@@ -105,10 +109,68 @@ class McpWrapper extends Plugin
             fn() => $this->get('manifestBuilder')->clearCache()
         );
         
+        // Register webhook event handlers
+        $this->registerWebhookHandlers();
+        
         // Register manual tool classes
         $this->registerToolClasses();
         
         Craft::info('MCP Wrapper initialized', 'mcp-wrapper');
+    }
+    
+    /**
+     * Register webhook event handlers for entry changes
+     */
+    private function registerWebhookHandlers(): void
+    {
+        $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
+        $webhooksEnabled = !empty($config['webhooks']);
+        
+        if (!$webhooksEnabled) {
+            return;
+        }
+        
+        // Entry saved event
+        Event::on(
+            Entry::class,
+            Entry::EVENT_AFTER_SAVE,
+            function(ModelEvent $event) {
+                /** @var Entry $entry */
+                $entry = $event->sender;
+                
+                // Skip drafts and revisions
+                if ($entry->getIsDraft() || $entry->getIsRevision()) {
+                    return;
+                }
+                
+                /** @var WebhookService $webhookService */
+                $webhookService = $this->get('webhook');
+                $webhookService->queueWebhook(
+                    'entry.saved',
+                    $entry,
+                    $event->isNew ? [] : array_keys($entry->getDirtyAttributes())
+                );
+            }
+        );
+        
+        // Entry deleted event
+        Event::on(
+            Entry::class,
+            Entry::EVENT_AFTER_DELETE,
+            function(ModelEvent $event) {
+                /** @var Entry $entry */
+                $entry = $event->sender;
+                
+                // Skip drafts and revisions
+                if ($entry->getIsDraft() || $entry->getIsRevision()) {
+                    return;
+                }
+                
+                /** @var WebhookService $webhookService */
+                $webhookService = $this->get('webhook');
+                $webhookService->queueWebhook('entry.deleted', $entry);
+            }
+        );
     }
 
     /**

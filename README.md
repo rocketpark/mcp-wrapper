@@ -242,6 +242,27 @@ Restrict access to specific IPs or ranges:
 ]
 ```
 
+**7. Webhook Support** ✨ NEW
+
+Notify external systems when content changes:
+
+- Fires on entry save/delete events
+- Configurable filters (sections, statuses, events)
+- HMAC SHA-256 signatures for security
+- Async delivery via queue (doesn't block entry saves)
+- Test via console: `php craft mcp-wrapper/webhook/test`
+
+```php
+'webhooks' => [
+    [
+        'url' => 'https://your-app.com/webhooks/mcp',
+        'secret' => getenv('MCP_WEBHOOK_SECRET'),
+        'events' => ['entry.saved', 'entry.deleted'],
+        'sections' => ['news', 'blog'],
+    ]
+]
+```
+
 ### Multi-Schema Support
 
 Configure different GraphQL schemas for different use cases:
@@ -365,7 +386,7 @@ curl -X POST "https://your-site.com/mcp/MCPSchema" \
 The plugin includes a comprehensive PHPUnit test suite covering core functionality:
 
 ```bash
-# Run all unit tests (26 tests, 55 assertions)
+# Run all unit tests (33 tests, 72 assertions)
 vendor/bin/phpunit tests/Unit --colors=always
 
 # Or use the convenience script
@@ -385,6 +406,7 @@ vendor/bin/phpunit tests/Unit --colors=always
 - ToolCacheServiceTest.php - 8 tests (cache key generation, argument normalization)
 - RequestLoggerServiceTest.php - 10 tests (privacy, IP anonymization, arg hashing)
 - ToolAttributeTest.php - 8 tests (attribute discovery, enhanced annotations)
+- WebhookServiceTest.php - 7 tests (event/section/status filtering, payload structure)
 
 **Integration Tests (tests/):**
 - test-argument-mapping.php - Argument extraction from GraphQL schema
@@ -567,10 +589,18 @@ The plugin includes a CP utility at **Utilities → MCP Manifest Manager** for:
 
 ## Roadmap
 
+### ✅ Completed (v2.5 - February 2026)
+- [x] **Webhook Support** - HTTP POST notifications for content changes
+- [x] **Webhook Filtering** - Event, section, and status filters
+- [x] **HMAC Signatures** - Secure webhook delivery with SHA-256 signatures
+- [x] **Console Commands** - Test webhook delivery from CLI
+
+### ✅ Completed (v2.4 - February 2026)
+- [x] **Comprehensive Unit Test Suite** - 33 tests covering core services and attributes
+
 ### ✅ Completed (v2.3 - February 2026)
 - [x] **Output Schemas** - JSON schema definitions for all manual tools
 - [x] **Enhanced Tool Annotations** - costHint, confidentialityHint, destructiveHint
-- [x] **Comprehensive Unit Test Suite** - 26 tests covering core services and attributes
 
 ### ✅ Completed (v2.2 - February 2026)
 - [x] **Tool Result Caching** - 20-40% performance improvement for duplicate queries
@@ -591,6 +621,6 @@ The plugin includes a CP utility at **Utilities → MCP Manifest Manager** for:
 - [x] Prompts registry (schema_explorer, content_health, query_builder)
 
 ### 🔜 Planned
-- [ ] Webhook support for content change notifications
-- [ ] OAuth 2.1 support for enterprise deployments
 - [ ] Performance dashboard for analytics visualization
+- [ ] OAuth 2.1 support for enterprise deployments
+- [ ] Auto-generated tool improvements (output schemas for GraphQL tools)

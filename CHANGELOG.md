@@ -2,6 +2,47 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2.5.0 - 2026-02-02
+
+### Added - Webhook Support
+
+- **WebhookService**: HTTP POST notifications when content changes
+  - Fires on entry save/delete events (skips drafts and revisions)
+  - Async delivery via queue (configurable, doesn't block entry saves)
+  - HMAC SHA-256 signatures for security verification
+  - Configurable timeout (default: 5 seconds)
+
+- **Webhook Filtering**: Fine-grained control over which events to send
+  - Event filters: entry.saved, entry.deleted
+  - Section filters: Only specific sections
+  - Status filters: Only specific entry statuses (live, pending, etc.)
+  - Combined filters for complex scenarios
+
+- **DeliverWebhookJob**: Queue job for reliable async webhook delivery
+  - Handles retries automatically
+  - Logs failures for debugging
+  - Doesn't block entry save operations
+
+- **Console Commands**: Test and manage webhooks from CLI
+  - `php craft mcp-wrapper/webhook/test <url> [secret]` - Test webhook delivery
+  - `php craft mcp-wrapper/webhook/list` - List configured webhooks
+
+- **Configuration**: Comprehensive webhook setup in mcpwrapper.php
+  - Multiple webhooks supported
+  - Per-webhook URL, secret, timeout, filters
+  - Example configurations for Botpress, Slack, custom integrations
+
+- **Unit Tests**: WebhookServiceTest with 7 tests covering:
+  - Event filtering logic
+  - Section filtering logic
+  - Status filtering logic
+  - Combined filter scenarios
+  - Empty filters (allow all)
+
+### Changed
+- Updated config/mcpwrapper.php.example with webhook examples
+- Total unit tests: 33 tests with 72 assertions
+
 ## 2.4.0 - 2026-02-02
 
 ### Added - Comprehensive Unit Test Suite
