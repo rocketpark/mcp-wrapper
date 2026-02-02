@@ -1,5 +1,5 @@
 # Session: mcp-wrapper
-Updated: 2026-01-27T14:34:21.683Z
+Updated: 2026-02-02T15:02:55.634Z
 
 ## Goal
 Maintain and improve a production Craft CMS plugin that exposes content to AI assistants (particularly Botpress) via the Model Context Protocol (MCP). Success = stable plugin operation on Jensen Hughes production site with proper Regional Leadership filtering, accurate phone numbers, and privacy protection.
@@ -69,8 +69,30 @@ Maintain and improve a production Craft CMS plugin that exposes content to AI as
     - Test runner script - tests/run-all-tests.sh
     - Updated test-mcp-endpoint.sh for v2.1.0 protocol/version
     - All 57 unit tests passing
-- Now: [→] Deploy v2.1.0 improvements to production
-- Next: Monitor production, consider OAuth support per MCP 2025-11-25 spec
+  - [x] Security Testing (2026-02-02):
+    - GraphQL sanitization tests (49 tests) - tests/test-graphql-sanitization.php
+    - GraphQLSanitizer utility class - src/support/GraphQLSanitizer.php
+    - Log injection fix (explicit space in whitelist regex)
+    - All 106 unit tests now passing
+  - [x] Documentation Cleanup (2026-02-02):
+    - Deleted .history/ folder
+    - Deleted redundant MD files (QUICK-START-TESTING, BOT-FIXES-ACTION-PLAN, BOTPRESS-TEST-CHECKLIST, CODEBASE-REVIEW-AND-IMPROVEMENTS, MCP-WRAPPER-OVERVIEW-AND-UPDATES)
+    - Moved BOT-COMPREHENSIVE-TEST-QUESTIONS.md to tests/
+  - [x] Codebase Review & Unit Testing (2026-02-02):
+    - All 106 unit tests passing (run-all-tests.sh)
+    - All PHP files syntax validated (no errors)
+    - Code review of all security measures complete
+    - Demo MCP instance tested via mcp__craft-cms__ tools (queries, filters, pagination work)
+- Now: [→] Run Jensen Hughes-specific integration tests
+- Next:
+  - [ ] Run `./test-mcp-endpoint.sh https://staging3.jensenhughes.com MCPSchema`
+  - [ ] Verify Regional Leadership count = 59
+  - [ ] Verify craft_get_office_contact_info returns real phone numbers
+  - [ ] Verify no @jensenhughes.com emails in responses
+  - [ ] Check health and metrics endpoints
+    - Updated README.md: fixed MCP spec version (2025-11-25), removed broken links, added health/metrics docs, removed duplicate sections
+    - README reduced from 665 to 454 lines
+- Future: Consider implementing MCP best practice improvements (tool annotations, error codes, OAuth)
 
 ## Working Set
 
@@ -99,11 +121,14 @@ Maintain and improve a production Craft CMS plugin that exposes content to AI as
 - `tests/test-argument-mapping.php` - Argument mapping tests (3 tests)
 - `FINAL-TEST-RESULTS.md` - Comprehensive test results (76% pass rate)
 
-### Documentation
-- `README.md` - Main plugin documentation
+### Documentation (Cleaned 2026-02-02)
+- `README.md` - Main plugin documentation (updated for MCP 2025-11-25)
+- `CHANGELOG.md` - Version history
+- `LICENSE.md` - MIT license
 - `REGIONAL-LEADERSHIP-TESTING-GUIDE.md` - Critical filtering requirements
-- `BOTPRESS-INSTRUCTIONS-CORRECTED.md` - Updated Botpress Knowledge Base content
+- `BOTPRESS-INSTRUCTIONS-CORRECTED.md` - Botpress Knowledge Base content
 - `FINAL-TEST-RESULTS.md` - Production readiness assessment
+- `tests/BOT-COMPREHENSIVE-TEST-QUESTIONS.md` - 165 test scenarios (moved from root)
 
 ### Configuration
 - `.env` - MCP_GQLSCHEMA_TOKEN for GraphQL access
@@ -122,6 +147,20 @@ Known limitations (with workarounds):
 1. GraphQL search parameter only matches titles (not content) - Use craft_search_entries for broad searches
 2. State-based office search doesn't work - Use craft_get_office_contact_info with slug instead
 3. System info returns null for Craft version - Diagnostic only, no bot impact
+
+### Future Improvements (from best practices research 2026-02-02)
+**Craft CMS:**
+- Add `declare(strict_types=1)` to PHP files
+- Create Settings model with typed properties
+- Add PHPStan with craftcms/phpstan for static analysis
+- Consider Craft Pest for testing
+
+**MCP Protocol:**
+- Add tool annotations: `title`, `outputSchema`, `destructiveHint`, `idempotentHint`
+- Use `-32002` error code for resource not found
+- Add `$schema` field to input schemas (JSON Schema 2020-12)
+- Consider Streamable HTTP transport (SSE deprecated)
+- Plan for OAuth 2.1 support for enterprise deployments
 
 ## Codebase Summary
 
