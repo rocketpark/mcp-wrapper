@@ -600,6 +600,16 @@ The plugin includes a CP utility at **Utilities → MCP Manifest Manager** for:
 
 ## Roadmap
 
+### ✅ Completed (v2.7 - February 2026)
+- [x] **JSON Schema for Auto-Generated Tools** - Complete inputSchema and outputSchema for all 18 query_* tools
+- [x] **Enhanced Type Mapping** - Intelligent Craft field to JSON Schema conversion
+- [x] **Better AI Understanding** - Detailed parameter descriptions, defaults, and constraints
+
+### ✅ Completed (v2.6 - February 2026)
+- [x] **Performance Dashboard** - Visual analytics in Craft CP with real-time metrics
+- [x] **CSV Export** - Download analytics data for external analysis
+- [x] **Multi-Schema Support** - Filter dashboard by GraphQL schema
+
 ### ✅ Completed (v2.5 - February 2026)
 - [x] **Webhook Support** - HTTP POST notifications for content changes
 - [x] **Webhook Filtering** - Event, section, and status filters

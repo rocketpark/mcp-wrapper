@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2.7.0 - 2026-02-02
+
+### Added - JSON Schema Support for Auto-Generated Tools
+
+- **Input Schemas**: All auto-generated `query_*` tools now include complete `inputSchema`
+  - Standard parameters: `limit` (1-100, default 10), `offset` (pagination), `orderBy` (sorting)
+  - `search`: Full-text search across title and content
+  - `filters`: Object with field-specific filters based on section's custom fields
+  - Proper type definitions, descriptions, defaults, and constraints
+
+- **Output Schemas**: Comprehensive `outputSchema` for all query tools
+  - Standard entry fields: `id`, `title`, `slug`, `uri`, `url`, `dateCreated`, `dateUpdated`
+  - All custom fields with proper JSON Schema types (string, number, boolean, datetime, relations)
+  - Relation fields include nested structure with `id` and `title`
+  - Top-level structure: `{entries: [...], total: number}`
+
+- **Type Mapping**: Intelligent field-to-JSON-Schema conversion
+  - PlainText → string
+  - Number → number
+  - Lightswitch → boolean
+  - Date → string (format: date-time)
+  - Relations (Entries, Assets, Categories, etc.) → array of objects with id/title
+  - Dropdown/RadioButtons → enum (type: string)
+
+### Changed
+
+- Enhanced tool descriptions now mention "Returns array of entry objects with ID, title, and custom fields"
+- Better AI decision-making with complete type information
+- Improved parameter validation and documentation
+
 ## 2.6.0 - 2026-02-02
 
 ### Added - Performance Dashboard
