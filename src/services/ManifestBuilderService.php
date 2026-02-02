@@ -248,21 +248,173 @@ class ManifestBuilderService extends Component
 
         return [
             'name' => "query_{$sectionHandle}",
-            'description' => "Query {$sectionHandle} entries (schema {$schemaHandle}) with relationships.",
-            'endpoint' => '/api',
-            'method' => 'POST',
-            'dangerous' => false, // GraphQL queries are read-only
-            'parameters' => [
-                'query' => "query { entries(section: \"{$sectionHandle}\") { " .
-                    implode(' ', array_column($fields, 'handle')) . " } }",
-                'variables' => [
-                    'section' => $sectionHandle,
-                    'limit' => 'integer',
-                    'filters' => $this->generateFilterSchema($fields),
+            'description' => "Query {$sectionHandle} entries (schema {$schemaHandle}) with relationships. Returns array of entry objects with ID, title, and custom fields.",
+            'inputSchema' => $this->generateInputSchema($sectionHandle, $fields),
+            'outputSchema' => $this->generateOutputSchema($sectionHandle, $fields),
+            'dangerous' => false,
+        ];
+    }
+    
+    /**
+     * Generate JSON Schema for tool input parameters
+     */
+    private function generateInputSchema(string $sectionHandle, array $fields): array
+    {
+        $properties = [
+            'limit' => [
+                'type' => 'integer',
+                'description' => 'Maximum number of entries to return (default: 10)',
+                'minimum' => 1,
+                'maximum' => 100,
+                'default' => 10,
+            ],
+            'offset' => [
+                'type' => 'integer',
+                'description' => 'Number of entries to skip for pagination',
+                'minimum' => 0,
+                'default' => 0,
+            ],
+            'orderBy' => [
+                'type' => 'string',
+                'description' => 'Sort order (e.g., "title ASC", "dateCreated DESC")',
+                'default' => 'dateCreated DESC',
+            ],
+        ];
+        
+        // Add search parameter
+        $properties['search'] = [
+            'type' => 'string',
+            'description' => 'Search term to filter entries by title or content',
+        ];
+        
+        // Add field-specific filters
+        $filterProperties = [];
+        foreach ($fields as $field) {
+            if (in_array($field['type'], ['string', 'number'])) {
+                $filterProperties[$field['handle']] = [
+                    'type' => $field['type'] === 'number' ? 'number' : 'string',
+                    'description' => $field['instructions'] ?: "Filter by {$field['handle']}",
+                ];
+            }
+        }
+        
+        if (!empty($filterProperties)) {
+            $properties['filters'] = [
+                'type' => 'object',
+                'description' => 'Field-based filters',
+                'properties' => $filterProperties,
+            ];
+        }
+        
+        return [
+            'type' => 'object',
+            'properties' => $properties,
+            'required' => [],
+        ];
+    }
+    
+    /**
+     * Generate JSON Schema for tool output (entry structure)
+     */
+    private function generateOutputSchema(string $sectionHandle, array $fields): array
+    {
+        $entryProperties = [
+            'id' => [
+                'type' => 'integer',
+                'description' => 'Unique entry ID',
+            ],
+            'title' => [
+                'type' => 'string',
+                'description' => 'Entry title',
+            ],
+            'slug' => [
+                'type' => 'string',
+                'description' => 'URL-friendly slug',
+            ],
+            'uri' => [
+                'type' => ['string', 'null'],
+                'description' => 'Full URI path',
+            ],
+            'url' => [
+                'type' => ['string', 'null'],
+                'description' => 'Full URL',
+            ],
+            'dateCreated' => [
+                'type' => 'string',
+                'format' => 'date-time',
+                'description' => 'Creation timestamp',
+            ],
+            'dateUpdated' => [
+                'type' => 'string',
+                'format' => 'date-time',
+                'description' => 'Last update timestamp',
+            ],
+        ];
+        
+        // Add custom fields to schema
+        foreach ($fields as $field) {
+            $entryProperties[$field['handle']] = $this->fieldToJsonSchema($field);
+        }
+        
+        return [
+            'type' => 'object',
+            'properties' => [
+                'entries' => [
+                    'type' => 'array',
+                    'description' => "Array of {$sectionHandle} entries",
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => $entryProperties,
+                    ],
+                ],
+                'total' => [
+                    'type' => 'integer',
+                    'description' => 'Total number of entries matching query',
                 ],
             ],
-            'returns' => ['entries' => $fields],
+            'required' => ['entries', 'total'],
         ];
+    }
+    
+    /**
+     * Convert field description to JSON Schema property
+     */
+    private function fieldToJsonSchema(array $field): array
+    {
+        $schema = [
+            'description' => $field['instructions'] ?: "Field: {$field['handle']}",
+        ];
+        
+        switch ($field['type']) {
+            case 'string':
+                $schema['type'] = 'string';
+                break;
+            case 'number':
+                $schema['type'] = 'number';
+                break;
+            case 'boolean':
+                $schema['type'] = 'boolean';
+                break;
+            case 'datetime':
+                $schema['type'] = 'string';
+                $schema['format'] = 'date-time';
+                break;
+            case 'relation':
+                $schema['type'] = 'array';
+                $schema['description'] .= " (Related {$field['relationTo']['elementType']} elements)";
+                $schema['items'] = [
+                    'type' => 'object',
+                    'properties' => [
+                        'id' => ['type' => 'integer'],
+                        'title' => ['type' => 'string'],
+                    ],
+                ];
+                break;
+            default:
+                $schema['type'] = ['string', 'null'];
+        }
+        
+        return $schema;
     }
 
     private function describeField(FieldInterface $field): array
