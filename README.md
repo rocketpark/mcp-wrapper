@@ -4,10 +4,12 @@ A production-ready Craft CMS plugin that exposes your content to AI assistants t
 
 ## 📚 Documentation
 
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Production deployment guide (v2.2-v2.7)
+- **[VERIFICATION.md](VERIFICATION.md)** - Post-deployment verification checklist
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history and release notes
 - **[FINAL-TEST-RESULTS.md](FINAL-TEST-RESULTS.md)** - Comprehensive test results and production readiness
 - **[REGIONAL-LEADERSHIP-TESTING-GUIDE.md](REGIONAL-LEADERSHIP-TESTING-GUIDE.md)** - Technical guide for Regional Leadership filtering
 - **[BOTPRESS-INSTRUCTIONS-CORRECTED.md](BOTPRESS-INSTRUCTIONS-CORRECTED.md)** - Botpress Knowledge Base instructions
-- **[CHANGELOG.md](CHANGELOG.md)** - Version history
 
 ## Architecture
 
@@ -391,6 +393,27 @@ curl -X POST "https://your-site.com/mcp/MCPSchema" \
     "id":3
   }'
 ```
+
+## Deployment
+
+For production deployments, comprehensive guides are available:
+
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Complete deployment guide with step-by-step instructions
+- **[VERIFICATION.md](VERIFICATION.md)** - Post-deployment verification checklist
+
+**Quick Deployment:**
+
+```bash
+# Automated deployment script
+./scripts/deploy.sh
+
+# Or manual deployment:
+composer update rocket-park/mcp-wrapper
+php craft clear-caches/all
+php craft project-config/apply
+```
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed pre-deployment checks, configuration examples, and troubleshooting.
 
 ## Testing
 
