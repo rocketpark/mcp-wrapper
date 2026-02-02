@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2.4.0 - 2026-02-02
+
+### Added - Comprehensive Unit Test Suite
+
+- **PHPUnit Test Framework**: Professional unit testing with 26 tests and 55 assertions
+  - ToolCacheServiceTest: 8 tests covering cache key generation (MD5 hashing), argument normalization (ksort), complex argument handling
+  - RequestLoggerServiceTest: 10 tests covering privacy features (IPv4/IPv6 anonymization, argument hashing), consistency validation
+  - ToolAttributeTest: 8 tests covering attribute discovery, enhanced annotations, output schemas
+
+- **Test Infrastructure**:
+  - phpunit.xml configuration with coverage support
+  - tests/bootstrap.php for Yii2/Craft environment setup
+  - tests/run-unit-tests.sh convenience script with --coverage and --filter options
+  - Documentation in README with usage examples
+
+- **Test Coverage**:
+  - Core services: ToolCacheService, RequestLoggerService
+  - Attributes: Tool attribute with enhanced annotations
+  - All tests pass with reflection-based testing for private methods
+
+### Changed
+- Updated README with comprehensive testing section
+- Updated roadmap to mark Unit Test Suite as ✅ completed
+
 ## 2.3.0 - 2026-02-02
 
 ### Added - MCP Spec Compliance & Enhanced Metadata
