@@ -1,0 +1,69 @@
+<?php
+/**
+ * MCP Wrapper Configuration
+ * 
+ * Copy this file to config/mcpwrapper.php and configure for your environment.
+ * 
+ * @see https://github.com/rocketpark/mcp-wrapper
+ */
+
+return [
+    // GraphQL Schema Mapping
+    // Map schema handles to GraphQL bearer tokens from Craft CP
+    // Get tokens from Settings > GraphQL > Schemas
+    'schemas' => [
+        'MCPSchema' => getenv('MCP_GQLSCHEMA_TOKEN'),
+        // 'public' => getenv('MCP_PUBLIC_TOKEN'),
+        // 'internal' => getenv('MCP_INTERNAL_TOKEN'),
+    ],
+    
+    // Security Settings
+    'security' => [
+        // Enable dangerous tools (cache clear, config rebuild, etc.)
+        // ALWAYS false in production for safety
+        'enableDangerousTools' => false,
+        
+        // Disable specific tools by name
+        // Use this to prevent access to sensitive operations
+        'disabledTools' => [
+            // 'craft_read_logs',     // Don't expose log files
+            // 'craft_clear_caches',  // Don't allow cache clearing
+            // 'craft_get_env',       // Don't expose environment variables
+        ],
+        
+        // IP Allowlist (empty array = allow all)
+        // Supports CIDR notation for IPv4 and IPv6
+        // Use this to restrict access to specific networks
+        'allowedIps' => [
+            // '127.0.0.1',           // Localhost only
+            // '::1',                 // IPv6 localhost
+            // '192.168.1.0/24',      // Local network
+            // '10.0.0.0/8',          // Private network
+            // '2001:db8::/32',       // IPv6 network
+        ],
+        
+        // Rate Limiting
+        // Prevents abuse by limiting requests per IP address
+        'enableRateLimit' => true,        // Enable rate limiting
+        'rateLimit' => 100,                // Max requests per window
+        'rateLimitWindow' => 60,           // Window duration in seconds (60s = 100 req/min)
+    ],
+    
+    // Request Timeout
+    // Maximum seconds for a single MCP request to execute
+    // Prevents runaway queries from consuming resources
+    'requestTimeout' => 30,
+    
+    // Tool Result Caching
+    // Cache tool execution results to improve performance
+    // Reduces duplicate queries and database load
+    'toolCacheTTL' => 300,  // Cache for 5 minutes (0 = disabled)
+    
+    // Exclude specific tools from caching
+    // Use this for tools that return real-time or volatile data
+    'toolCacheExclude' => [
+        'craft_get_system_info',   // System status changes frequently
+        'craft_get_queue_status',  // Queue status is real-time
+        'craft_get_cache_info',    // Cache info shouldn't be cached
+    ],
+];

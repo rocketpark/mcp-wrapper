@@ -29,7 +29,7 @@ class McpServerService extends Component
      * Handle incoming JSON-RPC 2.0 requests with timeout handling
      * Per MCP spec: implementations SHOULD establish timeouts for sent requests
      */
-    public function handleRequest(array $jsonRpcRequest): array
+    public function handleRequest(array $jsonRpcRequest, string $schemaHandle = 'unknown'): array
     {
         $method = $jsonRpcRequest['method'] ?? null;
         $params = $jsonRpcRequest['params'] ?? [];
@@ -40,6 +40,12 @@ class McpServerService extends Component
         $timeout = $config['requestTimeout'] ?? self::DEFAULT_REQUEST_TIMEOUT;
 
         $startTime = microtime(true);
+        $toolName = null;
+        
+        // Extract tool name if this is a tools/call
+        if ($method === 'tools/call') {
+            $toolName = $params['name'] ?? null;
+        }
 
         try {
             Craft::info("MCP Request: {$method} (timeout: {$timeout}s)", 'mcp-wrapper');
@@ -51,20 +57,74 @@ class McpServerService extends Component
                 $method
             );
 
-            $duration = round((microtime(true) - $startTime) * 1000, 2);
-            Craft::info("MCP Response: success for {$method} ({$duration}ms)", 'mcp-wrapper');
+            $duration = microtime(true) - $startTime;
+            $response = $this->successResponse($id, $result);
+            
+            Craft::info("MCP Response: success for {$method} ({$this->formatDuration($duration)})", 'mcp-wrapper');
 
-            return $this->successResponse($id, $result);
+            // Log structured request data
+            $this->logRequest($method, $toolName, $params, $response, $duration, $schemaHandle);
+
+            return $response;
         } catch (RequestTimeoutException $e) {
-            $duration = round((microtime(true) - $startTime) * 1000, 2);
-            Craft::warning("MCP Timeout ({$method}): {$e->getMessage()} ({$duration}ms)", 'mcp-wrapper');
-            return $this->errorResponse($id, $e);
+            $duration = microtime(true) - $startTime;
+            $response = $this->errorResponse($id, $e);
+            
+            Craft::warning("MCP Timeout ({$method}): {$e->getMessage()} ({$this->formatDuration($duration)})", 'mcp-wrapper');
+            
+            // Log failed request
+            $this->logRequest($method, $toolName, $params, $response, $duration, $schemaHandle);
+            
+            return $response;
         } catch (\Exception $e) {
-            $duration = round((microtime(true) - $startTime) * 1000, 2);
-            Craft::error("MCP Error ({$method}): {$e->getMessage()} ({$duration}ms)", 'mcp-wrapper');
+            $duration = microtime(true) - $startTime;
+            $response = $this->errorResponse($id, $e);
+            
+            Craft::error("MCP Error ({$method}): {$e->getMessage()} ({$this->formatDuration($duration)})", 'mcp-wrapper');
             Craft::error($e->getTraceAsString(), 'mcp-wrapper');
-            return $this->errorResponse($id, $e);
+            
+            // Log failed request
+            $this->logRequest($method, $toolName, $params, $response, $duration, $schemaHandle);
+            
+            return $response;
         }
+    }
+
+    /**
+     * Log structured request data via RequestLoggerService
+     */
+    private function logRequest(
+        string $method,
+        ?string $toolName,
+        array $params,
+        array $response,
+        float $duration,
+        string $schemaHandle
+    ): void {
+        try {
+            $logger = Craft::$app->getModule('mcp-wrapper')->get('requestLogger');
+            $ip = Craft::$app->request->userIP ?? 'unknown';
+            
+            // Extract arguments for tools/call
+            $arguments = [];
+            if ($method === 'tools/call' && isset($params['arguments'])) {
+                $arguments = $params['arguments'];
+            }
+            
+            $logger->logRequest($method, $toolName, $arguments, $response, $duration, $schemaHandle, $ip);
+        } catch (\Exception $e) {
+            // Don't let logging failures affect the request
+            Craft::error("Failed to log request: {$e->getMessage()}", 'mcp-wrapper');
+        }
+    }
+
+    /**
+     * Format duration for logging
+     */
+    private function formatDuration(float $seconds): string
+    {
+        $ms = round($seconds * 1000, 2);
+        return "{$ms}ms";
     }
 
     /**

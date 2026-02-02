@@ -14,6 +14,11 @@ use GuzzleHttp\Client;
 class ManifestBuilderService extends Component
 {
     private string $cacheDir = '@storage/runtime/mcp';
+    
+    /**
+     * @var Client|null Shared GraphQL client for connection pooling
+     */
+    private static ?Client $graphqlClient = null;
 
     public function buildManifest(string $token, string $schemaHandle, bool $forceRebuild = false): array
     {
@@ -402,13 +407,26 @@ class ManifestBuilderService extends Component
         return rtrim($primarySite->getBaseUrl(), '/');
     }
 
+    /**
+     * Get shared GraphQL client (connection pooling)
+     */
+    private function getGraphQLClient(): Client
+    {
+        if (self::$graphqlClient === null) {
+            self::$graphqlClient = new Client([
+                'base_uri' => $this->getTrustedBaseUri(),
+                'timeout' => 10,
+                'http_errors' => false,
+            ]);
+            Craft::info("Created shared GraphQL client", 'mcp-wrapper');
+        }
+        return self::$graphqlClient;
+    }
+
     private function introspectGraphQL(string $token): array
     {
         try {
-            $client = new Client([
-                'base_uri' => $this->getTrustedBaseUri(),
-                'timeout' => 10,
-            ]);
+            $client = $this->getGraphQLClient();
 
             $query = <<<'GQL'
             { __schema { types { name fields { name type { name kind } } } } }

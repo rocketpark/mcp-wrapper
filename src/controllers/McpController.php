@@ -105,7 +105,7 @@ class McpController extends Controller
 
             // Handle request via service
             $mcpServer = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('mcpServer');
-            $response = $mcpServer->handleRequest($jsonRpcRequest);
+            $response = $mcpServer->handleRequest($jsonRpcRequest, $schemaHandle);
 
             return $this->asJson($response);
         } catch (\Exception $e) {

@@ -140,11 +140,25 @@ class ToolRegistryService extends Component
      */
     public function executeTool(string $toolName, array $arguments = []): mixed
     {
+        // Try to get cached result first
+        $cacheService = Craft::$app->getModule('mcp-wrapper')->get('toolCache');
+        $cached = $cacheService->get($toolName, $arguments);
+        
+        if ($cached !== null) {
+            return $cached;
+        }
+        
+        // Execute tool
         $manualTools = $this->discoverManualTools();
         
         foreach ($manualTools as $tool) {
             if ($tool['name'] === $toolName) {
-                return $this->invokeToolMethod($tool['handler'], $arguments);
+                $result = $this->invokeToolMethod($tool['handler'], $arguments);
+                
+                // Cache the result
+                $cacheService->set($toolName, $arguments, $result);
+                
+                return $result;
             }
         }
         

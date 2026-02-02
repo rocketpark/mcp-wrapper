@@ -47,6 +47,8 @@ class McpWrapper extends Plugin
                 'toolRegistry' => ToolRegistryService::class,
                 'promptRegistry' => PromptRegistryService::class,
                 'resourceRegistry' => ResourceRegistryService::class,
+                'toolCache' => ToolCacheService::class,
+                'requestLogger' => RequestLoggerService::class,
             ],
         ];
     }
@@ -127,6 +129,7 @@ class McpWrapper extends Plugin
     private function _configureLogging(): void
     {
         $logPath = Craft::getAlias('@storage/logs/mcpwrapper.log');
+        $requestLogPath = Craft::getAlias('@storage/logs/mcp-requests.log');
         
         // Add custom file target for mcp-wrapper category
         Craft::getLogger()->dispatcher->targets['mcpwrapper'] = new \yii\log\FileTarget([
@@ -138,6 +141,19 @@ class McpWrapper extends Plugin
             'maxLogFiles' => 5,
         ]);
         
-        Craft::info('MCP Wrapper logging configured: ' . $logPath, 'mcp-wrapper');
+        // Add separate target for structured request logging
+        Craft::getLogger()->dispatcher->targets['mcp-requests'] = new \yii\log\FileTarget([
+            'logFile' => $requestLogPath,
+            'categories' => ['mcp-requests'],
+            'levels' => ['info'],
+            'logVars' => [],
+            'maxFileSize' => 10240, // 10MB
+            'maxLogFiles' => 10,
+            'enableRotation' => true,
+        ]);
+        
+        Craft::info('MCP Wrapper logging configured', 'mcp-wrapper');
+        Craft::info('  - Main log: ' . $logPath, 'mcp-wrapper');
+        Craft::info('  - Request log: ' . $requestLogPath, 'mcp-wrapper');
     }
 }
