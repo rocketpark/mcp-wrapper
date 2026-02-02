@@ -15,6 +15,8 @@ use rocketpark\mcpwrapper\services\McpServerService;
 use rocketpark\mcpwrapper\services\ToolRegistryService;
 use rocketpark\mcpwrapper\services\PromptRegistryService;
 use rocketpark\mcpwrapper\services\ResourceRegistryService;
+use rocketpark\mcpwrapper\services\ToolCacheService;
+use rocketpark\mcpwrapper\services\RequestLoggerService;
 use rocketpark\mcpwrapper\tools\EntryTools;
 use rocketpark\mcpwrapper\tools\SystemTools;
 
