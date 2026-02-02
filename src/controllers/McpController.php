@@ -229,13 +229,38 @@ class McpController extends Controller
     }
     
     /**
+     * Validate access to observability endpoints (metrics, health)
+     * Uses the same IP allowlist as the main MCP endpoints
+     *
+     * @throws ForbiddenHttpException if IP not allowed
+     */
+    private function validateObservabilityAccess(): void
+    {
+        $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
+        $allowedIps = $config['security']['allowedIps'] ?? [];
+
+        // If allowlist is configured, enforce it for observability endpoints
+        if (!empty($allowedIps)) {
+            $remoteIp = Craft::$app->request->getUserIP();
+            if (!IpValidator::isAllowed($remoteIp, $allowedIps)) {
+                Craft::warning("Observability access denied for IP: {$remoteIp}", 'mcp-wrapper');
+                throw new ForbiddenHttpException('Access denied: IP not whitelisted');
+            }
+        }
+    }
+
+    /**
      * Metrics endpoint for monitoring (Prometheus-compatible format)
      * Returns basic MCP server metrics
      *
      * GET /mcp/metrics - Returns metrics in Prometheus text format
+     *
+     * Note: Access is restricted by IP allowlist when configured
      */
     public function actionMetrics(): Response
     {
+        $this->validateObservabilityAccess();
+
         $this->response->format = Response::FORMAT_RAW;
         $this->response->headers->set('Content-Type', 'text/plain; version=0.0.4');
 
@@ -284,9 +309,13 @@ class McpController extends Controller
      *
      * GET /mcp/health - Quick health check
      * GET /mcp/health?detailed=1 - Detailed health with component checks
+     *
+     * Note: Access is restricted by IP allowlist when configured
      */
     public function actionHealth(): Response
     {
+        $this->validateObservabilityAccess();
+
         $this->response->format = Response::FORMAT_JSON;
         $detailed = (bool) Craft::$app->request->getQueryParam('detailed', false);
 

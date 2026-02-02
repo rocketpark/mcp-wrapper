@@ -546,13 +546,28 @@ class McpServerService extends Component
     }
 
     /**
+     * Get trusted base URI for internal API requests
+     *
+     * Uses the primary site's base URL instead of HTTP Host header
+     * to prevent SSRF attacks via Host header manipulation.
+     *
+     * @return string The trusted base URI
+     */
+    private function getTrustedBaseUri(): string
+    {
+        // Use the primary site's configured base URL (from config, not request headers)
+        $primarySite = Craft::$app->getSites()->getPrimarySite();
+        return rtrim($primarySite->getBaseUrl(), '/');
+    }
+
+    /**
      * Introspect GraphQL schema to get available types
      */
     private function introspectGraphQLSchema(string $token): array
     {
         try {
             $client = new Client([
-                'base_uri' => Craft::$app->request->getHostInfo(),
+                'base_uri' => $this->getTrustedBaseUri(),
                 'timeout' => 10,
             ]);
 
@@ -660,27 +675,27 @@ class McpServerService extends Component
         }
         
         if (!empty($args['uid']) && is_array($args['uid'])) {
-            $uidsStr = implode(',', array_map(fn($uid) => '"' . addslashes($uid) . '"', $args['uid']));
+            $uidsStr = implode(',', array_map(fn($uid) => '"' . $this->escapeGraphQLString($uid) . '"', $args['uid']));
             $filters[] = "uid: [{$uidsStr}]";
         }
-        
+
         if (!empty($args['slug']) && is_array($args['slug'])) {
-            $slugsStr = implode(',', array_map(fn($slug) => '"' . addslashes($slug) . '"', $args['slug']));
+            $slugsStr = implode(',', array_map(fn($slug) => '"' . $this->escapeGraphQLString($slug) . '"', $args['slug']));
             $filters[] = "slug: [{$slugsStr}]";
         }
-        
+
         if (!empty($args['uri']) && is_array($args['uri'])) {
-            $urisStr = implode(',', array_map(fn($uri) => '"' . addslashes($uri) . '"', $args['uri']));
+            $urisStr = implode(',', array_map(fn($uri) => '"' . $this->escapeGraphQLString($uri) . '"', $args['uri']));
             $filters[] = "uri: [{$urisStr}]";
         }
-        
+
         if (!empty($args['title'])) {
-            $filters[] = 'title: "' . addslashes($args['title']) . '"';
+            $filters[] = 'title: "' . $this->escapeGraphQLString($args['title']) . '"';
         }
         
         // Entry type filters
         if (!empty($args['type']) && is_array($args['type'])) {
-            $typesStr = implode(',', array_map(fn($t) => '"' . addslashes($t) . '"', $args['type']));
+            $typesStr = implode(',', array_map(fn($t) => '"' . $this->escapeGraphQLString($t) . '"', $args['type']));
             $filters[] = "type: [{$typesStr}]";
         }
         
@@ -691,7 +706,7 @@ class McpServerService extends Component
         
         // Status filters
         if (!empty($args['status']) && is_array($args['status'])) {
-            $statusStr = implode(',', array_map(fn($s) => '"' . addslashes($s) . '"', $args['status']));
+            $statusStr = implode(',', array_map(fn($s) => '"' . $this->escapeGraphQLString($s) . '"', $args['status']));
             $filters[] = "status: [{$statusStr}]";
         }
         
@@ -706,7 +721,7 @@ class McpServerService extends Component
         // Date filters
         foreach (['dateCreated', 'dateUpdated', 'postDate', 'expiryDate', 'before', 'after'] as $dateField) {
             if (!empty($args[$dateField])) {
-                $filters[] = "{$dateField}: \"" . addslashes($args[$dateField]) . '"';
+                $filters[] = "{$dateField}: \"" . $this->escapeGraphQLString($args[$dateField]) . '"';
             }
         }
         
@@ -727,20 +742,20 @@ class McpServerService extends Component
             $authorIdsStr = implode(',', array_map('intval', $args['authorId']));
             $filters[] = "authorId: [{$authorIdsStr}]";
         }
-        
+
         if (!empty($args['authorGroup']) && is_array($args['authorGroup'])) {
-            $authorGroupsStr = implode(',', array_map(fn($g) => '"' . addslashes($g) . '"', $args['authorGroup']));
+            $authorGroupsStr = implode(',', array_map(fn($g) => '"' . $this->escapeGraphQLString($g) . '"', $args['authorGroup']));
             $filters[] = "authorGroup: [{$authorGroupsStr}]";
         }
-        
+
         // Search
         if (!empty($args['search'])) {
-            $filters[] = 'search: "' . addslashes($args['search']) . '"';
+            $filters[] = 'search: "' . $this->escapeGraphQLString($args['search']) . '"';
         }
-        
+
         // Ordering
         if (!empty($args['orderBy'])) {
-            $filters[] = 'orderBy: "' . addslashes($args['orderBy']) . '"';
+            $filters[] = 'orderBy: "' . $this->escapeGraphQLString($args['orderBy']) . '"';
         }
         
         if (isset($args['inReverse'])) {
@@ -757,7 +772,7 @@ class McpServerService extends Component
         
         // Multi-site
         if (!empty($args['site']) && is_array($args['site'])) {
-            $sitesStr = implode(',', array_map(fn($s) => '"' . addslashes($s) . '"', $args['site']));
+            $sitesStr = implode(',', array_map(fn($s) => '"' . $this->escapeGraphQLString($s) . '"', $args['site']));
             $filters[] = "site: [{$sitesStr}]";
         }
         
@@ -800,10 +815,10 @@ class McpServerService extends Component
                 if (in_array($unionTypeName, $availableTypes)) {
                     // Query the union type to get possible types
                     $client = new \GuzzleHttp\Client([
-                        'base_uri' => Craft::$app->request->getHostInfo(),
+                        'base_uri' => $this->getTrustedBaseUri(),
                         'timeout' => 10,
                     ]);
-                    
+
                     $introspectionQuery = sprintf(
                         '{ __type(name: "%s") { possibleTypes { name } } }',
                         $unionTypeName
@@ -992,7 +1007,7 @@ class McpServerService extends Component
     {
         try {
             $client = new \GuzzleHttp\Client([
-                'base_uri' => Craft::$app->request->getHostInfo(),
+                'base_uri' => $this->getTrustedBaseUri(),
                 'timeout' => 10,
             ]);
 
@@ -1173,6 +1188,34 @@ class McpServerService extends Component
     private const MAX_ARRAY_ITEMS = 100;
 
     /**
+     * Escape a string for safe use in GraphQL queries
+     *
+     * GraphQL strings use JSON-style escaping. This is more secure than addslashes()
+     * which doesn't handle Unicode escapes, newlines properly, or GraphQL-specific injection vectors.
+     *
+     * @param string $value The string to escape
+     * @return string The escaped string (without surrounding quotes)
+     */
+    private function escapeGraphQLString(string $value): string
+    {
+        // Use JSON encoding which properly escapes:
+        // - Quotes (" → \")
+        // - Backslashes (\ → \\)
+        // - Newlines, tabs, carriage returns (\n, \t, \r)
+        // - Unicode characters (properly encoded)
+        // - Control characters
+        $encoded = json_encode($value, JSON_UNESCAPED_UNICODE);
+
+        // json_encode returns false on encoding failure
+        if ($encoded === false) {
+            throw new \Exception('Invalid characters in input parameter', -32602);
+        }
+
+        // Remove the surrounding quotes that json_encode adds
+        return substr($encoded, 1, -1);
+    }
+
+    /**
      * Maximum string length for text parameters
      */
     private const MAX_STRING_LENGTH = 500;
@@ -1264,26 +1307,57 @@ class McpServerService extends Component
 
     /**
      * Sanitize string input for GraphQL queries
-     * Removes potentially dangerous characters while preserving functionality
+     *
+     * Uses a whitelist approach: only allows characters that are known to be safe
+     * for the expected input types (search terms, titles, dates, etc.)
+     *
+     * Allowed characters:
+     * - Alphanumeric (a-z, A-Z, 0-9)
+     * - Common punctuation (space, comma, period, hyphen, apostrophe, colon)
+     * - Date/time characters (T, Z, +, /)
+     * - Unicode letters (for international names/content)
+     *
+     * @param string $input The input string to sanitize
+     * @return string The sanitized string
+     * @throws \Exception if input contains disallowed characters
      */
     private function sanitizeStringInput(string $input): string
     {
-        // Remove null bytes
+        // Remove null bytes (always dangerous)
         $input = str_replace("\0", '', $input);
 
-        // Remove GraphQL-specific injection attempts
-        // Block directives, fragments, and query manipulation
-        $dangerousPatterns = [
-            '/@\w+\s*\(/',      // Directives like @skip(
-            '/\.\.\.\s*on\s+/', // Inline fragments
-            '/__\w+/',          // Introspection fields like __schema
-            '/\{.*\{/',         // Nested query attempts
+        // Whitelist pattern: allows safe characters for search/filter values
+        // - \p{L} = Unicode letters (for international content)
+        // - \p{N} = Unicode numbers
+        // - \s = whitespace (space, tab, newline)
+        // - Common safe punctuation: . , - ' " : ; ! ? @ # $ % & * ( ) + = / \ | < >
+        // - Date separators: T Z (ISO dates)
+        //
+        // Explicitly BLOCKS:
+        // - Backticks (`) - used in template literals
+        // - Curly braces { } - GraphQL query syntax
+        // - Square brackets [ ] - GraphQL array syntax
+        // - Triple dots ... - GraphQL fragments
+        $safePattern = '/^[\p{L}\p{N}\s.,\-\'"":;!?@#$%&*()+_=\/\\\\|<>TZ]+$/u';
+
+        if (!preg_match($safePattern, $input)) {
+            // Log the violation (truncated to prevent log injection)
+            $truncatedInput = mb_substr($input, 0, 100);
+            Craft::warning("Input contains disallowed characters: {$truncatedInput}", 'mcp-wrapper');
+            throw new \Exception('Input contains invalid characters', -32602);
+        }
+
+        // Additional check: block GraphQL-specific patterns that could slip through
+        // These use multi-character sequences that the single-char whitelist might miss
+        $dangerousSequences = [
+            '...',      // Fragment spread
+            '__',       // Introspection (double underscore)
         ];
 
-        foreach ($dangerousPatterns as $pattern) {
-            if (preg_match($pattern, $input)) {
-                Craft::warning("Potentially malicious input blocked: {$input}", 'mcp-wrapper');
-                throw new \Exception('Invalid characters in input parameter', -32602);
+        foreach ($dangerousSequences as $sequence) {
+            if (str_contains($input, $sequence)) {
+                Craft::warning("Input contains dangerous sequence '{$sequence}'", 'mcp-wrapper');
+                throw new \Exception('Input contains invalid character sequence', -32602);
             }
         }
 

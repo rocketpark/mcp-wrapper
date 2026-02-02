@@ -392,11 +392,21 @@ class ManifestBuilderService extends Component
         }
     }
 
+    /**
+     * Get trusted base URI for internal API requests
+     * Prevents SSRF via Host header manipulation
+     */
+    private function getTrustedBaseUri(): string
+    {
+        $primarySite = Craft::$app->getSites()->getPrimarySite();
+        return rtrim($primarySite->getBaseUrl(), '/');
+    }
+
     private function introspectGraphQL(string $token): array
     {
         try {
             $client = new Client([
-                'base_uri' => Craft::$app->request->getHostInfo(),
+                'base_uri' => $this->getTrustedBaseUri(),
                 'timeout' => 10,
             ]);
 
