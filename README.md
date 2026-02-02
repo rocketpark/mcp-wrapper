@@ -362,16 +362,43 @@ curl -X POST "https://your-site.com/mcp/MCPSchema" \
 
 ## Testing
 
-Run the test suite:
+The plugin includes a comprehensive PHPUnit test suite covering core functionality:
 
 ```bash
-# Unit tests (106 tests)
-bash tests/run-all-tests.sh
+# Run all unit tests (26 tests, 55 assertions)
+vendor/bin/phpunit tests/Unit --colors=always
 
-# MCP endpoint tests
+# Or use the convenience script
+./tests/run-unit-tests.sh
+
+# Run specific test class
+./tests/run-unit-tests.sh --filter ToolCacheServiceTest
+
+# Generate coverage report
+./tests/run-unit-tests.sh --coverage
+# Opens tests/coverage/index.html
+```
+
+### Test Coverage
+
+**Unit Tests (tests/Unit/):**
+- ToolCacheServiceTest.php - 8 tests (cache key generation, argument normalization)
+- RequestLoggerServiceTest.php - 10 tests (privacy, IP anonymization, arg hashing)
+- ToolAttributeTest.php - 8 tests (attribute discovery, enhanced annotations)
+
+**Integration Tests (tests/):**
+- test-argument-mapping.php - Argument extraction from GraphQL schema
+- test-graphql-sanitization.php - SQL injection prevention
+- test-ip-validator.php - IPv4/IPv6 CIDR validation
+- test-tool-registry.php - Tool discovery and registration
+
+### Running MCP Endpoint Tests
+
+```bash
+# Test MCP endpoint
 ./test-mcp-endpoint.sh https://your-site.com ai
 
-# Regional Leadership filter tests
+# Test Regional Leadership filters
 ./test-regional-leadership-filter.sh
 ```
 
@@ -540,10 +567,15 @@ The plugin includes a CP utility at **Utilities → MCP Manifest Manager** for:
 
 ## Roadmap
 
+### ✅ Completed (v2.3 - February 2026)
+- [x] **Output Schemas** - JSON schema definitions for all manual tools
+- [x] **Enhanced Tool Annotations** - costHint, confidentialityHint, destructiveHint
+- [x] **Comprehensive Unit Test Suite** - 26 tests covering core services and attributes
+
 ### ✅ Completed (v2.2 - February 2026)
-- [x] **Tool Result Caching** - 60-80% performance improvement for duplicate queries
+- [x] **Tool Result Caching** - 20-40% performance improvement for duplicate queries
 - [x] **Request Analytics Logging** - Structured logging for debugging and usage analysis
-- [x] **Connection Pooling** - Reusable HTTP clients for 10-20% faster GraphQL queries
+- [x] **Connection Pooling** - Reusable GraphQL clients for 10-20% faster queries
 - [x] **Config Example File** - mcpwrapper.php.example for easier setup
 
 ### ✅ Completed (v2.1)
@@ -559,8 +591,6 @@ The plugin includes a CP utility at **Utilities → MCP Manifest Manager** for:
 - [x] Prompts registry (schema_explorer, content_health, query_builder)
 
 ### 🔜 Planned
-- [ ] Output schemas for all tools
-- [ ] Enhanced tool annotations (costHint, confidentialityHint)
-- [ ] Comprehensive unit test suite
-- [ ] Webhook support for content changes
+- [ ] Webhook support for content change notifications
 - [ ] OAuth 2.1 support for enterprise deployments
+- [ ] Performance dashboard for analytics visualization

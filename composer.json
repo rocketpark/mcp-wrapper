@@ -18,7 +18,8 @@
         "guzzlehttp/guzzle": "^7.0"
     },
     "require-dev": {
-        "craftcms/rector": "dev-main"
+        "craftcms/rector": "dev-main",
+        "phpunit/phpunit": "^10.5"
     },
     "autoload": {
         "psr-4": {
