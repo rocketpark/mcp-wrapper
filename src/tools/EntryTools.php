@@ -36,7 +36,23 @@ class EntryTools
             ],
             'required' => ['id'],
         ],
+        outputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'success' => ['type' => 'boolean'],
+                'data' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'entry' => ['type' => 'object'],
+                    ],
+                ],
+                'message' => ['type' => 'string'],
+            ],
+            'required' => ['success'],
+        ],
         dangerous: false,
+        costHint: 'low',
+        confidentialityHint: 'medium',
     )]
     public function getEntryById(int $id, ?int $siteId = null): array
     {
@@ -57,6 +73,22 @@ class EntryTools
     #[Tool(
         name: 'craft_search_entries',
         description: 'Query entries using any Craft entry query parameters including custom fields. Supports all parameters from https://craftcms.com/docs/5.x/reference/element-types/entries.html#parameters',
+        outputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'success' => ['type' => 'boolean'],
+                'data' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'entries' => ['type' => 'array'],
+                        'count' => ['type' => 'integer'],
+                    ],
+                ],
+            ],
+            'required' => ['success'],
+        ],
+        costHint: 'medium',
+        confidentialityHint: 'low',
         inputSchema: [
             'type' => 'object',
             'properties' => [
@@ -231,7 +263,23 @@ class EntryTools
             ],
             'required' => ['section', 'slug'],
         ],
+        outputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'success' => ['type' => 'boolean'],
+                'data' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'entry' => ['type' => 'object'],
+                    ],
+                ],
+                'message' => ['type' => 'string'],
+            ],
+            'required' => ['success'],
+        ],
         dangerous: false,
+        costHint: 'low',
+        confidentialityHint: 'medium',
     )]
     public function getEntryBySlug(string $section, string $slug, ?int $siteId = null): array
     {
@@ -368,7 +416,26 @@ class EntryTools
             ],
             'required' => ['slug'],
         ],
+        outputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'success' => ['type' => 'boolean'],
+                'data' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'slug' => ['type' => 'string'],
+                        'title' => ['type' => 'string'],
+                        'phone' => ['type' => 'string'],
+                        'address' => ['type' => 'string'],
+                        'contactFormUrl' => ['type' => 'string'],
+                    ],
+                ],
+            ],
+            'required' => ['success'],
+        ],
         dangerous: false,
+        costHint: 'low',
+        confidentialityHint: 'high',
     )]
     public function getOfficeContactInfo(string $slug): array
     {

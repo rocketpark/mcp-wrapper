@@ -67,7 +67,7 @@ class ToolRegistryService extends Component
                 foreach ($attributes as $attribute) {
                     $toolAttr = $attribute->newInstance();
                     
-                    $tools[] = [
+                    $toolDef = [
                         'name' => $toolAttr->name,
                         'description' => $toolAttr->description,
                         'inputSchema' => $toolAttr->inputSchema,
@@ -75,12 +75,22 @@ class ToolRegistryService extends Component
                         'annotations' => [
                             'readOnlyHint' => !$toolAttr->dangerous,
                             'openWorldHint' => false,
+                            'destructiveHint' => $toolAttr->dangerous,
+                            'costHint' => $toolAttr->costHint,
+                            'confidentialityHint' => $toolAttr->confidentialityHint,
                         ],
                         'handler' => [
                             'class' => $className,
                             'method' => $method->getName(),
                         ],
                     ];
+                    
+                    // Add outputSchema if provided
+                    if (!empty($toolAttr->outputSchema)) {
+                        $toolDef['outputSchema'] = $toolAttr->outputSchema;
+                    }
+                    
+                    $tools[] = $toolDef;
                     
                     Craft::info("Discovered tool: {$toolAttr->name} from {$className}::{$method->getName()}", 'mcp-wrapper');
                 }

@@ -24,7 +24,26 @@ class SystemTools
             'type' => 'object',
             'properties' => [],
         ],
+        outputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'success' => ['type' => 'boolean'],
+                'data' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'craft' => ['type' => 'object'],
+                        'php' => ['type' => 'object'],
+                        'database' => ['type' => 'object'],
+                        'server' => ['type' => 'object'],
+                        'plugins' => ['type' => 'array'],
+                    ],
+                ],
+            ],
+            'required' => ['success'],
+        ],
         dangerous: false,
+        costHint: 'low',
+        confidentialityHint: 'high',
     )]
     public function getSystemInfo(): array
     {
@@ -84,7 +103,23 @@ class SystemTools
                 ],
             ],
         ],
+        outputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'success' => ['type' => 'boolean'],
+                'data' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'plugins' => ['type' => 'array'],
+                        'count' => ['type' => 'integer'],
+                    ],
+                ],
+            ],
+            'required' => ['success'],
+        ],
         dangerous: false,
+        costHint: 'low',
+        confidentialityHint: 'medium',
     )]
     public function listPlugins(bool $enabledOnly = false): array
     {
@@ -124,7 +159,24 @@ class SystemTools
                 ],
             ],
         ],
+        outputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'success' => ['type' => 'boolean'],
+                'data' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'waiting' => ['type' => 'array'],
+                        'failed' => ['type' => 'array'],
+                        'counts' => ['type' => 'object'],
+                    ],
+                ],
+            ],
+            'required' => ['success'],
+        ],
         dangerous: false,
+        costHint: 'low',
+        confidentialityHint: 'low',
     )]
     public function getQueueStatus(int $limit = 20): array
     {
@@ -180,7 +232,23 @@ class SystemTools
                 ],
             ],
         ],
+        outputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'success' => ['type' => 'boolean'],
+                'data' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'logs' => ['type' => 'array'],
+                        'count' => ['type' => 'integer'],
+                    ],
+                ],
+            ],
+            'required' => ['success'],
+        ],
         dangerous: false,
+        costHint: 'medium',
+        confidentialityHint: 'high',
     )]
     public function readLogs(int $limit = 50, string $level = 'all'): array
     {
@@ -222,7 +290,24 @@ class SystemTools
             'type' => 'object',
             'properties' => [],
         ],
+        outputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'success' => ['type' => 'boolean'],
+                'data' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'dataCache' => ['type' => 'object'],
+                        'templateCache' => ['type' => 'object'],
+                        'compiledTemplates' => ['type' => 'object'],
+                    ],
+                ],
+            ],
+            'required' => ['success'],
+        ],
         dangerous: false,
+        costHint: 'low',
+        confidentialityHint: 'low',
     )]
     public function getCacheInfo(): array
     {
@@ -264,7 +349,23 @@ class SystemTools
                 ],
             ],
         ],
+        outputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'success' => ['type' => 'boolean'],
+                'data' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'cleared' => ['type' => 'array'],
+                        'message' => ['type' => 'string'],
+                    ],
+                ],
+            ],
+            'required' => ['success'],
+        ],
         dangerous: true,
+        costHint: 'high',
+        confidentialityHint: 'none',
     )]
     public function clearCaches(array $caches = ['all']): array
     {
@@ -308,7 +409,23 @@ class SystemTools
             'type' => 'object',
             'properties' => [],
         ],
+        outputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'success' => ['type' => 'boolean'],
+                'data' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'isApplied' => ['type' => 'boolean'],
+                        'pendingChanges' => ['type' => 'boolean'],
+                    ],
+                ],
+            ],
+            'required' => ['success'],
+        ],
         dangerous: false,
+        costHint: 'low',
+        confidentialityHint: 'low',
     )]
     public function getProjectConfigStatus(): array
     {
