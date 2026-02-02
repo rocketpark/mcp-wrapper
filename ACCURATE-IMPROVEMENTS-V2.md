@@ -712,12 +712,15 @@ private function getGraphQLClient(): Client
 **Total Effort:** ~2 weeks
 
 7. ✅ **Unit Test Suite** (1-2 weeks) - ✅ IMPLEMENTED v2.4.0
-   - 26 tests with 55 assertions
-   - ToolCacheServiceTest, RequestLoggerServiceTest, ToolAttributeTest
+   - 33 tests with 72 assertions
+   - ToolCacheServiceTest, RequestLoggerServiceTest, ToolAttributeTest, WebhookServiceTest
    - PHPUnit infrastructure (phpunit.xml, bootstrap, runner script)
    
-8. **Webhook Support** (2-3 days)
-   - NOT IMPLEMENTED - When second customer needs it
+8. ✅ **Webhook Support** (2-3 days) - ✅ IMPLEMENTED v2.5.0
+   - HTTP POST notifications on entry save/delete
+   - Event/section/status filtering
+   - HMAC SHA-256 signatures for security
+   - Async delivery via queue
 
 ---
 
