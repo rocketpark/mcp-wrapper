@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2.3.0 - 2026-02-02
+
+### Added - MCP Spec Compliance & Enhanced Metadata
+
+- **Output Schemas**: All manual tools now include JSON schema for output structure
+  - Enables better AI parsing and client-side validation
+  - Full MCP specification compliance
+  - Structured response format with success/data/message fields
+
+- **Enhanced Tool Annotations**: Performance and security hints
+  - `costHint`: Performance cost indicator (low/medium/high)
+  - `confidentialityHint`: Data sensitivity level (none/low/medium/high)
+  - `destructiveHint`: Warns about data modification operations
+  - Helps AI make better decisions about tool usage
+
+- **Updated Tools** (11 manual tools):
+  - EntryTools: craft_get_entry_by_id, craft_search_entries, craft_get_entry_by_slug, craft_get_office_contact_info
+  - SystemTools: craft_get_system_info, craft_list_plugins, craft_get_queue_status, craft_read_logs, craft_get_cache_info, craft_clear_caches, craft_get_project_config_status
+
+### Changed
+- Updated `Tool` attribute class to support outputSchema, costHint, confidentialityHint parameters
+- ToolRegistryService now includes enhanced annotations in tool definitions
+
 ## 2.2.0 - 2026-02-02
 
 ### Added - Performance & Analytics
