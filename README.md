@@ -4,6 +4,7 @@ A production-ready Craft CMS plugin that exposes your content to AI assistants t
 
 ## 📚 Documentation
 
+- **[RECENT-CHANGES-SUMMARY.md](RECENT-CHANGES-SUMMARY.md)** - **NEW!** Comprehensive guide to all changes v2.2-v2.7 (past 2 days)
 - **[DEPLOYMENT.md](DEPLOYMENT.md)** - Production deployment guide (v2.2-v2.7)
 - **[VERIFICATION.md](VERIFICATION.md)** - Post-deployment verification checklist
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and release notes
