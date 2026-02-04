@@ -18,7 +18,7 @@ class McpServerService extends Component
 {
     private const MCP_VERSION = '2025-11-25';
     private const SERVER_NAME = 'craft-cms-mcp';
-    private const SERVER_VERSION = '2.1.0';
+    private const SERVER_VERSION = '2.7.0';
 
     /**
      * Default request timeout in seconds (configurable via mcpwrapper.php)

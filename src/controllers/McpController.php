@@ -269,7 +269,7 @@ class McpController extends Controller
         // Server info
         $metrics[] = '# HELP mcp_server_info MCP server information';
         $metrics[] = '# TYPE mcp_server_info gauge';
-        $metrics[] = 'mcp_server_info{version="2.1.0",protocol="2025-11-25"} 1';
+        $metrics[] = 'mcp_server_info{version="2.7.0",protocol="2025-11-25"} 1';
 
         // Rate limit status (if available)
         $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
@@ -322,7 +322,7 @@ class McpController extends Controller
         $health = [
             'status' => 'healthy',
             'timestamp' => date('c'),
-            'version' => '2.1.0',
+            'version' => '2.7.0',
             'protocolVersion' => '2025-11-25',
         ];
 
