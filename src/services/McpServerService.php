@@ -630,6 +630,7 @@ class McpServerService extends Component
             $client = new Client([
                 'base_uri' => $this->getTrustedBaseUri(),
                 'timeout' => 10,
+                'verify' => !str_ends_with($this->getTrustedBaseUri(), '.test'),
             ]);
 
             $query = '{ __schema { types { name } } }';
@@ -1070,6 +1071,7 @@ class McpServerService extends Component
             $client = new \GuzzleHttp\Client([
                 'base_uri' => $this->getTrustedBaseUri(),
                 'timeout' => 10,
+                'verify' => !str_ends_with($this->getTrustedBaseUri(), '.test'),
             ]);
 
             $response = $client->post('/api', [

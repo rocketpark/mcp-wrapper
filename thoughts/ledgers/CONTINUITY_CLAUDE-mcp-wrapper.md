@@ -1,5 +1,5 @@
 # Session: mcp-wrapper
-Updated: 2026-02-02T15:14:17.502Z
+Updated: 2026-02-04T14:34:10.558Z
 
 ## Goal
 Maintain and improve a production Craft CMS plugin that exposes content to AI assistants (particularly Botpress) via the Model Context Protocol (MCP). Success = stable plugin operation on Jensen Hughes production site with proper Regional Leadership filtering, accurate phone numbers, and privacy protection.
