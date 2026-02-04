@@ -10,12 +10,35 @@ use rocketpark\mcpwrapper\support\SafeExecution;
 
 /**
  * Entry Tools
- * 
+ *
  * Direct Craft API access for entries, bypassing GraphQL schema permissions.
  * Useful for administrative tasks and debugging.
  */
 class EntryTools
 {
+    /**
+     * Fields that should NEVER be exposed via API for privacy protection
+     * These fields may contain personal email addresses or sensitive data
+     */
+    private const BLOCKED_FIELDS = [
+        'formSubmissionNotificationEmail',
+        'contactEmails',
+        'privateEmail',
+        'personalEmail',
+        'internalEmail',
+        'notificationEmail',
+    ];
+
+    /**
+     * Valid parameters for Entry::find() query
+     * Only these parameters will be applied to prevent method call errors
+     */
+    private const VALID_QUERY_PARAMS = [
+        'section', 'type', 'slug', 'status', 'search', 'title', 'id',
+        'authorId', 'postDate', 'before', 'after', 'expiryDate',
+        'site', 'siteId', 'unique', 'orderBy', 'limit', 'offset',
+        'relatedTo', 'ancestorOf', 'descendantOf', 'level',
+    ];
     /**
      * Get entry by ID with all fields
      */
@@ -112,6 +135,10 @@ class EntryTools
                     'type' => 'string',
                     'description' => 'Full-text search term (only searches fields marked as searchable)',
                 ],
+                'query' => [
+                    'type' => 'string',
+                    'description' => 'Alias for "search" - full-text search term',
+                ],
                 'title' => [
                     'type' => 'string',
                     'description' => 'Filter by exact or partial title match',
@@ -195,21 +222,42 @@ class EntryTools
     {
         return SafeExecution::run(function() use ($params) {
             $query = Entry::find();
-            
+
             // Extract custom fields (they need special handling)
             $customFields = $params['fields'] ?? [];
             unset($params['fields']);
-            
+
+            // Handle 'query' as an alias for 'search' (common user mistake)
+            if (isset($params['query']) && !isset($params['search'])) {
+                $params['search'] = $params['query'];
+                unset($params['query']);
+            }
+
             // Set default limit if not specified
             if (!isset($params['limit'])) {
                 $params['limit'] = 20;
             }
-            
-            // Apply all standard Craft parameters
+
+            // Validate and apply only known Craft query parameters
+            // This prevents errors from invalid method calls like $query->query()
+            $invalidParams = [];
             foreach ($params as $param => $value) {
                 if ($value !== null) {
-                    $query->{$param}($value);
+                    if (in_array($param, self::VALID_QUERY_PARAMS, true)) {
+                        $query->{$param}($value);
+                    } else {
+                        $invalidParams[] = $param;
+                    }
                 }
+            }
+
+            // Warn about invalid parameters but continue execution
+            if (!empty($invalidParams)) {
+                Craft::warning(
+                    'craft_search_entries received invalid parameters: ' . implode(', ', $invalidParams) .
+                    '. Valid parameters are: ' . implode(', ', self::VALID_QUERY_PARAMS),
+                    'mcp-wrapper'
+                );
             }
             
             // Apply custom field filters
@@ -335,12 +383,16 @@ class EntryTools
             'dateUpdated' => $entry->dateUpdated->format('Y-m-d H:i:s'),
         ];
 
-        // Add custom fields
+        // Add custom fields (excluding blocked fields for privacy)
         $fieldLayout = $entry->getFieldLayout();
         if ($fieldLayout) {
             $customFields = [];
             foreach ($fieldLayout->getCustomFields() as $field) {
                 $handle = $field->handle;
+                // Skip blocked fields to protect privacy (e.g., personal emails)
+                if (in_array($handle, self::BLOCKED_FIELDS, true)) {
+                    continue;
+                }
                 $value = $entry->$handle;
                 $customFields[$handle] = $this->serializeFieldValue($value);
             }
