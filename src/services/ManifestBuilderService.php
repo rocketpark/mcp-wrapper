@@ -708,6 +708,7 @@ class ManifestBuilderService extends Component
                 'base_uri' => $this->getTrustedBaseUri(),
                 'timeout' => 10,
                 'http_errors' => false,
+                'verify' => !str_ends_with($this->getTrustedBaseUri(), '.test'),
             ]);
             Craft::info("Created shared GraphQL client", 'mcp-wrapper');
         }
