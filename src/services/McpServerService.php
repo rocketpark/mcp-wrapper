@@ -525,10 +525,20 @@ class McpServerService extends Component
         }
 
         // Otherwise, it's a GraphQL query tool
-        $sectionHandle = $this->extractSectionHandle($toolName);
+        $handle = $this->extractSectionHandle($toolName);
         $token = $this->getSchemaToken($params);
 
-        $result = $this->executeGraphQLQuery($token, $sectionHandle, $arguments, $params);
+        // Check if this is a category group or section
+        $categoryGroup = Craft::$app->getCategories()->getGroupByHandle($handle);
+        $section = Craft::$app->getEntries()->getSectionByHandle($handle);
+        
+        if ($categoryGroup) {
+            $result = $this->executeCategoryQuery($token, $handle, $arguments, $params);
+        } elseif ($section) {
+            $result = $this->executeGraphQLQuery($token, $handle, $arguments, $params);
+        } else {
+            throw new \Exception("Unknown section or category group: {$handle}", -32602);
+        }
 
         return [
             'content' => [
@@ -706,6 +716,109 @@ class McpServerService extends Component
             Craft::error("Failed to execute GraphQL query: {$e->getMessage()}", 'mcp-wrapper');
             throw $e;
         }
+    }
+
+    /**
+     * Execute a category query
+     */
+    private function executeCategoryQuery(string $token, string $categoryGroupHandle, array $args, array $params = []): array
+    {
+        try {
+            $query = $this->buildCategoryGraphQLQuery($categoryGroupHandle, $args, $params);
+            Craft::info("Category GraphQL Query for {$categoryGroupHandle}: {$query}", 'mcp-wrapper');
+            
+            $data = $this->sendGraphQLRequest($token, $query);
+            
+            if (isset($data['errors'])) {
+                $errorJson = json_encode($data['errors']);
+                Craft::error("GraphQL errors: {$errorJson}", 'mcp-wrapper');
+                throw new \Exception('GraphQL error: ' . $errorJson, -32603);
+            }
+
+            $result = $data['data'] ?? [];
+            // Result uses category group-specific field name (e.g., leadershipTeamsCategories)
+            $categoryField = $categoryGroupHandle . 'Categories';
+            $categories = $result[$categoryField] ?? $result['categories'] ?? [];
+            $categoryCount = count($categories);
+            Craft::info("GraphQL query returned {$categoryCount} categories from field '{$categoryField}'", 'mcp-wrapper');
+            
+            // Filter out sensitive fields
+            $categories = $this->filterSensitiveFields($categories);
+            
+            // Normalize result to use 'categories' key
+            return ['categories' => $categories];
+        } catch (\Exception $e) {
+            Craft::error("Failed to execute category query: {$e->getMessage()}", 'mcp-wrapper');
+            throw $e;
+        }
+    }
+
+    /**
+     * Build GraphQL query string for categories
+     */
+    private function buildCategoryGraphQLQuery(string $categoryGroupHandle, array $args, array $params = []): string
+    {
+        // Validate handle
+        if (!$this->isValidHandle($categoryGroupHandle)) {
+            throw new \Exception("Invalid category group handle: '{$categoryGroupHandle}'", -32602);
+        }
+
+        // Validate and sanitize arguments
+        $args = $this->validateQueryArgs($args);
+
+        $limit = min(500, max(1, (int) ($args['limit'] ?? 100)));
+        
+        $filters = [
+            "group: \"{$categoryGroupHandle}\"",
+            "limit: {$limit}",
+        ];
+        
+        // Level filter (for structure)
+        if (isset($args['level'])) {
+            $filters[] = "level: " . intval($args['level']);
+        }
+        
+        // Ordering
+        if (!empty($args['orderBy'])) {
+            $filters[] = 'orderBy: "' . $this->escapeGraphQLString($args['orderBy']) . '"';
+        }
+        
+        // Get custom fields for this category group
+        $fieldsList = $this->getFieldsListForCategoryQuery($categoryGroupHandle, $params);
+
+        // Use category group-specific GraphQL field (e.g., leadershipTeamsCategories)
+        $categoryField = $categoryGroupHandle . 'Categories';
+        
+        return "query { {$categoryField}(" . implode(', ', $filters) . ") { id title slug uri {$fieldsList} } }";
+    }
+
+    /**
+     * Get fields list for category query
+     */
+    private function getFieldsListForCategoryQuery(string $categoryGroupHandle, array $params = []): string
+    {
+        $categoryGroup = Craft::$app->getCategories()->getGroupByHandle($categoryGroupHandle);
+        if (!$categoryGroup) {
+            return '';
+        }
+
+        $fieldLayout = $categoryGroup->getFieldLayout();
+        if (!$fieldLayout) {
+            return '';
+        }
+
+        $fields = [];
+        foreach ($fieldLayout->getCustomFields() as $field) {
+            $fieldHandle = $field->handle;
+            
+            // Get proper GraphQL query fragment for this field type
+            $fieldFragment = $this->getGraphQLFieldFragment($field);
+            if ($fieldFragment) {
+                $fields[] = $fieldFragment;
+            }
+        }
+
+        return !empty($fields) ? ' ' . implode(' ', $fields) : '';
     }
 
     /**

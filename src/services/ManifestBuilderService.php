@@ -176,9 +176,16 @@ class ManifestBuilderService extends Component
         $sectionCount = $allowedSections === null ? "ALL" : (empty($allowedSections) ? "NONE (check project-config/apply)" : count($allowedSections));
         Craft::info("Schema '{$schemaHandle}' allows {$sectionCount} sections", 'mcp-wrapper');
         
+        // Get allowed category groups for this schema
+        $allowedCategoryGroups = $this->getAllowedCategoryGroupsForSchema($token);
+        $categoryCount = $allowedCategoryGroups === null ? "ALL" : (empty($allowedCategoryGroups) ? "NONE" : count($allowedCategoryGroups));
+        Craft::info("Schema '{$schemaHandle}' allows {$categoryCount} category groups", 'mcp-wrapper');
+        
         $sections = Craft::$app->getEntries()->getAllSections();
+        $categoryGroups = Craft::$app->getCategories()->getAllGroups();
         $tools = [];
         
+        // Generate tools for sections
         foreach ($sections as $section) {
             // Skip if this section is not allowed in the schema
             // null means allow all, empty array means allow none, populated array means check membership
@@ -194,7 +201,21 @@ class ManifestBuilderService extends Component
             }
         }
         
-        Craft::info("Generated " . count($tools) . " GraphQL tools for schema '{$schemaHandle}'", 'mcp-wrapper');
+        // Generate tools for category groups
+        foreach ($categoryGroups as $categoryGroup) {
+            if ($allowedCategoryGroups !== null && !in_array($categoryGroup->handle, $allowedCategoryGroups)) {
+                Craft::info("Skipping category group '{$categoryGroup->handle}' - not enabled in schema '{$schemaHandle}'", 'mcp-wrapper');
+                continue;
+            }
+            
+            $tool = $this->buildToolForCategoryGroup($categoryGroup->handle, $schemaHandle);
+            if ($tool) {
+                $tools[] = $tool;
+                Craft::info("Added tool for category group: {$categoryGroup->handle}", 'mcp-wrapper');
+            }
+        }
+        
+        Craft::info("Generated " . count($tools) . " GraphQL tools for schema '{$schemaHandle}' (sections + categories)", 'mcp-wrapper');
         return $tools;
     }
 
@@ -251,6 +272,33 @@ class ManifestBuilderService extends Component
             'description' => "Query {$sectionHandle} entries (schema {$schemaHandle}) with relationships. Returns array of entry objects with ID, title, and custom fields.",
             'inputSchema' => $this->generateInputSchema($sectionHandle, $fields),
             'outputSchema' => $this->generateOutputSchema($sectionHandle, $fields),
+            'dangerous' => false,
+        ];
+    }
+
+    private function buildToolForCategoryGroup(string $categoryGroupHandle, string $schemaHandle): ?array
+    {
+        $categoryGroup = Craft::$app->getCategories()->getGroupByHandle($categoryGroupHandle);
+        if (!$categoryGroup) {
+            Craft::warning("Category group not found: {$categoryGroupHandle}", 'mcp-wrapper');
+            return null;
+        }
+
+        Craft::info("Found category group: {$categoryGroupHandle}", 'mcp-wrapper');
+        
+        $fields = [];
+        $fieldLayout = $categoryGroup->getFieldLayout();
+        if ($fieldLayout) {
+            foreach ($fieldLayout->getCustomFields() as $field) {
+                $fields[] = $this->describeField($field);
+            }
+        }
+
+        return [
+            'name' => "query_{$categoryGroupHandle}",
+            'description' => "Query {$categoryGroupHandle} categories (schema {$schemaHandle}). Returns array of category objects with ID, title, and custom fields.",
+            'inputSchema' => $this->generateCategoryInputSchema($categoryGroupHandle, $fields),
+            'outputSchema' => $this->generateOutputSchema($categoryGroupHandle, $fields),
             'dangerous' => false,
         ];
     }
@@ -312,7 +360,47 @@ class ManifestBuilderService extends Component
             'required' => [],
         ];
     }
-    
+    /**
+     * Generate JSON Schema for category tool input parameters
+     */
+    private function generateCategoryInputSchema(string $categoryGroupHandle, array $fields): array
+    {
+        $properties = [
+            'limit' => [
+                'type' => 'integer',
+                'description' => 'Maximum number of categories to return (default: 100)',
+                'minimum' => 1,
+                'maximum' => 500,
+                'default' => 100,
+            ],
+            'level' => [
+                'type' => 'integer',
+                'description' => 'Filter by structure level (1 = top level)',
+                'minimum' => 1,
+            ],
+            'orderBy' => [
+                'type' => 'string',
+                'description' => 'Sort order (e.g., "title ASC", "lft ASC" for structure order)',
+                'default' => 'lft ASC',
+            ],
+        ];
+        
+        // Add field-based filters
+        foreach ($fields as $field) {
+            if (isset($field['handle'])) {
+                $properties[$field['handle']] = [
+                    'type' => 'string',
+                    'description' => "Filter by {$field['label']} field",
+                ];
+            }
+        }
+        
+        return [
+            'type' => 'object',
+            'properties' => $properties,
+            'required' => [],
+        ];
+    }    
     /**
      * Generate JSON Schema for tool output (entry structure)
      */
@@ -546,6 +634,57 @@ class ManifestBuilderService extends Component
         } catch (\Exception $e) {
             Craft::error("Error getting allowed sections: {$e->getMessage()}", 'mcp-wrapper');
             return []; // Empty array means allow none on error (fail secure)
+        }
+    }
+
+    /**
+     * Get allowed category groups for a GraphQL schema based on its permissions
+     */
+    private function getAllowedCategoryGroupsForSchema(string $token): ?array
+    {
+        try {
+            $gqlToken = Craft::$app->getGql()->getTokenByAccessToken($token);
+            
+            if (!$gqlToken) {
+                Craft::error("Could not find GQL token for category groups - blocking all", 'mcp-wrapper');
+                return [];
+            }
+            
+            $schema = Craft::$app->getGql()->getSchemaById($gqlToken->schemaId);
+            
+            if (!$schema) {
+                Craft::error("Could not find GraphQL schema for category groups - blocking all", 'mcp-wrapper');
+                return [];
+            }
+            
+            $scope = $schema->scope ?? [];
+            if (empty($scope)) {
+                Craft::warning("Schema has empty scope for category groups", 'mcp-wrapper');
+                return [];
+            }
+            
+            // Parse scope to find enabled category groups
+            // Scope format: ["categorygroups.{uid}:read", ...]
+            $allowedCategoryGroups = [];
+            foreach ($scope as $permission) {
+                if (str_starts_with($permission, 'categorygroups.') && str_ends_with($permission, ':read')) {
+                    // Extract category group UID
+                    $categoryGroupUid = substr($permission, 15, -5); // Remove "categorygroups." and ":read"
+                    
+                    // Get category group by UID
+                    $categoryGroup = Craft::$app->getCategories()->getGroupByUid($categoryGroupUid);
+                    if ($categoryGroup) {
+                        $allowedCategoryGroups[] = $categoryGroup->handle;
+                        Craft::info("Schema allows category group: {$categoryGroup->handle} (uid: {$categoryGroupUid})", 'mcp-wrapper');
+                    }
+                }
+            }
+            
+            return $allowedCategoryGroups;
+            
+        } catch (\Exception $e) {
+            Craft::error("Error getting allowed category groups: {$e->getMessage()}", 'mcp-wrapper');
+            return [];
         }
     }
 
