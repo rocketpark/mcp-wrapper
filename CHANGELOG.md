@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2.7.1 - 2026-02-04
+
+### Documentation
+
+- **Major Documentation Cleanup**
+  - Updated README with enhanced mermaid diagrams (high-level data flow + component architecture)
+  - Added version badges and production status to README header
+  - Reorganized documentation links to focus on essential guides
+  - Archived outdated documentation to `docs/archive/`:
+    - ACCURATE-IMPROVEMENTS-V2.md (historical analysis)
+    - IMPROVEMENT-RECOMMENDATIONS.md (superseded by CHANGELOG)
+    - V2.2-IMPLEMENTATION-SUMMARY.md (superseded by CHANGELOG)
+    - RECENT-CHANGES-SUMMARY.md (superseded by CHANGELOG)
+    - FINAL-TEST-RESULTS.md (old test results)
+    - REGIONAL-LEADERSHIP-TESTING-GUIDE.md (debugging guide)
+  - Moved WEBHOOK-EXAMPLES.md to `docs/examples/`
+  - Updated Botpress instructions to match production version
+  - Core documentation now consists of:
+    - README.md (architecture and quick start)
+    - DEPLOYMENT.md (production deployment)
+    - VERIFICATION.md (post-deployment checklist)
+    - CHANGELOG.md (version history)
+    - JENSEN-HUGHES-IMPLEMENTATION.md (implementation guide)
+    - COMPREHENSIVE-BOT-QUESTIONS.md (200+ test questions)
+
 ## 2.7.0 - 2026-02-02
 
 ### Added - JSON Schema Support for Auto-Generated Tools

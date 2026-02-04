@@ -1,74 +1,160 @@
 # MCP Wrapper for Craft CMS
 
-A production-ready Craft CMS plugin that exposes your content to AI assistants through the Model Context Protocol (MCP).
+[![Version](https://img.shields.io/badge/version-2.7.0-blue.svg)](CHANGELOG.md)
+[![Craft CMS](https://img.shields.io/badge/Craft%20CMS-5.0%2B-orange.svg)](https://craftcms.com)
+[![PHP](https://img.shields.io/badge/PHP-8.2%2B-purple.svg)](https://php.net)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE.md)
+
+A production-ready Craft CMS plugin that exposes your content to AI assistants through the [Model Context Protocol (MCP)](https://modelcontextprotocol.io).
+
+**✨ Live in Production:** Powers the AI chatbot on [Jensen Hughes](https://www.jensenhughes.com) website with 97 offices, 101+ team members, and 20 services.
 
 ## 📚 Documentation
 
-- **[RECENT-CHANGES-SUMMARY.md](RECENT-CHANGES-SUMMARY.md)** - **NEW!** Comprehensive guide to all changes v2.2-v2.7 (past 2 days)
-- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Production deployment guide (v2.2-v2.7)
+### Core Documentation
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Production deployment guide
 - **[VERIFICATION.md](VERIFICATION.md)** - Post-deployment verification checklist
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and release notes
-- **[FINAL-TEST-RESULTS.md](FINAL-TEST-RESULTS.md)** - Comprehensive test results and production readiness
-- **[REGIONAL-LEADERSHIP-TESTING-GUIDE.md](REGIONAL-LEADERSHIP-TESTING-GUIDE.md)** - Technical guide for Regional Leadership filtering
-- **[BOTPRESS-INSTRUCTIONS-CORRECTED.md](BOTPRESS-INSTRUCTIONS-CORRECTED.md)** - Botpress Knowledge Base instructions
+
+### Implementation Guides
+- **[JENSEN-HUGHES-IMPLEMENTATION.md](JENSEN-HUGHES-IMPLEMENTATION.md)** - Complete implementation guide with real-world example
+- **[COMPREHENSIVE-BOT-QUESTIONS.md](COMPREHENSIVE-BOT-QUESTIONS.md)** - 200+ test questions for AI assistant training
+- **[botpress-integration/AUTONOMOUS-NODE-INSTRUCTIONS-V4-WITH-PRIVACY.md](botpress-integration/AUTONOMOUS-NODE-INSTRUCTIONS-V4-WITH-PRIVACY.md)** - Botpress AI instructions (production version)
 
 ## Architecture
 
+### High-Level Data Flow
+
 ```mermaid
 flowchart TB
-    Client[AI Client<br/>Claude/Botpress/ChatGPT]
+    User([Website Visitor])
+    Bot[Botpress AI Chat Widget]
     
     subgraph "MCP Wrapper Plugin"
-        Endpoint["/mcp/{schemaHandle}<br/>JSON-RPC 2.0 Endpoint"]
-        McpServer[McpServerService<br/>Request Handler]
-        ToolRegistry[ToolRegistryService<br/>Tool Orchestrator]
+        direction TB
+        Endpoint["/mcp/MCPSchema<br/>JSON-RPC 2.0 Endpoint"]
         
-        subgraph "Tool Sources"
-            ManifestBuilder[ManifestBuilderService<br/>Auto-generates from Sections]
-            ManualTools[Manual Tools<br/>#[Tool] Attribute Classes]
+        subgraph Security["🔒 Security Layer"]
+            RateLimit[Rate Limiter<br/>100 req/60s]
+            IPCheck[IP Validator<br/>Allowlist]
+            DangerCheck[Tool Safety Check]
         end
         
-        subgraph "Craft CMS Integration"
-            GraphQL[GraphQL Schema<br/>Permission Filtering]
-            ProjectConfig[Project Config YAML<br/>schema scope: sections.{uid}:read]
-            Sections[Craft Sections<br/>News, Products, Pages, etc.]
+        McpServer[McpServerService<br/>JSON-RPC Handler]
+        
+        subgraph ToolSystem["🛠️ Tool System"]
+            ToolRegistry[ToolRegistryService<br/>Orchestrator]
+            ToolCache[ToolCacheService<br/>5min TTL]
+            
+            subgraph "Tool Generators"
+                AutoGen[ManifestBuilderService<br/>Auto-gen from Sections]
+                Manual[Manual Tools<br/>#[Tool] PHP Classes]
+            end
         end
         
-        SafeExec[SafeExecution Wrapper<br/>Error Handling]
-        Cache[File Cache<br/>@storage/runtime/mcp/]
+        subgraph "Craft CMS"
+            GQLSchema[GraphQL Schema<br/>MCPSchema Token]
+            ProjectConfig[project/graphql/schemas/<br/>f36b9985...yaml]
+            Sections[(Craft Sections<br/>News, Services, Team, etc.)]
+        end
+        
+        Analytics[AnalyticsService<br/>Usage Tracking]
+        FileCache[File Cache<br/>@storage/runtime/mcp/]
     end
     
-    Client -->|POST JSON-RPC| Endpoint
-    Endpoint --> McpServer
+    User -->|"What services do you offer?"| Bot
+    Bot -->|POST JSON-RPC| Endpoint
+    Endpoint --> RateLimit
+    RateLimit --> IPCheck
+    IPCheck --> DangerCheck
+    DangerCheck --> McpServer
     
     McpServer -->|tools/list| ToolRegistry
     McpServer -->|tools/call| ToolRegistry
     
-    ToolRegistry --> ManifestBuilder
-    ToolRegistry --> ManualTools
+    ToolRegistry --> ToolCache
+    ToolCache -->|cache miss| AutoGen
+    ToolCache -->|cache miss| Manual
     
-    ManifestBuilder -->|Read Schema Scope| ProjectConfig
-    ManifestBuilder -->|Query Allowed Sections| GraphQL
-    GraphQL -->|Filter by UID| Sections
+    AutoGen -->|read scope| ProjectConfig
+    AutoGen -->|query filtered| GQLSchema
+    Manual -->|query| GQLSchema
     
-    ManualTools --> SafeExec
-    ManifestBuilder --> SafeExec
+    GQLSchema -->|allowed sections only| Sections
     
-    SafeExec -->|Execute GraphQL| GraphQL
+    ToolRegistry --> Analytics
+    ToolRegistry -.->|store manifest| FileCache
+    ToolCache -.->|store results| FileCache
     
-    ToolRegistry -.->|Cache Manifest| Cache
+    McpServer -->|JSON Response| Bot
+    Bot -->|Formatted Answer| User
     
-    McpServer -->|JSON Response| Client
+    style User fill:#e1f5ff
+    style Bot fill:#ffe1f5
+    style Security fill:#ffcccc
+    style ToolSystem fill:#e1ffe1
+    style GQLSchema fill:#f5e1ff
+    style Analytics fill:#fff4e1
     
-    style Client fill:#e1f5ff
-    style McpServer fill:#fff4e1
-    style ToolRegistry fill:#ffe1f5
-    style ManifestBuilder fill:#e1ffe1
-    style GraphQL fill:#f5e1ff
-    style SafeExec fill:#ffe1e1
+    classDef critical fill:#ff9999,stroke:#cc0000,stroke-width:3px
+    class ProjectConfig,GQLSchema critical
+```
+
+### Detailed Component Architecture
+
+```mermaid
+classDiagram
+    class McpServerService {
+        +handleRequest(request)
+        +listTools(schemaHandle)
+        +callTool(toolName, arguments)
+        -validateSchema(handle)
+        -enforceRateLimit()
+        -checkIpAllowlist()
+    }
     
-    classDef security fill:#ffcccc,stroke:#cc0000,stroke-width:2px
-    class ProjectConfig,GraphQL security
+    class ToolRegistryService {
+        +executeTool(name, args)
+        +getAvailableTools(schema)
+        +registerToolClass(class)
+        -toolCache: ToolCacheService
+        -analytics: AnalyticsService
+    }
+    
+    class ManifestBuilderService {
+        +getGeneratedTools(schema)
+        +buildToolForSection(section)
+        +executeSectionQuery(args)
+        -getAllowedSectionsForSchema()
+        -getGraphQLClient()
+    }
+    
+    class ToolCacheService {
+        +get(toolName, argsHash)
+        +set(toolName, argsHash, result)
+        +clear(toolName)
+        -shouldCache(toolName)
+        -generateCacheKey()
+    }
+    
+    class AnalyticsService {
+        +recordToolCall(name, duration)
+        +getUsageStats()
+        +getTopTools(limit)
+        +getAverageResponseTime()
+    }
+    
+    class GraphQLSchema {
+        +scope: sections.{uid}:read[]
+        +token: string
+        +enforcePermissions()
+    }
+    
+    McpServerService --> ToolRegistryService
+    ToolRegistryService --> ManifestBuilderService
+    ToolRegistryService --> ToolCacheService
+    ToolRegistryService --> AnalyticsService
+    ManifestBuilderService --> GraphQLSchema
 ```
 
 ## What It Does
