@@ -5,3 +5,42 @@
 .env
 /node_modules
 /vendor
+
+# Local development files
+.history/
+.serena/
+.claude/
+
+# Temporary/empty files
+id
+title
+typeId
+config.php
+
+# Ignore vscode AI rules
+.github/instructions/codacy.instructions.md
+.github/copilot-instructions.md
+.codacy/
+
+# Temporary documentation files
+*-TEMP.md
+*-DRAFT.md
+FIX-*.md
+DEPLOY-*.md
+PRODUCTION-*.md
+*-FIXES.md
+*-TEST-*.md
+*-CHECKLIST.md
+*-WORKFLOWS.md
+*-IMPLEMENTATION*.md
+
+# Diagnostic and test scripts (root level only)
+/diagnose-*.sh
+/test-*.sh
+/test-*.php
+/test-*.js
+*.sql
+
+# Backup files
+*.backup
+src/**/*.backup

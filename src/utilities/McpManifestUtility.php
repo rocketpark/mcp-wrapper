@@ -6,15 +6,38 @@ use craft\base\Utility;
 
 class McpManifestUtility extends Utility
 {
-    public static function displayName(): string => 'MCP Manifest Manager';
-    public static function id(): string => 'mcp-manifest-manager';
-    public static function iconPath(): ?string => Craft::getAlias('@app/icons/cogs.svg');
+    public static function displayName(): string
+    {
+        return 'MCP Manifest Manager';
+    }
+
+    public static function id(): string
+    {
+        return 'mcp-manifest-manager';
+    }
+
+    public static function iconPath(): ?string
+    {
+        return Craft::getAlias('@app/icons/cogs.svg');
+    }
 
     public static function contentHtml(): string
     {
-        return Craft::$app->view->renderTemplate('mcpwrapper/utility', [
+        $view = Craft::$app->getView();
+        $oldMode = $view->getTemplateMode();
+        $view->setTemplateMode($view::TEMPLATE_MODE_CP);
+        
+        // Read the template file directly
+        $templatePath = Craft::getAlias('@rocketpark/mcpwrapper/templates/utility.twig');
+        $templateContent = file_get_contents($templatePath);
+        
+        // Render as string with variables
+        $html = $view->renderString($templateContent, [
             'schemas' => self::getSchemaInfo(),
         ]);
+        
+        $view->setTemplateMode($oldMode);
+        return $html;
     }
 
     private static function getSchemaInfo(): array
@@ -29,8 +52,8 @@ class McpManifestUtility extends Utility
                 'handle' => $handle,
                 'exists' => $exists,
                 'lastModified' => $exists ? date('Y-m-d H:i:s', filemtime($path)) : null,
-                'urlView' => "/actions/mcpwrapper/utility/view-manifest?schema={$handle}",
-                'urlRebuild' => "/actions/mcpwrapper/utility/rebuild-manifest?schema={$handle}",
+                'urlView' => "/actions/mcp-wrapper/utility/view-manifest?schema={$handle}",
+                'urlRebuild' => "/actions/mcp-wrapper/utility/rebuild-manifest?schema={$handle}",
             ];
         }
         return $info;

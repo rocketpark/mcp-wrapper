@@ -3,33 +3,51 @@ namespace rocketpark\mcpwrapper\services;
 
 use Craft;
 use craft\base\Component;
+use craft\base\FieldInterface;
 use craft\fields\Assets;
 use craft\fields\Categories;
 use craft\fields\Entries;
 use craft\fields\Tags;
 use craft\fields\Users;
-use craft\fields\BaseField;
 use GuzzleHttp\Client;
 
 class ManifestBuilderService extends Component
 {
     private string $cacheDir = '@storage/runtime/mcp';
+    
+    /**
+     * @var Client|null Shared GraphQL client for connection pooling
+     */
+    private static ?Client $graphqlClient = null;
 
     public function buildManifest(string $token, string $schemaHandle, bool $forceRebuild = false): array
     {
-        $path = Craft::getAlias("{$this->cacheDir}/manifest-{$schemaHandle}.json");
+        try {
+            $path = Craft::getAlias("{$this->cacheDir}/manifest-{$schemaHandle}.json");
 
-        if (!$forceRebuild && file_exists($path)) {
-            $cached = json_decode(file_get_contents($path), true);
-            if ($cached) return $cached;
+            if (!$forceRebuild && file_exists($path)) {
+                Craft::info("Loading cached manifest for schema: {$schemaHandle}", 'mcp-wrapper');
+                $cached = json_decode(file_get_contents($path), true);
+                if ($cached) return $cached;
+            }
+
+            Craft::info("Generating manifest for schema: {$schemaHandle}", 'mcp-wrapper');
+            $manifest = $this->generateManifest($token, $schemaHandle);
+
+            if (!is_dir(dirname($path))) {
+                mkdir(dirname($path), 0775, true);
+                Craft::info("Created cache directory: " . dirname($path), 'mcp-wrapper');
+            }
+            
+            file_put_contents($path, json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+            Craft::info("Manifest cached at: {$path}", 'mcp-wrapper');
+
+            return $manifest;
+        } catch (\Exception $e) {
+            Craft::error("Failed to build manifest: {$e->getMessage()}", 'mcp-wrapper');
+            Craft::error($e->getTraceAsString(), 'mcp-wrapper');
+            throw $e;
         }
-
-        $manifest = $this->generateManifest($token, $schemaHandle);
-
-        if (!is_dir(dirname($path))) mkdir(dirname($path), 0775, true);
-        file_put_contents($path, json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-
-        return $manifest;
     }
 
     public function clearCache(?string $schemaHandle = null): void
@@ -43,33 +61,207 @@ class ManifestBuilderService extends Component
 
     private function generateManifest(string $token, string $schemaHandle): array
     {
-        $schemaData = $this->introspectGraphQL($token);
-        $types = $schemaData['types'] ?? [];
-        $entryTypes = array_filter($types, fn($t) =>
-            isset($t['fields']) && str_contains(strtolower($t['name']), 'entry')
-        );
+        try {
+            // Try to use Craft services directly first (works in production without introspection)
+            return $this->generateManifestFromCraftServices($schemaHandle);
+        } catch (\Exception $e) {
+            Craft::warning("Failed to generate manifest from Craft services, falling back to GraphQL introspection: {$e->getMessage()}", 'mcp-wrapper');
+            
+            // Get allowed sections from the GraphQL schema
+            $allowedSections = $this->getAllowedSectionsForSchema($token);
+            Craft::info("Allowed sections for schema: " . implode(', ', $allowedSections), 'mcp-wrapper');
+            
+            // Fallback to GraphQL introspection
+            $schemaData = $this->introspectGraphQL($token);
+            $types = $schemaData['types'] ?? [];
+            
+            // Find the Query type to get actual section query fields
+            $queryType = null;
+            foreach ($types as $type) {
+                if ($type['name'] === 'Query') {
+                    $queryType = $type;
+                    break;
+                }
+            }
+            
+            if (!$queryType || !isset($queryType['fields'])) {
+                throw new \Exception('Could not find Query type in GraphQL schema');
+            }
+            
+            $tools = [];
+            foreach ($queryType['fields'] as $field) {
+                $fieldName = $field['name'] ?? '';
+                
+                // Look for section query fields (e.g., "servicesEntries", "ourTeamEntries")
+                if (str_ends_with($fieldName, 'Entries')) {
+                    // Extract section handle (e.g., "servicesEntries" -> "services")
+                    $sectionHandle = substr($fieldName, 0, -7); // Remove "Entries" suffix
+                    
+                    // Skip if this section is not allowed in the schema
+                    // null means allow all, empty array means allow none, populated array means check membership
+                    if ($allowedSections !== null && !in_array($sectionHandle, $allowedSections)) {
+                        Craft::info("Skipping section '{$sectionHandle}' - not enabled in schema", 'mcp-wrapper');
+                        continue;
+                    }
+                    
+                    Craft::info("Processing GraphQL query field '{$fieldName}' -> section handle '{$sectionHandle}'", 'mcp-wrapper');
+                    
+                    $tool = $this->buildToolForSection($sectionHandle, $schemaHandle);
+                    if ($tool) {
+                        $tools[] = $tool;
+                        Craft::info("Successfully built tool: {$tool['name']}", 'mcp-wrapper');
+                    } else {
+                        Craft::warning("Failed to build tool for section '{$sectionHandle}' (from GraphQL query field '{$fieldName}')", 'mcp-wrapper');
+                    }
+                }
+            }
 
-        $tools = [];
-        foreach ($entryTypes as $type) {
-            $sectionHandle = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', $type['name']));
-            $tools[] = $this->buildToolForSection($sectionHandle, $schemaHandle);
+            return [
+                'version' => '1.1',
+                'schemaHandle' => $schemaHandle,
+                'description' => "Auto-generated MCP manifest (with relationships) for GraphQL schema '{$schemaHandle}'.",
+                'tools' => array_values(array_filter($tools)),
+            ];
         }
+    }
 
+    /**
+     * Generate manifest directly from Craft services without GraphQL introspection
+     * This works in production environments where introspection might be disabled
+     */
+    private function generateManifestFromCraftServices(string $schemaHandle): array
+    {
+        Craft::info("Generating manifest from Craft services for schema: {$schemaHandle}", 'mcp-wrapper');
+        
+        // Get all tools (GraphQL + manual)
+        $toolRegistry = Craft::$app->getModule('mcp-wrapper')->get('toolRegistry');
+        $tools = $toolRegistry->getAllTools($schemaHandle);
+        
+        if (empty($tools)) {
+            throw new \Exception("No tools available for manifest generation");
+        }
+        
+        // Apply security filters
+        $tools = $this->applySecurityFilters($tools);
+        
+        Craft::info("Generated manifest with " . count($tools) . " tools", 'mcp-wrapper');
+        
         return [
-            'version' => '1.1',
+            'version' => '1.2',
             'schemaHandle' => $schemaHandle,
-            'description' => "Auto-generated MCP manifest (with relationships) for GraphQL schema '{$schemaHandle}'.",
-            'tools' => array_values(array_filter($tools)),
+            'description' => "MCP manifest for GraphQL schema '{$schemaHandle}' with manual and auto-generated tools.",
+            'tools' => $tools,
         ];
+    }
+
+    /**
+     * Get only the GraphQL auto-generated tools (for ToolRegistry)
+     * 
+     * @param string $schemaHandle GraphQL schema handle
+     * @return array Array of GraphQL tool definitions
+     */
+    public function getGeneratedTools(string $schemaHandle): array
+    {
+        // Get the token for this schema
+        $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
+        $token = $config['schemas'][$schemaHandle] ?? null;
+        
+        if (!$token) {
+            Craft::warning("No token found for schema: {$schemaHandle}", 'mcp-wrapper');
+            return [];
+        }
+        
+        // Get allowed sections for this schema
+        $allowedSections = $this->getAllowedSectionsForSchema($token);
+        $sectionCount = $allowedSections === null ? "ALL" : (empty($allowedSections) ? "NONE (check project-config/apply)" : count($allowedSections));
+        Craft::info("Schema '{$schemaHandle}' allows {$sectionCount} sections", 'mcp-wrapper');
+        
+        // Get allowed category groups for this schema
+        $allowedCategoryGroups = $this->getAllowedCategoryGroupsForSchema($token);
+        $categoryCount = $allowedCategoryGroups === null ? "ALL" : (empty($allowedCategoryGroups) ? "NONE" : count($allowedCategoryGroups));
+        Craft::info("Schema '{$schemaHandle}' allows {$categoryCount} category groups", 'mcp-wrapper');
+        
+        $sections = Craft::$app->getEntries()->getAllSections();
+        $categoryGroups = Craft::$app->getCategories()->getAllGroups();
+        $tools = [];
+        
+        // Generate tools for sections
+        foreach ($sections as $section) {
+            // Skip if this section is not allowed in the schema
+            // null means allow all, empty array means allow none, populated array means check membership
+            if ($allowedSections !== null && !in_array($section->handle, $allowedSections)) {
+                Craft::info("Skipping section '{$section->handle}' - not enabled in schema '{$schemaHandle}'", 'mcp-wrapper');
+                continue;
+            }
+            
+            $tool = $this->buildToolForSection($section->handle, $schemaHandle);
+            if ($tool) {
+                $tools[] = $tool;
+                Craft::info("Added tool for section: {$section->handle}", 'mcp-wrapper');
+            }
+        }
+        
+        // Generate tools for category groups
+        foreach ($categoryGroups as $categoryGroup) {
+            if ($allowedCategoryGroups !== null && !in_array($categoryGroup->handle, $allowedCategoryGroups)) {
+                Craft::info("Skipping category group '{$categoryGroup->handle}' - not enabled in schema '{$schemaHandle}'", 'mcp-wrapper');
+                continue;
+            }
+            
+            $tool = $this->buildToolForCategoryGroup($categoryGroup->handle, $schemaHandle);
+            if ($tool) {
+                $tools[] = $tool;
+                Craft::info("Added tool for category group: {$categoryGroup->handle}", 'mcp-wrapper');
+            }
+        }
+        
+        Craft::info("Generated " . count($tools) . " GraphQL tools for schema '{$schemaHandle}' (sections + categories)", 'mcp-wrapper');
+        return $tools;
+    }
+
+    /**
+     * Apply security filters to tools based on config
+     */
+    private function applySecurityFilters(array $tools): array
+    {
+        $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
+        $security = $config['security'] ?? [];
+        
+        $enableDangerousTools = $security['enableDangerousTools'] ?? true;
+        $disabledTools = $security['disabledTools'] ?? [];
+        
+        return array_values(array_filter($tools, function($tool) use ($enableDangerousTools, $disabledTools) {
+            // Filter disabled tools
+            if (in_array($tool['name'], $disabledTools)) {
+                Craft::info("Tool disabled by config: {$tool['name']}", 'mcp-wrapper');
+                return false;
+            }
+            
+            // Filter dangerous tools if not enabled
+            $isDangerous = isset($tool['dangerous']) && $tool['dangerous'];
+            if ($isDangerous && !$enableDangerousTools) {
+                Craft::info("Dangerous tool filtered out: {$tool['name']}", 'mcp-wrapper');
+                return false;
+            }
+            
+            return true;
+        }));
     }
 
     private function buildToolForSection(string $sectionHandle, string $schemaHandle): ?array
     {
-        $section = Craft::$app->sections->getSectionByHandle($sectionHandle);
-        if (!$section) return null;
+        $section = Craft::$app->getEntries()->getSectionByHandle($sectionHandle);
+        if (!$section) {
+            Craft::warning("Section not found: {$sectionHandle}", 'mcp-wrapper');
+            return null;
+        }
 
+        Craft::info("Found section: {$sectionHandle}, getting entry types...", 'mcp-wrapper');
+        $entryTypes = $section->getEntryTypes();
+        Craft::info("Entry types type: " . gettype($entryTypes) . ", value: " . json_encode($entryTypes), 'mcp-wrapper');
+        
         $fields = [];
-        foreach ($section->getEntryTypes() as $entryType) {
+        foreach ($entryTypes as $entryType) {
             foreach ($entryType->getFieldLayout()->getCustomFields() as $field) {
                 $fields[] = $this->describeField($field);
             }
@@ -77,23 +269,243 @@ class ManifestBuilderService extends Component
 
         return [
             'name' => "query_{$sectionHandle}",
-            'description' => "Query {$sectionHandle} entries (schema {$schemaHandle}) with relationships.",
-            'endpoint' => '/api',
-            'method' => 'POST',
-            'parameters' => [
-                'query' => "query { entries(section: \"{$sectionHandle}\") { " .
-                    implode(' ', array_column($fields, 'handle')) . " } }",
-                'variables' => [
-                    'section' => $sectionHandle,
-                    'limit' => 'integer',
-                    'filters' => $this->generateFilterSchema($fields),
-                ],
-            ],
-            'returns' => ['entries' => $fields],
+            'description' => "Query {$sectionHandle} entries (schema {$schemaHandle}) with relationships. Returns array of entry objects with ID, title, and custom fields.",
+            'inputSchema' => $this->generateInputSchema($sectionHandle, $fields),
+            'outputSchema' => $this->generateOutputSchema($sectionHandle, $fields),
+            'dangerous' => false,
         ];
     }
 
-    private function describeField(BaseField $field): array
+    private function buildToolForCategoryGroup(string $categoryGroupHandle, string $schemaHandle): ?array
+    {
+        $categoryGroup = Craft::$app->getCategories()->getGroupByHandle($categoryGroupHandle);
+        if (!$categoryGroup) {
+            Craft::warning("Category group not found: {$categoryGroupHandle}", 'mcp-wrapper');
+            return null;
+        }
+
+        Craft::info("Found category group: {$categoryGroupHandle}", 'mcp-wrapper');
+        
+        $fields = [];
+        $fieldLayout = $categoryGroup->getFieldLayout();
+        if ($fieldLayout) {
+            foreach ($fieldLayout->getCustomFields() as $field) {
+                $fields[] = $this->describeField($field);
+            }
+        }
+
+        return [
+            'name' => "query_{$categoryGroupHandle}",
+            'description' => "Query {$categoryGroupHandle} categories (schema {$schemaHandle}). Returns array of category objects with ID, title, and custom fields.",
+            'inputSchema' => $this->generateCategoryInputSchema($categoryGroupHandle, $fields),
+            'outputSchema' => $this->generateOutputSchema($categoryGroupHandle, $fields),
+            'dangerous' => false,
+        ];
+    }
+    
+    /**
+     * Generate JSON Schema for tool input parameters
+     */
+    private function generateInputSchema(string $sectionHandle, array $fields): array
+    {
+        $properties = [
+            'limit' => [
+                'type' => 'integer',
+                'description' => 'Maximum number of entries to return (default: 10)',
+                'minimum' => 1,
+                'maximum' => 100,
+                'default' => 10,
+            ],
+            'offset' => [
+                'type' => 'integer',
+                'description' => 'Number of entries to skip for pagination',
+                'minimum' => 0,
+                'default' => 0,
+            ],
+            'orderBy' => [
+                'type' => 'string',
+                'description' => 'Sort order (e.g., "title ASC", "dateCreated DESC")',
+                'default' => 'dateCreated DESC',
+            ],
+        ];
+        
+        // Add search parameter
+        $properties['search'] = [
+            'type' => 'string',
+            'description' => 'Search term to filter entries by title or content',
+        ];
+        
+        // Add field-specific filters
+        $filterProperties = [];
+        foreach ($fields as $field) {
+            if (in_array($field['type'], ['string', 'number'])) {
+                $filterProperties[$field['handle']] = [
+                    'type' => $field['type'] === 'number' ? 'number' : 'string',
+                    'description' => $field['instructions'] ?: "Filter by {$field['handle']}",
+                ];
+            }
+        }
+        
+        if (!empty($filterProperties)) {
+            $properties['filters'] = [
+                'type' => 'object',
+                'description' => 'Field-based filters',
+                'properties' => $filterProperties,
+            ];
+        }
+        
+        return [
+            'type' => 'object',
+            'properties' => $properties,
+            'required' => [],
+        ];
+    }
+    /**
+     * Generate JSON Schema for category tool input parameters
+     */
+    private function generateCategoryInputSchema(string $categoryGroupHandle, array $fields): array
+    {
+        $properties = [
+            'limit' => [
+                'type' => 'integer',
+                'description' => 'Maximum number of categories to return (default: 100)',
+                'minimum' => 1,
+                'maximum' => 500,
+                'default' => 100,
+            ],
+            'level' => [
+                'type' => 'integer',
+                'description' => 'Filter by structure level (1 = top level)',
+                'minimum' => 1,
+            ],
+            'orderBy' => [
+                'type' => 'string',
+                'description' => 'Sort order (e.g., "title ASC", "lft ASC" for structure order)',
+                'default' => 'lft ASC',
+            ],
+        ];
+        
+        // Add field-based filters
+        foreach ($fields as $field) {
+            if (isset($field['handle'])) {
+                $properties[$field['handle']] = [
+                    'type' => 'string',
+                    'description' => "Filter by {$field['label']} field",
+                ];
+            }
+        }
+        
+        return [
+            'type' => 'object',
+            'properties' => $properties,
+            'required' => [],
+        ];
+    }    
+    /**
+     * Generate JSON Schema for tool output (entry structure)
+     */
+    private function generateOutputSchema(string $sectionHandle, array $fields): array
+    {
+        $entryProperties = [
+            'id' => [
+                'type' => 'integer',
+                'description' => 'Unique entry ID',
+            ],
+            'title' => [
+                'type' => 'string',
+                'description' => 'Entry title',
+            ],
+            'slug' => [
+                'type' => 'string',
+                'description' => 'URL-friendly slug',
+            ],
+            'uri' => [
+                'type' => ['string', 'null'],
+                'description' => 'Full URI path',
+            ],
+            'url' => [
+                'type' => ['string', 'null'],
+                'description' => 'Full URL',
+            ],
+            'dateCreated' => [
+                'type' => 'string',
+                'format' => 'date-time',
+                'description' => 'Creation timestamp',
+            ],
+            'dateUpdated' => [
+                'type' => 'string',
+                'format' => 'date-time',
+                'description' => 'Last update timestamp',
+            ],
+        ];
+        
+        // Add custom fields to schema
+        foreach ($fields as $field) {
+            $entryProperties[$field['handle']] = $this->fieldToJsonSchema($field);
+        }
+        
+        return [
+            'type' => 'object',
+            'properties' => [
+                'entries' => [
+                    'type' => 'array',
+                    'description' => "Array of {$sectionHandle} entries",
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => $entryProperties,
+                    ],
+                ],
+                'total' => [
+                    'type' => 'integer',
+                    'description' => 'Total number of entries matching query',
+                ],
+            ],
+            'required' => ['entries', 'total'],
+        ];
+    }
+    
+    /**
+     * Convert field description to JSON Schema property
+     */
+    private function fieldToJsonSchema(array $field): array
+    {
+        $schema = [
+            'description' => $field['instructions'] ?: "Field: {$field['handle']}",
+        ];
+        
+        switch ($field['type']) {
+            case 'string':
+                $schema['type'] = 'string';
+                break;
+            case 'number':
+                $schema['type'] = 'number';
+                break;
+            case 'boolean':
+                $schema['type'] = 'boolean';
+                break;
+            case 'datetime':
+                $schema['type'] = 'string';
+                $schema['format'] = 'date-time';
+                break;
+            case 'relation':
+                $schema['type'] = 'array';
+                $schema['description'] .= " (Related {$field['relationTo']['elementType']} elements)";
+                $schema['items'] = [
+                    'type' => 'object',
+                    'properties' => [
+                        'id' => ['type' => 'integer'],
+                        'title' => ['type' => 'string'],
+                    ],
+                ];
+                break;
+            default:
+                $schema['type'] = ['string', 'null'];
+        }
+        
+        return $schema;
+    }
+
+    private function describeField(FieldInterface $field): array
     {
         $base = [
             'handle' => $field->handle,
@@ -119,6 +531,10 @@ class ManifestBuilderService extends Component
     private function extractSourceHandles($sources): array
     {
         if (!$sources) return [];
+        if (!is_array($sources)) {
+            Craft::warning("extractSourceHandles received non-array sources: " . gettype($sources) . " = " . json_encode($sources), 'mcp-wrapper');
+            return [];
+        }
         $handles = [];
         foreach ($sources as $src) {
             if ($src === '*') $handles[] = 'all';
@@ -129,7 +545,7 @@ class ManifestBuilderService extends Component
         return $handles;
     }
 
-    private function mapFieldType(BaseField $field): string
+    private function mapFieldType(FieldInterface $field): string
     {
         $type = (new \ReflectionClass($field))->getShortName();
 
@@ -161,26 +577,192 @@ class ManifestBuilderService extends Component
         return $filters;
     }
 
+    /**
+     * Get allowed sections for a GraphQL schema by looking up scopes
+     * Returns null to indicate "allow all", empty array means "allow none", non-empty array means specific sections
+     */
+    private function getAllowedSectionsForSchema(string $token): ?array
+    {
+        try {
+            // Find the GQL token using Craft's service
+            $gqlToken = Craft::$app->getGql()->getTokenByAccessToken($token);
+            
+            if (!$gqlToken) {
+                Craft::error("Could not find GQL token - this will block all sections for security", 'mcp-wrapper');
+                return []; // Empty array means allow none (secure by default)
+            }
+            
+            Craft::info("Found GQL token: {$gqlToken->name} (schema ID: {$gqlToken->schemaId})", 'mcp-wrapper');
+            
+            // Get the schema for this token
+            $schema = Craft::$app->getGql()->getSchemaById($gqlToken->schemaId);
+            
+            if (!$schema) {
+                Craft::error("Could not find GraphQL schema for token's schema ID - blocking all sections", 'mcp-wrapper');
+                return [];
+            }
+            
+            Craft::info("Found GraphQL schema: {$schema->name} (uid: {$schema->uid})", 'mcp-wrapper');
+            Craft::info("Schema scope: " . json_encode($schema->scope), 'mcp-wrapper');
+            
+            // Get the schema's scope (permissions)
+            $scope = $schema->scope ?? [];
+            if (empty($scope)) {
+                Craft::warning("Schema has empty scope - this might indicate project config is out of sync. Run: php craft project-config/apply", 'mcp-wrapper');
+                return []; // Empty scope means allow none (DB likely out of sync with project config)
+            }
+            
+            // Parse scope to find enabled sections
+            // Scope format: ["sections.{uid}:read", "sections.{uid}:read", ...]
+            $allowedSections = [];
+            foreach ($scope as $permission) {
+                if (str_starts_with($permission, 'sections.') && str_ends_with($permission, ':read')) {
+                    // Extract section UID
+                    $sectionUid = substr($permission, 9, -5); // Remove "sections." and ":read"
+                    
+                    // Get section by UID
+                    $section = Craft::$app->getEntries()->getSectionByUid($sectionUid);
+                    if ($section) {
+                        $allowedSections[] = $section->handle;
+                        Craft::info("Schema allows section: {$section->handle} (uid: {$sectionUid})", 'mcp-wrapper');
+                    }
+                }
+            }
+            
+            return $allowedSections;
+            
+        } catch (\Exception $e) {
+            Craft::error("Error getting allowed sections: {$e->getMessage()}", 'mcp-wrapper');
+            return []; // Empty array means allow none on error (fail secure)
+        }
+    }
+
+    /**
+     * Get allowed category groups for a GraphQL schema based on its permissions
+     */
+    private function getAllowedCategoryGroupsForSchema(string $token): ?array
+    {
+        try {
+            $gqlToken = Craft::$app->getGql()->getTokenByAccessToken($token);
+            
+            if (!$gqlToken) {
+                Craft::error("Could not find GQL token for category groups - blocking all", 'mcp-wrapper');
+                return [];
+            }
+            
+            $schema = Craft::$app->getGql()->getSchemaById($gqlToken->schemaId);
+            
+            if (!$schema) {
+                Craft::error("Could not find GraphQL schema for category groups - blocking all", 'mcp-wrapper');
+                return [];
+            }
+            
+            $scope = $schema->scope ?? [];
+            if (empty($scope)) {
+                Craft::warning("Schema has empty scope for category groups", 'mcp-wrapper');
+                return [];
+            }
+            
+            // Parse scope to find enabled category groups
+            // Scope format: ["categorygroups.{uid}:read", ...]
+            $allowedCategoryGroups = [];
+            foreach ($scope as $permission) {
+                if (str_starts_with($permission, 'categorygroups.') && str_ends_with($permission, ':read')) {
+                    // Extract category group UID
+                    $categoryGroupUid = substr($permission, 15, -5); // Remove "categorygroups." and ":read"
+                    
+                    // Get category group by UID
+                    $categoryGroup = Craft::$app->getCategories()->getGroupByUid($categoryGroupUid);
+                    if ($categoryGroup) {
+                        $allowedCategoryGroups[] = $categoryGroup->handle;
+                        Craft::info("Schema allows category group: {$categoryGroup->handle} (uid: {$categoryGroupUid})", 'mcp-wrapper');
+                    }
+                }
+            }
+            
+            return $allowedCategoryGroups;
+            
+        } catch (\Exception $e) {
+            Craft::error("Error getting allowed category groups: {$e->getMessage()}", 'mcp-wrapper');
+            return [];
+        }
+    }
+
+    /**
+     * Get trusted base URI for internal API requests
+     * Prevents SSRF via Host header manipulation
+     */
+    private function getTrustedBaseUri(): string
+    {
+        $primarySite = Craft::$app->getSites()->getPrimarySite();
+        return rtrim($primarySite->getBaseUrl(), '/');
+    }
+
+    /**
+     * Get shared GraphQL client (connection pooling)
+     */
+    private function getGraphQLClient(): Client
+    {
+        if (self::$graphqlClient === null) {
+            self::$graphqlClient = new Client([
+                'base_uri' => $this->getTrustedBaseUri(),
+                'timeout' => 10,
+                'http_errors' => false,
+                'verify' => !str_ends_with($this->getTrustedBaseUri(), '.test'),
+            ]);
+            Craft::info("Created shared GraphQL client", 'mcp-wrapper');
+        }
+        return self::$graphqlClient;
+    }
+
     private function introspectGraphQL(string $token): array
     {
-        $client = new Client([
-            'base_uri' => Craft::$app->request->getHostInfo(),
-            'timeout' => 10,
-        ]);
+        try {
+            $client = $this->getGraphQLClient();
 
-        $query = <<<'GQL'
-        { __schema { types { name fields { name type { name kind } } } } }
-        GQL;
+            $query = <<<'GQL'
+            { __schema { types { name fields { name type { name kind } } } } }
+            GQL;
 
-        $response = $client->post('/api', [
-            'headers' => [
-                'Authorization' => "Bearer {$token}",
-                'Content-Type' => 'application/json',
-            ],
-            'json' => ['query' => $query],
-        ]);
+            Craft::info("Introspecting GraphQL schema", 'mcp-wrapper');
+            
+            $response = $client->post('/api', [
+                'headers' => [
+                    'Authorization' => "Bearer {$token}",
+                    'Content-Type' => 'application/json',
+                ],
+                'json' => ['query' => $query],
+            ]);
 
-        $data = json_decode($response->getBody()->getContents(), true);
-        return $data['data']['__schema'] ?? [];
+            $data = json_decode($response->getBody()->getContents(), true);
+            
+            if (!isset($data['data']['__schema'])) {
+                Craft::error("GraphQL introspection failed: missing __schema", 'mcp-wrapper');
+                throw new \Exception('GraphQL introspection returned invalid data');
+            }
+            
+            // Log all Entry types found
+            $entryTypes = array_filter($data['data']['__schema']['types'], function($type) {
+                return isset($type['name']) && str_ends_with($type['name'], '_Entry');
+            });
+            $entryTypeNames = array_map(fn($t) => $t['name'], $entryTypes);
+            Craft::info("GraphQL Entry types found: " . implode(', ', $entryTypeNames), 'mcp-wrapper');
+            
+            // Log full schema data for debugging
+            Craft::info("Full GraphQL schema data: " . json_encode($data['data']['__schema'], JSON_PRETTY_PRINT), 'mcp-wrapper');
+            
+            Craft::info("GraphQL introspection successful", 'mcp-wrapper');
+            return $data['data']['__schema'];
+        } catch (\GuzzleHttp\Exception\RequestException $e) {
+            Craft::error("GraphQL introspection request failed: {$e->getMessage()}", 'mcp-wrapper');
+            if ($e->hasResponse()) {
+                $body = $e->getResponse()->getBody()->getContents();
+                Craft::error("Response body: {$body}", 'mcp-wrapper');
+            }
+            throw new \Exception('Failed to introspect GraphQL schema: ' . $e->getMessage());
+        } catch (\Exception $e) {
+            Craft::error("Unexpected error during GraphQL introspection: {$e->getMessage()}", 'mcp-wrapper');
+            throw $e;
+        }
     }
 }

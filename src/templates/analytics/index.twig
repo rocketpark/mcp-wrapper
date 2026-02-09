@@ -1,0 +1,296 @@
+{# 
+MCP Wrapper Analytics Dashboard
+Displays performance metrics and usage statistics
+#}
+
+{% extends "_layouts/cp" %}
+{% import "_includes/forms" as forms %}
+
+{% set title = "MCP Analytics Dashboard" %}
+{% set fullPageForm = false %}
+
+{% block content %}
+<div id="mcp-analytics-dashboard">
+    <!-- Header Controls -->
+    <div class="flex justify-between items-center mb-6">
+        <div class="flex gap-4">
+            <!-- Schema Selector -->
+            {{ forms.selectField({
+                label: 'Schema',
+                id: 'schema-select',
+                name: 'schema',
+                value: selectedSchema,
+                options: schemas|map(s => { label: s, value: s }),
+            }) }}
+            
+            <!-- Date Range -->
+            {{ forms.selectField({
+                label: 'Time Range',
+                id: 'days-select',
+                name: 'days',
+                value: days,
+                options: [
+                    { label: 'Last 24 hours', value: 1 },
+                    { label: 'Last 7 days', value: 7 },
+                    { label: 'Last 30 days', value: 30 },
+                    { label: 'Last 90 days', value: 90 },
+                ],
+            }) }}
+        </div>
+        
+        <div class="flex gap-2">
+            <button type="button" class="btn" id="refresh-btn">
+                <span class="spinner hidden" id="refresh-spinner"></span>
+                Refresh
+            </button>
+            <a href="{{ actionUrl('mcp-wrapper/analytics/export', { 
+                schemaHandle: selectedSchema, 
+                days: days 
+            }) }}" class="btn">Export CSV</a>
+        </div>
+    </div>
+    
+    <!-- Loading State -->
+    <div id="loading-state" class="text-center py-12">
+        <div class="spinner spinner-big"></div>
+        <p class="mt-4 text-gray-500">Loading analytics...</p>
+    </div>
+    
+    <!-- Dashboard Content -->
+    <div id="dashboard-content" class="hidden">
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-4 gap-4 mb-6">
+            <div class="stat-card">
+                <div class="stat-label">Total Requests</div>
+                <div class="stat-value" id="stat-total">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Success Rate</div>
+                <div class="stat-value" id="stat-success-rate">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Avg Response Time</div>
+                <div class="stat-value" id="stat-avg-duration">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Cache Hit Rate</div>
+                <div class="stat-value" id="stat-cache-rate">-</div>
+            </div>
+        </div>
+        
+        <!-- Charts Row -->
+        <div class="grid grid-cols-2 gap-6 mb-6">
+            <!-- Top Tools -->
+            <div class="card">
+                <h2 class="text-lg font-semibold mb-4">Top Tools by Usage</h2>
+                <div id="top-tools-chart"></div>
+            </div>
+            
+            <!-- Response Time Distribution -->
+            <div class="card">
+                <h2 class="text-lg font-semibold mb-4">Response Time Distribution</h2>
+                <div id="response-time-chart"></div>
+            </div>
+        </div>
+        
+        <!-- Tables Row -->
+        <div class="grid grid-cols-2 gap-6">
+            <!-- Slowest Requests -->
+            <div class="card">
+                <h2 class="text-lg font-semibold mb-4">Slowest Requests</h2>
+                <table class="data fullwidth">
+                    <thead>
+                        <tr>
+                            <th>Tool</th>
+                            <th>Duration</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="slowest-requests-table">
+                        <tr><td colspan="3" class="text-center text-gray-500">No data</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Error Log -->
+            <div class="card">
+                <h2 class="text-lg font-semibold mb-4">Recent Errors</h2>
+                <table class="data fullwidth">
+                    <thead>
+                        <tr>
+                            <th>Tool</th>
+                            <th>Error</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="errors-table">
+                        <tr><td colspan="3" class="text-center text-gray-500">No errors</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.stat-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-bottom: 0.5rem;
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+.card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+#top-tools-chart, #response-time-chart {
+    height: 300px;
+}
+</style>
+
+<script>
+(function() {
+    const schemaSelect = document.getElementById('schema-select');
+    const daysSelect = document.getElementById('days-select');
+    const refreshBtn = document.getElementById('refresh-btn');
+    const loadingState = document.getElementById('loading-state');
+    const dashboardContent = document.getElementById('dashboard-content');
+    
+    let currentData = null;
+    
+    // Load analytics data
+    async function loadAnalytics() {
+        const schema = schemaSelect?.value || '{{ selectedSchema }}';
+        const days = daysSelect?.value || {{ days }};
+        
+        loadingState.classList.remove('hidden');
+        dashboardContent.classList.add('hidden');
+        
+        try {
+            const response = await fetch(
+                `{{ actionUrl('mcp-wrapper/analytics/data') }}?schemaHandle=${schema}&days=${days}`,
+                {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                }
+            );
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                currentData = result.data;
+                renderDashboard(currentData);
+            } else {
+                Craft.cp.displayError('Failed to load analytics');
+            }
+        } catch (error) {
+            console.error('Analytics error:', error);
+            Craft.cp.displayError('Failed to load analytics');
+        } finally {
+            loadingState.classList.add('hidden');
+            dashboardContent.classList.remove('hidden');
+        }
+    }
+    
+    // Render dashboard with data
+    function renderDashboard(data) {
+        // Summary stats
+        document.getElementById('stat-total').textContent = 
+            (data.total_requests || 0).toLocaleString();
+        document.getElementById('stat-success-rate').textContent = 
+            (data.success_rate || 0).toFixed(1) + '%';
+        document.getElementById('stat-avg-duration').textContent = 
+            (data.avg_duration_ms || 0).toFixed(0) + 'ms';
+        document.getElementById('stat-cache-rate').textContent = 
+            (data.cache_hit_rate || 0).toFixed(1) + '%';
+        
+        // Top tools table
+        renderTopTools(data.top_tools || []);
+        
+        // Slowest requests table
+        renderSlowestRequests(data.slowest_requests || []);
+        
+        // Errors table  
+        renderErrors(data.recent_errors || []);
+    }
+    
+    function renderTopTools(tools) {
+        const chartDiv = document.getElementById('top-tools-chart');
+        if (!tools.length) {
+            chartDiv.innerHTML = '<p class="text-center text-gray-500">No data available</p>';
+            return;
+        }
+        
+        const html = tools.slice(0, 10).map(tool => `
+            <div class="flex justify-between items-center py-2 border-b">
+                <span class="font-medium">${tool.tool}</span>
+                <div class="flex gap-4">
+                    <span class="text-gray-600">${tool.count} calls</span>
+                    <span class="text-gray-500">${tool.avg_duration_ms.toFixed(0)}ms avg</span>
+                </div>
+            </div>
+        `).join('');
+        
+        chartDiv.innerHTML = html;
+    }
+    
+    function renderSlowestRequests(requests) {
+        const tbody = document.getElementById('slowest-requests-table');
+        if (!requests.length) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-gray-500">No data</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = requests.slice(0, 10).map(req => `
+            <tr>
+                <td><code>${req.tool}</code></td>
+                <td><span class="badge ${req.duration_ms > 1000 ? 'badge-red' : 'badge-yellow'}">${req.duration_ms.toFixed(0)}ms</span></td>
+                <td class="text-sm text-gray-500">${new Date(req.timestamp).toLocaleString()}</td>
+            </tr>
+        `).join('');
+    }
+    
+    function renderErrors(errors) {
+        const tbody = document.getElementById('errors-table');
+        if (!errors.length) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-gray-500">No errors</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = errors.slice(0, 10).map(err => `
+            <tr>
+                <td><code>${err.tool || 'unknown'}</code></td>
+                <td class="text-sm">${err.error_message || 'Unknown error'}</td>
+                <td class="text-sm text-gray-500">${new Date(err.timestamp).toLocaleString()}</td>
+            </tr>
+        `).join('');
+    }
+    
+    // Event listeners
+    schemaSelect?.addEventListener('change', loadAnalytics);
+    daysSelect?.addEventListener('change', loadAnalytics);
+    refreshBtn?.addEventListener('click', loadAnalytics);
+    
+    // Initial load
+    loadAnalytics();
+})();
+</script>
+{% endblock %}

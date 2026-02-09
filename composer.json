@@ -14,7 +14,12 @@
     },
     "require": {
         "php": "^8.2",
-        "craftcms/cms": "^5.0.0"
+        "craftcms/cms": "^5.0.0",
+        "guzzlehttp/guzzle": "^7.0"
+    },
+    "require-dev": {
+        "craftcms/rector": "dev-main",
+        "phpunit/phpunit": "^10.5"
     },
     "autoload": {
         "psr-4": {
@@ -27,6 +32,13 @@
         "handle": "mcp-wrapper",
         "name": "MCP Wrapper",
         "developer": "Rocket Park",
-        "class": "rocketpark\\mcpwrapper\\McpWrapper"
+        "class": "rocketpark\\mcpwrapper\\McpWrapper",
+        "basePath": "src"
+    },
+    "config": {
+        "allow-plugins": {
+            "yiisoft/yii2-composer": true,
+            "craftcms/plugin-installer": true
+        }
     }
 }

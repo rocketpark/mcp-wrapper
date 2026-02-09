@@ -1,0 +1,7 @@
+# Botpress Integration Files
+
+node_modules/
+dist/
+.botpress/
+*.log
+.DS_Store

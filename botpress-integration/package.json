@@ -1,0 +1,28 @@
+{
+  "name": "botpress-craftcms-mcp-integration",
+  "version": "1.0.0",
+  "description": "Botpress integration for Craft CMS via Model Context Protocol (MCP)",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "bp build",
+    "deploy": "bp deploy",
+    "check:type": "tsc --noEmit"
+  },
+  "keywords": [
+    "botpress",
+    "craft-cms",
+    "mcp",
+    "model-context-protocol"
+  ],
+  "author": "Rocket Park",
+  "license": "MIT",
+  "devDependencies": {
+    "@botpress/cli": "latest",
+    "@botpress/sdk": "latest",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  }
+}
