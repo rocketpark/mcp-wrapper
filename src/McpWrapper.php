@@ -81,6 +81,8 @@ class McpWrapper extends Plugin
                 $event->rules['mcp/health'] = 'mcp-wrapper/mcp/health';
                 $event->rules['mcp/metrics'] = 'mcp-wrapper/mcp/metrics';
                 $event->rules['mcp/<schemaHandle:[a-zA-Z0-9_-]+>'] = 'mcp-wrapper/mcp/index';
+                // Webhook endpoints
+                $event->rules['mcp/webhook/kb-sync'] = 'mcp-wrapper/webhook/trigger-kb-sync';
             }
         );
 
