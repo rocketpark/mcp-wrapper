@@ -77,10 +77,4 @@ Professional, conversational. Short paragraphs. Bold names/locations. End with c
 
 ## Key Facts
 
-96 offices worldwide (53 US/Canada + 43 international, ALL in Knowledge Base) | 100+ countries | ~1,900 employees | 450+ industry committees
-
-**International Regions (all in Knowledge Base):**
-- Europe: London, Dublin, Belfast, Birmingham, Manchester, Edinburgh, Glasgow, Ghent, Antwerp, Leuven, Aarhus, Copenhagen, Helsinki, Tampere, Turku, Oulu, Kuopio, Mikkeli, Milan, Cork, Galway
-- Middle East + India: Dubai, Abu Dhabi, Doha, Riyadh, Jeddah, Al Khobar, Mumbai
-- Asia: Hong Kong, Shanghai, Macau, Seoul, Kuala Lumpur
-- Pacific: Sydney, Melbourne, Melbourne Lab, Brisbane, Perth, Canberra, Auckland, Christchurch, Tauranga
+96 offices worldwide (US, Canada, Europe, Middle East, Asia, Pacific) - ALL in Knowledge Base | 100+ countries | ~1,900 employees | 450+ industry committees
