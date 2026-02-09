@@ -352,7 +352,27 @@ Notify external systems when content changes:
 ]
 ```
 
-**8. Performance Dashboard** ✨ NEW
+**8. Site-Specific Settings** ✨ NEW
+
+Configure site-specific behaviors without hardcoding values in the plugin:
+
+- Keeps site-specific URLs out of the public repository
+- Configurable per-site for multi-site installs
+- Falls back to Craft's primary site URL if not specified
+
+```php
+'siteSettings' => [
+    // Base URL for generating absolute URLs (optional)
+    'baseUrl' => getenv('PRIMARY_SITE_URL'),
+    
+    // Office contact form path template ({slug} replaced with office slug)
+    'officeContactFormPath' => '/contact/office-locations/form',
+],
+```
+
+**Used by:** `craft_get_office_contact_info` tool for generating contact URLs
+
+**9. Performance Dashboard** ✨ NEW
 
 Visual analytics in Craft CP:\n- **Real-time Metrics**: Total requests, success rate, avg response time, cache hit rate
 - **Tool Usage**: Most-used tools with error rates and duration

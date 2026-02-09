@@ -502,6 +502,15 @@ class EntryTools
                 return Response::notFound("Office location '{$slug}' not found");
             }
 
+            // Get site-specific settings from config
+            $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
+            $siteSettings = $config['siteSettings'] ?? [];
+            $baseUrl = $siteSettings['baseUrl'] ?? Craft::$app->sites->primarySite->baseUrl;
+            $contactFormPath = $siteSettings['officeContactFormPath'] ?? '/contact/office-locations/form';
+            
+            // Ensure baseUrl doesn't have trailing slash
+            $baseUrl = rtrim($baseUrl, '/');
+            
             $contactInfo = [
                 'slug' => $slug,
                 'title' => $office->title,
@@ -517,8 +526,10 @@ class EntryTools
                 'latitude' => null,
                 'longitude' => null,
                 'googleMapsUrl' => null,
-                'contactFormUrl' => "https://www.jensenhughes.com/contact/office-locations/form/{$slug}",
-                'officeDetailsUrl' => $office->url ?? "https://www.jensenhughes.com/{$office->uri}",
+                // Use configured contact form path with slug
+                'contactFormUrl' => "{$baseUrl}{$contactFormPath}/{$slug}",
+                // Prefer Craft's native URL, fall back to constructed URL
+                'officeDetailsUrl' => $office->url ?? "{$baseUrl}/{$office->uri}",
                 'officeSummary' => $office->officeSummary ?? null,
             ];
 

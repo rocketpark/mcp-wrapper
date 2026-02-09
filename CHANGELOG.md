@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2.7.2 - 2026-02-09
+
+### Fixed
+
+- **Removed Hardcoded Site URLs**: EntryTools no longer contains hardcoded `jensenhughes.com` URLs
+  - Added `siteSettings` configuration section to `mcpwrapper.php.example`
+  - `craft_get_office_contact_info` tool now uses configurable `baseUrl` and `officeContactFormPath`
+  - Site-specific URLs are now configured in local config file (stays out of public repository)
+  - Falls back to Craft's primary site URL if not specified
+
+- **Analytics Dashboard Utility**: Fixed `McpAnalyticsUtility` to properly render inline
+  - Previously attempted to redirect, which could fail in some CP contexts
+  - Now renders the analytics template directly within the Utilities section
+  - Accessible via **Utilities > MCP Analytics** or `/admin/mcp-wrapper/analytics`
+  - Requires `utility:mcp-wrapper` permission
+
+### Configuration
+
+- **New `siteSettings` Section**: Added to config for site-specific customization
+  ```php
+  'siteSettings' => [
+      'baseUrl' => getenv('PRIMARY_SITE_URL'),
+      'officeContactFormPath' => '/contact/office-locations/form',
+  ],
+  ```
+
 ## 2.7.1 - 2026-02-04
 
 ### Documentation

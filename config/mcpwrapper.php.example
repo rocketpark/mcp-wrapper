@@ -94,4 +94,18 @@ return [
     // Webhook Queue
     // Process webhooks asynchronously to avoid blocking entry saves
     'webhookUseQueue' => true,  // false = send immediately (synchronous)
+    
+    // Site-Specific Settings
+    // Configure site-specific behaviors without hardcoding values in the plugin
+    // This keeps your site-specific configuration out of the public repository
+    'siteSettings' => [
+        // Base URL for generating absolute URLs (optional)
+        // Falls back to Craft's primary site URL if not specified
+        'baseUrl' => getenv('PRIMARY_SITE_URL'),
+        
+        // Office contact form path template
+        // Use {slug} as placeholder for office slug
+        // Example: '/contact/office-locations/form' becomes '/contact/office-locations/form/chicago'
+        'officeContactFormPath' => '/contact/office-locations/form',
+    ],
 ];

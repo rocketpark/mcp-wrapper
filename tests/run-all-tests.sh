@@ -38,6 +38,8 @@ run_test "test-request-timeout-exception.php" "RequestTimeoutException"
 run_test "test-tool-registry.php" "Tool Registry"
 run_test "test-argument-mapping.php" "Argument Mapping"
 run_test "test-graphql-sanitization.php" "GraphQL Sanitization"
+run_test "test-site-settings.php" "Site Settings Configuration (v2.7.2)"
+run_test "test-entry-tools-urls.php" "EntryTools URL Generation (v2.7.2)"
 
 echo "========================================"
 echo "Test Suite Complete"

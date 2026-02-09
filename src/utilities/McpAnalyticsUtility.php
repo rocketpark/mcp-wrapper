@@ -44,8 +44,15 @@ class McpAnalyticsUtility extends Utility
      */
     public static function contentHtml(): string
     {
-        // Redirect to analytics controller
-        Craft::$app->getResponse()->redirect('mcp-wrapper/analytics')->send();
-        return '';
+        // Render analytics dashboard inline
+        $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
+        $schemas = array_keys($config['schemas'] ?? []);
+        $selectedSchema = $schemas[0] ?? null;
+        
+        return Craft::$app->getView()->renderTemplate('mcp-wrapper/analytics/index', [
+            'schemas' => $schemas,
+            'selectedSchema' => $selectedSchema,
+            'days' => 7,
+        ]);
     }
 }
