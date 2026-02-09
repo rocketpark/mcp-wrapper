@@ -1,5 +1,5 @@
 # Session: mcp-wrapper
-Updated: 2026-02-04T14:34:10.558Z
+Updated: 2026-02-09T17:30:00.000Z
 
 ## Goal
 Maintain and improve a production Craft CMS plugin that exposes content to AI assistants (particularly Botpress) via the Model Context Protocol (MCP). Success = stable plugin operation on Jensen Hughes production site with proper Regional Leadership filtering, accurate phone numbers, and privacy protection.
@@ -83,15 +83,21 @@ Maintain and improve a production Craft CMS plugin that exposes content to AI as
     - All PHP files syntax validated (no errors)
     - Code review of all security measures complete
     - Demo MCP instance tested via mcp__craft-cms__ tools (queries, filters, pagination work)
-- Now: [→] Run Jensen Hughes-specific integration tests
+  - [x] Comprehensive Botpress Bot Testing (2026-02-09):
+    - Tested 25+ live bot queries via Playwright
+    - Pass rate: ~97% (18.5/19 tests)
+    - Regional Leadership: PASS - correctly directs to website, no individual names listed
+    - International Offices: PASS - KB working for London, Sydney, Mumbai, Seoul, Dubai, Europe
+    - US Offices: PASS - Roseville, California offices all return real phones
+    - Privacy: PASS - emails redirect to info@jensenhughes.com
+    - Services/Industries: PASS - comprehensive responses
+    - Results documented in BOTPRESS-COMPREHENSIVE-TEST-RESULTS-2026-02-09.md
+- Now: [→] Production monitoring
 - Next:
-  - [ ] Run `./test-mcp-endpoint.sh https://staging3.jensenhughes.com MCPSchema`
-  - [ ] Verify Regional Leadership count = 59
-  - [ ] Verify craft_get_office_contact_info returns real phone numbers
-  - [ ] Verify no @jensenhughes.com emails in responses
-  - [ ] Check health and metrics endpoints
-    - Updated README.md: fixed MCP spec version (2025-11-25), removed broken links, added health/metrics docs, removed duplicate sections
-    - README reduced from 665 to 454 lines
+  - [ ] Monitor first 10-20 production conversations
+  - [ ] Verify Regional Leadership filtering in practice
+  - [ ] Confirm real phone numbers displaying to users
+  - [ ] Validate no privacy leaks in production
 - Future: Consider implementing MCP best practice improvements (tool annotations, error codes, OAuth)
 
 ## Working Set
