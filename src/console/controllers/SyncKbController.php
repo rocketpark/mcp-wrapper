@@ -185,12 +185,27 @@ class SyncKbController extends Controller
     {
         $this->stdout("Syncing Leadership...\n", Console::FG_YELLOW);
 
-        // Regional Leadership is in ourTeam section with teamMemberType field
-        $entries = Entry::find()
+        // Get all team members - teamMemberType is a relational field
+        $allEntries = Entry::find()
             ->section('ourTeam')
-            ->teamMemberType('Regional Leadership')
             ->status('live')
             ->all();
+
+        $this->stdout("  Found " . count($allEntries) . " total team members\n");
+
+        // Filter to only Regional Leadership members
+        $entries = [];
+        foreach ($allEntries as $entry) {
+            $types = $entry->getFieldValue('teamMemberType');
+            if ($types) {
+                foreach ($types->all() as $type) {
+                    if (stripos($type->title, 'Regional Leadership') !== false) {
+                        $entries[] = $entry;
+                        break;
+                    }
+                }
+            }
+        }
 
         $this->stdout("  Found " . count($entries) . " Regional Leaders\n");
 
