@@ -24,11 +24,10 @@ Code examples and integration patterns:
 The following files remain in the project root and constitute the primary documentation:
 
 - **[README.md](../README.md)** - Main documentation with architecture diagrams
-- **[DEPLOYMENT.md](../DEPLOYMENT.md)** - Production deployment guide
-- **[VERIFICATION.md](../VERIFICATION.md)** - Post-deployment verification checklist
 - **[CHANGELOG.md](../CHANGELOG.md)** - Version history and release notes
 - **[JENSEN-HUGHES-IMPLEMENTATION.md](../JENSEN-HUGHES-IMPLEMENTATION.md)** - Real-world implementation guide
-- **[COMPREHENSIVE-BOT-QUESTIONS.md](../COMPREHENSIVE-BOT-QUESTIONS.md)** - 200+ AI assistant test questions
+- **[BOTPRESS-KB-STRATEGY.md](BOTPRESS-KB-STRATEGY.md)** - Knowledge Base architecture and sync strategy
+- **[tests/BOT-COMPREHENSIVE-TEST-QUESTIONS.md](../tests/BOT-COMPREHENSIVE-TEST-QUESTIONS.md)** - 150+ AI assistant test questions
 
 ## Contributing
 
