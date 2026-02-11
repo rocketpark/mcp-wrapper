@@ -185,23 +185,14 @@ class SyncKbController extends Controller
     {
         $this->stdout("Syncing Leadership...\n", Console::FG_YELLOW);
 
+        // Regional Leadership is in ourTeam section with teamMemberType field
         $entries = Entry::find()
-            ->section('experts')
-            ->relatedTo(['field' => 'executiveLeadership', 'value' => true])
+            ->section('ourTeam')
+            ->teamMemberType('Regional Leadership')
             ->status('live')
             ->all();
 
-        // If no relation field, try getting by leadership category
-        if (empty($entries)) {
-            $entries = Entry::find()
-                ->section('experts')
-                ->status('live')
-                ->limit(50)
-                ->all();
-            // Filter for leadership - adjust based on actual field structure
-        }
-
-        $this->stdout("  Found " . count($entries) . " leaders\n");
+        $this->stdout("  Found " . count($entries) . " Regional Leaders\n");
 
         if ($this->dryRun) {
             $this->stdout("  [DRY RUN] Would upload to Botpress\n", Console::FG_CYAN);
