@@ -65,7 +65,11 @@ class McpWrapper extends Plugin
         parent::init();
 
         // Set controller namespace for proper routing
-        $this->controllerNamespace = 'rocketpark\\mcpwrapper\\controllers';
+        if (Craft::$app->getRequest()->getIsConsoleRequest()) {
+            $this->controllerNamespace = 'rocketpark\\mcpwrapper\\console\\controllers';
+        } else {
+            $this->controllerNamespace = 'rocketpark\\mcpwrapper\\controllers';
+        }
 
         self::$plugin = $this;
         
