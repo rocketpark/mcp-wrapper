@@ -12,7 +12,7 @@
  *   BOTPRESS_PAT          - Personal Access Token from Botpress
  *   BOTPRESS_BOT_ID       - Bot ID (from bot URL or settings)
  *   BOTPRESS_KB_ID        - Knowledge Base ID (from KB settings)
- *   MCP_ENDPOINT          - MCP endpoint URL (default: https://staging3.jensenhughes.com/mcp/ai)
+ *   MCP_ENDPOINT          - MCP endpoint URL (default: https://jensenhughes3.on-forge.com/mcp/ai)
  *
  * Optional:
  *   DRY_RUN=true          - Preview output without uploading
@@ -33,7 +33,7 @@ const config = {
   botpressPat: process.env.BOTPRESS_PAT,
   botpressBotId: process.env.BOTPRESS_BOT_ID,
   botpressKbId: process.env.BOTPRESS_KB_ID,
-  mcpEndpoint: process.env.MCP_ENDPOINT || 'https://staging3.jensenhughes.com/mcp/ai',
+  mcpEndpoint: process.env.MCP_ENDPOINT || 'https://jensenhughes3.on-forge.com/mcp/ai',
   dryRun: process.env.DRY_RUN === 'true',
   useLocalData: process.env.USE_LOCAL_DATA === 'true',
   saveLocalData: process.env.SAVE_LOCAL_DATA === 'true',

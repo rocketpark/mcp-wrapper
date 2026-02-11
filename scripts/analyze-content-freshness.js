@@ -9,7 +9,7 @@
 
 const https = require('https');
 
-const MCP_ENDPOINT = process.env.MCP_ENDPOINT || 'https://staging3.jensenhughes.com/mcp/ai';
+const MCP_ENDPOINT = process.env.MCP_ENDPOINT || 'https://jensenhughes3.on-forge.com/mcp/ai';
 const agent = new https.Agent({ rejectUnauthorized: false });
 
 function makeRequest(url, body) {
