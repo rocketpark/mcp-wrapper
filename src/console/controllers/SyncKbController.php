@@ -111,16 +111,15 @@ class SyncKbController extends Controller
     {
         $this->stdout("Syncing Services...\n", Console::FG_YELLOW);
 
-        $section = Craft::$app->getSections()->getSectionByHandle('services');
-        if (!$section) {
-            $this->stderr("  Services section not found\n", Console::FG_RED);
-            return false;
-        }
-
         $entries = Entry::find()
             ->section('services')
             ->status('live')
             ->all();
+
+        if (empty($entries)) {
+            $this->stderr("  No services found\n", Console::FG_RED);
+            return false;
+        }
 
         $this->stdout("  Found " . count($entries) . " services\n");
 

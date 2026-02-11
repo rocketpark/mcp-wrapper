@@ -1,5 +1,5 @@
 # Session: mcp-wrapper
-Updated: 2026-02-10T20:22:14.037Z
+Updated: 2026-02-11T17:36:11.382Z
 
 ## Goal
 Maintain and improve a production Craft CMS plugin that exposes content to AI assistants (particularly Botpress) via the Model Context Protocol (MCP). Success = stable plugin operation on Jensen Hughes production site with proper Regional Leadership filtering, accurate phone numbers, and privacy protection.
@@ -92,12 +92,15 @@ Maintain and improve a production Craft CMS plugin that exposes content to AI as
     - Privacy: PASS - emails redirect to info@jensenhughes.com
     - Services/Industries: PASS - comprehensive responses
     - Results documented in BOTPRESS-COMPREHENSIVE-TEST-RESULTS-2026-02-09.md
-- Now: [→] Botpress KB Content Expansion
+- Now: [→] Botpress KB ready for production monitoring
 - Next:
   - [x] Create services sync script (sync-services-to-botpress.js)
+  - [x] Create industries sync script (sync-industries-to-botpress.js)
+  - [x] Create services KB content (data/botpress-services.txt) - uploaded to Botpress
+  - [x] Create industries KB content (data/botpress-industries.txt) - ready for upload
+  - [ ] Upload industries KB to Botpress Studio (manual - user task)
   - [ ] Test services sync with DRY_RUN=true
   - [ ] Add services sync to Forge scheduler (monthly: 0 2 1 * *)
-  - [ ] Create industries sync script
   - [ ] Monitor first 10-20 production conversations
 - Future: Consider implementing MCP best practice improvements (tool annotations, error codes, OAuth)
 
