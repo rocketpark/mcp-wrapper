@@ -17,13 +17,28 @@ use yii\web\Response;
 class McpController extends Controller
 {
     protected array|int|bool $allowAnonymous = true;
-    public $enableCsrfValidation = false; // MCP clients don't use CSRF tokens
 
     /**
-     * Validate IP access and rate limiting before any action
+     * CSRF validation is disabled by default for API clients.
+     * However, for session-authenticated requests (e.g., admin users),
+     * we re-enable CSRF protection in beforeAction().
+     */
+    public $enableCsrfValidation = false;
+
+    /**
+     * Validate IP access, CSRF (for session requests), and rate limiting before any action
      */
     public function beforeAction($action): bool
     {
+        // Enable CSRF for session-authenticated requests to prevent CSRF attacks
+        // API token requests (Authorization header) skip CSRF validation
+        $hasAuthHeader = Craft::$app->request->headers->has('Authorization');
+        $isSessionAuth = Craft::$app->getUser()->getIdentity() !== null && !$hasAuthHeader;
+
+        if ($isSessionAuth) {
+            $this->enableCsrfValidation = true;
+        }
+
         if (!parent::beforeAction($action)) {
             return false;
         }

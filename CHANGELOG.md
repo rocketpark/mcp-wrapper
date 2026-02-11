@@ -2,6 +2,49 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2.8.0 - 2026-02-11
+
+### Added - Botpress Knowledge Base Auto-Sync
+
+- **Console Command**: New `php craft mcp-wrapper/sync-kb` command for automated KB synchronization
+  - Syncs Services (52), Industries (13), Offices (97), and Regional Leadership (59) to Botpress
+  - Supports individual sync: `sync-kb/services`, `sync-kb/industries`, `sync-kb/offices`, `sync-kb/leadership`
+  - `--dry-run` option to preview without uploading
+  - `--force` option to sync even if no changes detected
+  - Designed for cron job automation (daily at 3am UTC recommended)
+
+- **Environment Variables**:
+  - `BOTPRESS_PAT` - Botpress Personal Access Token
+  - `BOTPRESS_BOT_ID` - Bot ID for API requests
+  - Optional: Configure multiple KB IDs in `mcpwrapper.php` via `botpressKbIds` array
+
+### Security Improvements
+
+- **SSRF Protection**: Added trusted domains allowlist validation for base URL
+  - Configure via `security.trustedDomains` in `mcpwrapper.php`
+  - Prevents SSRF attacks against cloud metadata services and internal networks
+
+- **Safe HTML Parsing**: Replaced regex-based HTML parsing with DOMDocument
+  - Phone number extraction now uses proper HTML parser
+  - Validates extracted phone numbers match expected format
+
+- **Custom Field Validation**: Added field handle validation in `craft_search_entries`
+  - Validates field handles against actual section field layouts
+  - Prevents arbitrary method calls on query objects
+
+- **Rate Limiter**: Fixed race condition with mutex locking
+  - Prevents concurrent requests from bypassing rate limits
+  - Uses Craft's mutex for atomic increment operations
+
+- **CSRF Protection**: Enabled CSRF validation for session-authenticated requests
+  - API token requests (Authorization header) skip CSRF
+  - Session-based admin requests now require CSRF token
+
+- **KB Upload Validation**: Added content validation before Botpress upload
+  - 10MB size limit
+  - UTF-8 encoding validation
+  - Control character sanitization
+
 ## 2.7.2 - 2026-02-09
 
 ### Fixed

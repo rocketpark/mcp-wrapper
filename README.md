@@ -1,6 +1,6 @@
 # MCP Wrapper for Craft CMS
 
-[![Version](https://img.shields.io/badge/version-2.7.2-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.8.0-blue.svg)](CHANGELOG.md)
 [![Craft CMS](https://img.shields.io/badge/Craft%20CMS-5.0%2B-orange.svg)](https://craftcms.com)
 [![PHP](https://img.shields.io/badge/PHP-8.2%2B-purple.svg)](https://php.net)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE.md)
@@ -399,6 +399,49 @@ Each schema can have different:
 - Sections/entry types
 - Field visibility
 - Permission levels
+
+## Console Commands
+
+### Knowledge Base Sync
+
+Automatically sync Craft CMS content to Botpress Knowledge Base:
+
+```bash
+# Sync all KBs (Services, Industries, Offices, Leadership)
+php craft mcp-wrapper/sync-kb
+
+# Sync specific content type
+php craft mcp-wrapper/sync-kb/services
+php craft mcp-wrapper/sync-kb/industries
+php craft mcp-wrapper/sync-kb/offices
+php craft mcp-wrapper/sync-kb/leadership
+
+# Preview without uploading
+php craft mcp-wrapper/sync-kb --dry-run
+
+# Force sync even if no changes
+php craft mcp-wrapper/sync-kb --force
+```
+
+**Required Environment Variables:**
+
+```bash
+BOTPRESS_PAT=your-personal-access-token
+BOTPRESS_BOT_ID=your-bot-id
+```
+
+**Recommended Cron Schedule:**
+
+```bash
+# Daily at 3am UTC
+0 3 * * * cd /path/to/project && php craft mcp-wrapper/sync-kb >> /var/log/kb-sync.log 2>&1
+```
+
+### Webhook Testing
+
+```bash
+php craft mcp-wrapper/webhook/test
+```
 
 ## Usage
 

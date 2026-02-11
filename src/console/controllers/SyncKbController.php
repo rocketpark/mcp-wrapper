@@ -382,11 +382,29 @@ class SyncKbController extends Controller
 
         $this->stdout("  Uploading to Botpress KB: {$kbId}\n");
 
+        // Validate content before upload
+        $maxSize = 10 * 1024 * 1024; // 10MB limit
+        if (strlen($content) > $maxSize) {
+            $this->stderr("  Content too large: " . number_format(strlen($content)) . " bytes (max " . number_format($maxSize) . ")\n", Console::FG_RED);
+            return false;
+        }
+
+        // Validate UTF-8 encoding
+        if (!mb_check_encoding($content, 'UTF-8')) {
+            $this->stderr("  Invalid UTF-8 encoding in content\n", Console::FG_RED);
+            return false;
+        }
+
+        // Sanitize content: remove null bytes and control characters (except newlines/tabs)
+        $content = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $content);
+
+        $this->stdout("  Content size: " . number_format(strlen($content)) . " bytes\n");
+
         // Create multipart form data
         $boundary = uniqid('boundary');
         $body = "--{$boundary}\r\n";
         $body .= "Content-Disposition: form-data; name=\"file\"; filename=\"{$filename}\"\r\n";
-        $body .= "Content-Type: text/plain\r\n\r\n";
+        $body .= "Content-Type: text/plain; charset=utf-8\r\n\r\n";
         $body .= $content . "\r\n";
         $body .= "--{$boundary}--\r\n";
 

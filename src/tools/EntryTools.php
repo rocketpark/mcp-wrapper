@@ -260,9 +260,31 @@ class EntryTools
                 );
             }
             
-            // Apply custom field filters
-            foreach ($customFields as $fieldHandle => $fieldValue) {
-                $query->{$fieldHandle}($fieldValue);
+            // Apply custom field filters with validation
+            if (!empty($customFields)) {
+                // Get valid field handles for the section (if specified)
+                $validFieldHandles = $this->getValidFieldHandles($params['section'] ?? null);
+
+                foreach ($customFields as $fieldHandle => $fieldValue) {
+                    // Validate field handle format (alphanumeric + underscore, doesn't start with number)
+                    if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $fieldHandle)) {
+                        Craft::warning("Invalid custom field handle format: {$fieldHandle}", 'mcp-wrapper');
+                        continue;
+                    }
+
+                    // If we have a valid fields list (section was specified), validate against it
+                    if (!empty($validFieldHandles) && !in_array($fieldHandle, $validFieldHandles, true)) {
+                        Craft::warning("Unknown custom field: {$fieldHandle}", 'mcp-wrapper');
+                        continue;
+                    }
+
+                    // Verify the method exists on the query object (extra safety)
+                    if (method_exists($query, $fieldHandle) || property_exists($query, $fieldHandle)) {
+                        $query->{$fieldHandle}($fieldValue);
+                    } else {
+                        Craft::warning("Field method not found on query: {$fieldHandle}", 'mcp-wrapper');
+                    }
+                }
             }
             
             // Get total count before limiting
@@ -568,20 +590,79 @@ class EntryTools
             $contactLinksEntries = $office->contactLinks->all() ?? [];
             if (count($contactLinksEntries) > 0) {
                 $contactLinksEntry = $contactLinksEntries[0] ?? null;
-                
+
                 if ($contactLinksEntry && isset($contactLinksEntry->contactDetails)) {
-                    // Extract phone from HTML: <a href="tel:+19259383550">+1 925 938 3550</a>
+                    // Extract phone from HTML using DOMDocument for safe parsing
                     $html = $contactLinksEntry->contactDetails;
-                    if (preg_match('/>([^<]+)<\/a>/', $html, $matches)) {
-                        $contactInfo['phone'] = trim($matches[1]);
-                    } elseif (preg_match('/tel:([^"]+)/', $html, $matches)) {
-                        // Fallback: extract from href
-                        $contactInfo['phone'] = trim($matches[1]);
+                    $phone = $this->extractPhoneFromHtml($html);
+                    if ($phone !== null) {
+                        $contactInfo['phone'] = $phone;
                     }
                 }
             }
 
             return Response::found('contactInfo', $contactInfo);
         });
+    }
+
+    /**
+     * Get valid field handles for a section
+     *
+     * @param string|null $sectionHandle The section handle, or null for all fields
+     * @return array Array of valid field handles
+     */
+    private function getValidFieldHandles(?string $sectionHandle): array
+    {
+        $validFields = [];
+
+        if ($sectionHandle !== null) {
+            // Get fields from the specific section's entry types
+            $section = Craft::$app->getEntries()->getSectionByHandle($sectionHandle);
+            if ($section) {
+                foreach ($section->getEntryTypes() as $entryType) {
+                    $fieldLayout = $entryType->getFieldLayout();
+                    if ($fieldLayout) {
+                        foreach ($fieldLayout->getCustomFields() as $field) {
+                            $validFields[] = $field->handle;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Return unique field handles
+        return array_unique($validFields);
+    }
+
+    /**
+     * Safely extract phone number from HTML using DOMDocument
+     *
+     * @param string $html The HTML containing the phone link
+     * @return string|null The extracted and validated phone number, or null if not found/invalid
+     */
+    private function extractPhoneFromHtml(string $html): ?string
+    {
+        if (empty($html)) {
+            return null;
+        }
+
+        // Use DOMDocument for safe HTML parsing
+        $doc = new \DOMDocument();
+        // Suppress warnings for malformed HTML, wrap in UTF-8 encoding declaration
+        @$doc->loadHTML('<?xml encoding="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+
+        $links = $doc->getElementsByTagName('a');
+        foreach ($links as $link) {
+            $href = $link->getAttribute('href');
+            if ($href && str_starts_with($href, 'tel:')) {
+                $phone = trim($link->textContent);
+                // Validate phone format: only allow digits, spaces, dashes, parens, plus sign
+                if (preg_match('/^\+?[\d\s\-()]+$/', $phone) && strlen($phone) >= 7) {
+                    return $phone;
+                }
+            }
+        }
+
+        return null;
     }
 }

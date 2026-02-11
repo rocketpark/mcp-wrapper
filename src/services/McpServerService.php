@@ -621,14 +621,30 @@ class McpServerService extends Component
      *
      * Uses the primary site's base URL instead of HTTP Host header
      * to prevent SSRF attacks via Host header manipulation.
+     * Validates against trusted domains allowlist if configured.
      *
      * @return string The trusted base URI
+     * @throws \Exception If base URL host is not in trusted domains list
      */
     private function getTrustedBaseUri(): string
     {
         // Use the primary site's configured base URL (from config, not request headers)
         $primarySite = Craft::$app->getSites()->getPrimarySite();
-        return rtrim($primarySite->getBaseUrl(), '/');
+        $baseUrl = rtrim($primarySite->getBaseUrl(), '/');
+
+        // Validate against trusted domains allowlist if configured
+        $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
+        $trustedDomains = $config['security']['trustedDomains'] ?? [];
+
+        if (!empty($trustedDomains)) {
+            $host = parse_url($baseUrl, PHP_URL_HOST);
+            if (!in_array($host, $trustedDomains, true)) {
+                Craft::error("Base URL host '{$host}' not in trusted domains list", 'mcp-wrapper');
+                throw new \Exception('Base URL host not in trusted domains list');
+            }
+        }
+
+        return $baseUrl;
     }
 
     /**
