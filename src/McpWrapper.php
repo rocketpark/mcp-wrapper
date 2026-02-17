@@ -197,8 +197,6 @@ class McpWrapper extends Plugin
         // Register built-in tool classes
         $toolRegistry->registerToolClass(EntryTools::class);
         $toolRegistry->registerToolClass(SystemTools::class);
-        
-        // TODO: Add more tool classes here or allow plugins to register their own
     }
     
     /**

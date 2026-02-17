@@ -11,7 +11,7 @@ use yii\base\Component;
  * Caches tool execution results to reduce duplicate queries and improve performance.
  * Supports configurable TTL and per-tool exclusion.
  * 
- * @author Rocket Park <hello@rocketpa.rk>
+ * @author Rocket Park <support@rocketpark.com>
  * @since 1.1.0
  */
 class ToolCacheService extends Component

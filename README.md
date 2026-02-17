@@ -3,7 +3,7 @@
 [![Version](https://img.shields.io/badge/version-2.8.0-blue.svg)](CHANGELOG.md)
 [![Craft CMS](https://img.shields.io/badge/Craft%20CMS-5.0%2B-orange.svg)](https://craftcms.com)
 [![PHP](https://img.shields.io/badge/PHP-8.2%2B-purple.svg)](https://php.net)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE.md)
+[![License](https://img.shields.io/badge/license-proprietary-blue.svg)](LICENSE.md)
 
 A production-ready Craft CMS plugin that exposes your content to AI assistants through the [Model Context Protocol (MCP)](https://modelcontextprotocol.io).
 

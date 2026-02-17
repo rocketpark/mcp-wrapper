@@ -25,10 +25,15 @@ class ManifestBuilderService extends Component
         try {
             $path = Craft::getAlias("{$this->cacheDir}/manifest-{$schemaHandle}.json");
 
-            if (!$forceRebuild && file_exists($path)) {
-                Craft::info("Loading cached manifest for schema: {$schemaHandle}", 'mcp-wrapper');
-                $cached = json_decode(file_get_contents($path), true);
-                if ($cached) return $cached;
+            if (!$forceRebuild) {
+                $contents = @file_get_contents($path);
+                if ($contents !== false) {
+                    Craft::info("Loading cached manifest for schema: {$schemaHandle}", 'mcp-wrapper');
+                    $cached = json_decode($contents, true);
+                    if ($cached) {
+                        return $cached;
+                    }
+                }
             }
 
             Craft::info("Generating manifest for schema: {$schemaHandle}", 'mcp-wrapper');
@@ -56,7 +61,11 @@ class ManifestBuilderService extends Component
             ? Craft::getAlias("{$this->cacheDir}/manifest-{$schemaHandle}.json")
             : Craft::getAlias("{$this->cacheDir}/manifest-*.json");
 
-        foreach (glob($pattern) as $file) @unlink($file);
+        foreach (glob($pattern) as $file) {
+            if (!unlink($file)) {
+                Craft::warning("Failed to delete manifest cache file: {$file}", 'mcp-wrapper');
+            }
+        }
     }
 
     private function generateManifest(string $token, string $schemaHandle): array
@@ -558,23 +567,6 @@ class ManifestBuilderService extends Component
             'Entries', 'Assets', 'Categories', 'Users', 'Tags' => 'relation',
             default => 'string',
         };
-    }
-
-    private function generateFilterSchema(array $fields): array
-    {
-        $filters = [];
-        foreach ($fields as $field) {
-            if (in_array($field['type'], ['string', 'number', 'datetime'])) {
-                $filters[$field['handle']] = ['eq' => $field['type']];
-            }
-            if ($field['type'] === 'relation' && !empty($field['relationTo'])) {
-                $filters[$field['handle']] = [
-                    'relatedTo' => $field['relationTo']['elementType'],
-                    'byHandle' => 'string',
-                ];
-            }
-        }
-        return $filters;
     }
 
     /**

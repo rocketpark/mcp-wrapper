@@ -95,6 +95,13 @@ return [
     // Process webhooks asynchronously to avoid blocking entry saves
     'webhookUseQueue' => true,  // false = send immediately (synchronous)
     
+    // SSE (Server-Sent Events) Settings
+    // Configure connection limits for the legacy SSE transport
+    'sse' => [
+        'maxDuration' => 3600,      // Maximum connection time in seconds (default: 1 hour)
+        'keepaliveInterval' => 15,  // Seconds between keepalive pings (default: 15)
+    ],
+
     // Site-Specific Settings
     // Configure site-specific behaviors without hardcoding values in the plugin
     // This keeps your site-specific configuration out of the public repository
