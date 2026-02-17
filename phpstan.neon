@@ -1,0 +1,10 @@
+parameters:
+    level: 6
+    paths:
+        - src
+    excludePaths:
+        - src/templates
+    # Craft CMS and Yii2 use magic methods extensively
+    checkMissingIterableValueType: false
+    # Allow dynamic properties from Craft's component system
+    checkGenericClassInNonGenericObjectType: false
