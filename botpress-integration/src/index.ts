@@ -176,11 +176,11 @@ export default new bp.Integration({
           }
         }
         
-        // CRITICAL: For team members, ALWAYS filter to Regional Leadership only
-        // This ensures only the 59 Regional Leaders are shown, not all 101 team members
+        // For team members: allow named person lookups to find anyone,
+        // but default browse/list queries to Regional Leadership only
         if (toolName === 'query_ourTeam') {
           const searchTerm = (queryArgs.search || '').toLowerCase()
-          logger.forBot().info(`Team member query - filtering to Regional Leadership only`)
+          logger.forBot().info(`Team member query - search: "${searchTerm}"`)
 
           // Get all team members to filter
           const result = await client.callTool(toolName, {
@@ -192,21 +192,48 @@ export default new bp.Integration({
             const data = JSON.parse(result.content[0].text)
             const allMembers = data.entries || []
 
-            // Filter to ONLY Regional Leadership members
-            const regionalLeaders = allMembers.filter((member: any) => {
-              const types = member.teamMemberType || []
-              return types.some((t: any) => {
-                const title = (t.title || '').toLowerCase()
-                return title.includes('regional leadership')
-              })
-            })
-
-            logger.forBot().info(`Found ${regionalLeaders.length} Regional Leaders from ${allMembers.length} total team members`)
-
-            // If search term provided, filter Regional Leaders by search
-            let filtered = regionalLeaders
+            // If searching for a specific person by name, search ALL members (not just Regional Leadership)
+            // This allows looking up experts like "Sean Lebel" who may not be Regional Leadership
             if (searchTerm) {
-              filtered = regionalLeaders.filter((member: any) => {
+              // First try exact name match across all members
+              const nameMatches = allMembers.filter((member: any) => {
+                const nameText = [
+                  member.title || '',
+                  member.fullName || '',
+                ].join(' ').toLowerCase()
+                return nameText.includes(searchTerm)
+              })
+
+              if (nameMatches.length > 0) {
+                logger.forBot().info(`Found ${nameMatches.length} team members matching name "${searchTerm}" (all members)`)
+                const limit = queryArgs.limit || 10
+                const offset = queryArgs.offset || 0
+                const paginatedResults = nameMatches.slice(offset, offset + limit)
+                return {
+                  content: [{
+                    type: 'text',
+                    text: JSON.stringify({
+                      entries: paginatedResults,
+                      _meta: {
+                        totalMatches: nameMatches.length,
+                        returned: paginatedResults.length,
+                        searchType: 'name_match'
+                      }
+                    })
+                  }],
+                }
+              }
+
+              // No name match found - fall through to Regional Leadership search by expertise/role
+              const regionalLeaders = allMembers.filter((member: any) => {
+                const types = member.teamMemberType || []
+                return types.some((t: any) => {
+                  const title = (t.title || '').toLowerCase()
+                  return title.includes('regional leadership')
+                })
+              })
+
+              const filtered = regionalLeaders.filter((member: any) => {
                 const searchableText = [
                   member.title || '',
                   member.role || '',
@@ -218,12 +245,41 @@ export default new bp.Integration({
                 return searchableText.includes(searchTerm)
               })
               logger.forBot().info(`After search filter: ${filtered.length} Regional Leaders match "${searchTerm}"`)
+
+              const limit = queryArgs.limit || 10
+              const offset = queryArgs.offset || 0
+              const paginatedResults = filtered.slice(offset, offset + limit)
+
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify({
+                    entries: paginatedResults,
+                    _meta: {
+                      totalRegionalLeaders: regionalLeaders.length,
+                      matchingSearch: filtered.length,
+                      returned: paginatedResults.length,
+                      searchType: 'regional_leadership_expertise'
+                    }
+                  })
+                }],
+              }
             }
 
-            // Apply pagination
+            // No search term: browse mode - show Regional Leadership only
+            const regionalLeaders = allMembers.filter((member: any) => {
+              const types = member.teamMemberType || []
+              return types.some((t: any) => {
+                const title = (t.title || '').toLowerCase()
+                return title.includes('regional leadership')
+              })
+            })
+
+            logger.forBot().info(`Browse mode: ${regionalLeaders.length} Regional Leaders from ${allMembers.length} total`)
+
             const limit = queryArgs.limit || 10
             const offset = queryArgs.offset || 0
-            const paginatedResults = filtered.slice(offset, offset + limit)
+            const paginatedResults = regionalLeaders.slice(offset, offset + limit)
 
             return {
               content: [{
@@ -232,8 +288,8 @@ export default new bp.Integration({
                   entries: paginatedResults,
                   _meta: {
                     totalRegionalLeaders: regionalLeaders.length,
-                    matchingSearch: filtered.length,
-                    returned: paginatedResults.length
+                    returned: paginatedResults.length,
+                    searchType: 'browse'
                   }
                 })
               }],
@@ -482,11 +538,36 @@ export default new bp.Integration({
             } else {
               // Skip sections known to be empty or misconfigured
               const emptyOrProblematicSections = [
-                'services', 'servicesBrowse', 'servicesBrowseEurope',
                 'podcasts', 'podcastsBrowse', 'podcastEpisodes'
               ]
               if (emptyOrProblematicSections.includes(section)) {
                 logger.forBot().info(`Skipping ${section} (known to be empty/misconfigured)`)
+                continue
+              }
+
+              // For services sections, search param only does exact title match,
+              // so fetch all and filter client-side (only ~20 services)
+              if (['services', 'servicesBrowse', 'servicesBrowseEurope'].includes(section)) {
+                const result = await client.callTool(`query_${section}`, {
+                  limit: 50,
+                })
+                if (result.content?.[0]?.text) {
+                  const data = JSON.parse(result.content[0].text)
+                  const entries = data.entries || data.results || []
+                  // Filter client-side by keyword match in title, summary, or capabilities
+                  const filtered = entries.filter((e: any) => {
+                    const text = [
+                      e.title || '',
+                      e.summary || '',
+                      e.slug || '',
+                      ...(e.capabilities || []).map((c: any) => c.title || c),
+                    ].join(' ').toLowerCase()
+                    return keywordList.some(kw => text.includes(kw.toLowerCase()))
+                  })
+                  if (filtered.length > 0) {
+                    relevantContent.push(...filtered)
+                  }
+                }
                 continue
               }
               
@@ -519,7 +600,7 @@ export default new bp.Integration({
 
         const sources = relevantContent.slice(0, 5).map(e => ({
           title: e.title,
-          url: e.url || `https://servicecurator.com/${e._section || 'content'}/${e.slug}`,
+          url: e.url || `https://www.jensenhughes.com/${e._section || 'content'}/${e.slug}`,
         }))
 
         return { answer, sources }

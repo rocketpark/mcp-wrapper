@@ -44,3 +44,4 @@ PRODUCTION-*.md
 # Backup files
 *.backup
 src/**/*.backup
+.playwright-mcp/

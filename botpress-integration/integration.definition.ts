@@ -10,7 +10,7 @@ export default new IntegrationDefinition({
   
   configuration: {
     schema: z.object({
-      mcpServerUrl: z.string().default('https://servicecurator.com').describe('Base URL of your Craft CMS MCP server'),
+      mcpServerUrl: z.string().describe('Base URL of your Craft CMS MCP server (e.g., https://www.jensenhughes.com)'),
       schemaHandle: z.string().default('public').describe('The GraphQL schema handle to use (e.g., public, ai, jensenhughes)'),
     }),
   },
