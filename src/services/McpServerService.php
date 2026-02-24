@@ -1028,7 +1028,7 @@ class McpServerService extends Component
                     
                     foreach ($possibleTypes as $type) {
                         $typeName = $type['name'];
-                        $fallbackFragments[] = "... on {$typeName} { id title slug uri dateCreated dateUpdated }";
+                        $fallbackFragments[] = "... on {$typeName} { id title slug uri url dateCreated dateUpdated }";
                     }
                     
                     Craft::info("Built fallback fragments for {$sectionHandle} from union type: " . count($fallbackFragments) . " types", 'mcp-wrapper');
@@ -1043,7 +1043,7 @@ class McpServerService extends Component
                 if ($section) {
                     foreach ($section->getEntryTypes() as $entryType) {
                         $typeName = $entryType->handle . '_Entry';
-                        $fallbackFragments[] = "... on {$typeName} { id title slug uri dateCreated dateUpdated }";
+                        $fallbackFragments[] = "... on {$typeName} { id title slug uri url dateCreated dateUpdated }";
                     }
                 }
             }
@@ -1059,7 +1059,7 @@ class McpServerService extends Component
                 // Ultimate fallback - try without inline fragments (will likely fail for union types)
                 Craft::warning("No entry types found for section {$sectionHandle}, query may fail", 'mcp-wrapper');
                 return sprintf(
-                    'query { %s(%s) { id title slug uri dateCreated dateUpdated } }',
+                    'query { %s(%s) { id title slug uri url dateCreated dateUpdated } }',
                     $sectionField,
                     implode(', ', $filters)
                 );
@@ -1182,7 +1182,7 @@ class McpServerService extends Component
             }
 
             // Build inline fragment for this entry type including basic fields
-            $basicFields = ['id', 'title', 'slug', 'uri', 'dateCreated', 'dateUpdated'];
+            $basicFields = ['id', 'title', 'slug', 'uri', 'url', 'dateCreated', 'dateUpdated'];
             $allFields = array_merge($basicFields, $fields);
             $fieldsStr = implode(' ', $allFields);
             $entryTypeFragments[] = "... on {$typeName} { {$fieldsStr} }";

@@ -600,7 +600,7 @@ export default new bp.Integration({
 
         const sources = relevantContent.slice(0, 5).map(e => ({
           title: e.title,
-          url: e.url || `https://www.jensenhughes.com/${e._section || 'content'}/${e.slug}`,
+          url: e.url || (e.uri ? `https://www.jensenhughes.com/${e.uri}` : `https://www.jensenhughes.com/${e.slug}`),
         }))
 
         return { answer, sources }
