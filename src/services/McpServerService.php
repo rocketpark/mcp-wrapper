@@ -3,7 +3,6 @@ namespace rocketpark\mcpwrapper\services;
 
 use Craft;
 use craft\base\Component;
-use GuzzleHttp\Client;
 use rocketpark\mcpwrapper\support\GraphQLSanitizer;
 use rocketpark\mcpwrapper\support\RequestTimeoutException;
 use yii\web\Response;
@@ -617,61 +616,20 @@ class McpServerService extends Component
     }
 
     /**
-     * Get trusted base URI for internal API requests
-     *
-     * Uses the primary site's base URL instead of HTTP Host header
-     * to prevent SSRF attacks via Host header manipulation.
-     * Validates against trusted domains allowlist if configured.
-     *
-     * @return string The trusted base URI
-     * @throws \Exception If base URL host is not in trusted domains list
-     */
-    private function getTrustedBaseUri(): string
-    {
-        // Use the primary site's configured base URL (from config, not request headers)
-        $primarySite = Craft::$app->getSites()->getPrimarySite();
-        $baseUrl = rtrim($primarySite->getBaseUrl(), '/');
-
-        // Validate against trusted domains allowlist if configured
-        $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
-        $trustedDomains = $config['security']['trustedDomains'] ?? [];
-
-        if (!empty($trustedDomains)) {
-            $host = parse_url($baseUrl, PHP_URL_HOST);
-            if (!in_array($host, $trustedDomains, true)) {
-                Craft::error("Base URL host '{$host}' not in trusted domains list", 'mcp-wrapper');
-                throw new \Exception('Base URL host not in trusted domains list');
-            }
-        }
-
-        return $baseUrl;
-    }
-
-    /**
      * Introspect GraphQL schema to get available types
      */
     private function introspectGraphQLSchema(string $token): array
     {
         try {
-            $client = new Client([
-                'base_uri' => $this->getTrustedBaseUri(),
-                'timeout' => 10,
-                'verify' => !str_ends_with($this->getTrustedBaseUri(), '.test'),
-            ]);
+            $gqlService = Craft::$app->getGql();
+            $gqlToken = $gqlService->getTokenByAccessToken($token);
+            $schema = $gqlToken->getSchema();
 
             $query = '{ __schema { types { name } } }';
 
-            Craft::info("Introspecting GraphQL schema", 'mcp-wrapper');
-            
-            $response = $client->post('/api', [
-                'headers' => [
-                    'Authorization' => "Bearer {$token}",
-                    'Content-Type' => 'application/json',
-                ],
-                'json' => ['query' => $query],
-            ]);
+            Craft::info("Introspecting GraphQL schema via internal API", 'mcp-wrapper');
 
-            $data = json_decode($response->getBody()->getContents(), true);
+            $data = $gqlService->executeQuery($schema, $query);
             
             if (!isset($data['data']['__schema'])) {
                 throw new \Exception('GraphQL introspection returned invalid data');
@@ -1005,25 +963,16 @@ class McpServerService extends Component
                 $unionTypeName = $sectionHandle . 'SectionEntryUnion';
                 if (in_array($unionTypeName, $availableTypes)) {
                     // Query the union type to get possible types
-                    $client = new \GuzzleHttp\Client([
-                        'base_uri' => $this->getTrustedBaseUri(),
-                        'timeout' => 10,
-                    ]);
+                    $gqlService = Craft::$app->getGql();
+                    $gqlToken = $gqlService->getTokenByAccessToken($token);
+                    $gqlSchema = $gqlToken->getSchema();
 
                     $introspectionQuery = sprintf(
                         '{ __type(name: "%s") { possibleTypes { name } } }',
                         $unionTypeName
                     );
-                    
-                    $response = $client->post('/api', [
-                        'headers' => [
-                            'Authorization' => 'Bearer ' . $token,
-                            'Content-Type' => 'application/json',
-                        ],
-                        'json' => ['query' => $introspectionQuery],
-                    ]);
-                    
-                    $data = json_decode($response->getBody()->getContents(), true);
+
+                    $data = $gqlService->executeQuery($gqlSchema, $introspectionQuery);
                     $possibleTypes = $data['data']['__type']['possibleTypes'] ?? [];
                     
                     foreach ($possibleTypes as $type) {
@@ -1192,35 +1141,26 @@ class McpServerService extends Component
     }
 
     /**
-     * Send GraphQL request to Craft API
+     * Send GraphQL request via Craft's internal GraphQL execution API
      */
     private function sendGraphQLRequest(string $token, string $query): array
     {
         try {
-            $client = new \GuzzleHttp\Client([
-                'base_uri' => $this->getTrustedBaseUri(),
-                'timeout' => 10,
-                'verify' => !str_ends_with($this->getTrustedBaseUri(), '.test'),
-            ]);
+            $gqlService = Craft::$app->getGql();
+            $gqlToken = $gqlService->getTokenByAccessToken($token);
+            $schema = $gqlToken->getSchema();
 
-            $response = $client->post('/api', [
-                'headers' => [
-                    'Authorization' => 'Bearer ' . $token,
-                    'Content-Type' => 'application/json',
-                ],
-                'json' => ['query' => $query],
-            ]);
+            $result = $gqlService->executeQuery($schema, $query);
 
-            return json_decode($response->getBody()->getContents(), true);
-        } catch (\GuzzleHttp\Exception\RequestException $e) {
-            Craft::error("GraphQL request failed: {$e->getMessage()}", 'mcp-wrapper');
-            if ($e->hasResponse()) {
-                $body = $e->getResponse()->getBody()->getContents();
-                Craft::error("Response body: {$body}", 'mcp-wrapper');
-            }
+            return $result;
+        } catch (\craft\errors\GqlException $e) {
+            Craft::error("Internal GraphQL execution failed: {$e->getMessage()}", 'mcp-wrapper');
             throw new \Exception('GraphQL request failed: ' . $e->getMessage(), -32603);
+        } catch (\InvalidArgumentException $e) {
+            Craft::error("Invalid GraphQL access token: {$e->getMessage()}", 'mcp-wrapper');
+            throw new \Exception('Invalid GraphQL access token', -32603);
         } catch (\Exception $e) {
-            Craft::error("Unexpected error in GraphQL request: {$e->getMessage()}", 'mcp-wrapper');
+            Craft::error("Unexpected error in GraphQL execution: {$e->getMessage()}", 'mcp-wrapper');
             throw $e;
         }
     }
