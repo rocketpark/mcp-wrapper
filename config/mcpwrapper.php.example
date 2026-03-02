@@ -9,12 +9,13 @@
 
 return [
     // GraphQL Schema Mapping
-    // Map schema handles to GraphQL bearer tokens from Craft CP
-    // Get tokens from Settings > GraphQL > Schemas
+    // Map URL handles to GraphQL schema identifiers
+    // Values can be an access token OR a schema name from Craft CP > Settings > GraphQL > Schemas
+    // Schema name lookup is tried as fallback when the value is not a valid access token
     'schemas' => [
-        'MCPSchema' => getenv('MCP_GQLSCHEMA_TOKEN'),
-        // 'public' => getenv('MCP_PUBLIC_TOKEN'),
-        // 'internal' => getenv('MCP_INTERNAL_TOKEN'),
+        'MCPSchema' => getenv('MCP_GQLSCHEMA_TOKEN') ?: 'MCPSchema',
+        // 'public' => getenv('MCP_PUBLIC_TOKEN') ?: 'Public Schema',
+        // 'internal' => getenv('MCP_INTERNAL_TOKEN') ?: 'Internal Schema',
     ],
     
     // Security Settings

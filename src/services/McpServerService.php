@@ -582,6 +582,36 @@ class McpServerService extends Component
     }
 
     /**
+     * Resolve a GqlSchema from a config value (token string or schema name)
+     * Tries access token first for backwards compatibility, falls back to schema name lookup
+     */
+    private function resolveGqlSchema(string $tokenOrSchemaName): \craft\models\GqlSchema
+    {
+        $gqlService = Craft::$app->getGql();
+
+        // Try as access token first (backwards compatibility)
+        if (!empty($tokenOrSchemaName)) {
+            try {
+                $gqlToken = $gqlService->getTokenByAccessToken($tokenOrSchemaName);
+                return $gqlToken->getSchema();
+            } catch (\InvalidArgumentException $e) {
+                // Not a valid token, try as schema name
+                Craft::info("Config value is not a valid access token, trying as schema name: {$tokenOrSchemaName}", 'mcp-wrapper');
+            }
+        }
+
+        // Try as schema name
+        foreach ($gqlService->getSchemas() as $schema) {
+            if ($schema->name === $tokenOrSchemaName) {
+                Craft::info("Resolved GraphQL schema by name: {$tokenOrSchemaName}", 'mcp-wrapper');
+                return $schema;
+            }
+        }
+
+        throw new \Exception("Could not resolve GraphQL schema from '{$tokenOrSchemaName}' - not a valid access token or schema name");
+    }
+
+    /**
      * Get sections accessible via this schema
      */
     private function getSectionsForSchema(string $token): array
@@ -621,9 +651,8 @@ class McpServerService extends Component
     private function introspectGraphQLSchema(string $token): array
     {
         try {
+            $schema = $this->resolveGqlSchema($token);
             $gqlService = Craft::$app->getGql();
-            $gqlToken = $gqlService->getTokenByAccessToken($token);
-            $schema = $gqlToken->getSchema();
 
             $query = '{ __schema { types { name } } }';
 
@@ -963,9 +992,8 @@ class McpServerService extends Component
                 $unionTypeName = $sectionHandle . 'SectionEntryUnion';
                 if (in_array($unionTypeName, $availableTypes)) {
                     // Query the union type to get possible types
+                    $gqlSchema = $this->resolveGqlSchema($token);
                     $gqlService = Craft::$app->getGql();
-                    $gqlToken = $gqlService->getTokenByAccessToken($token);
-                    $gqlSchema = $gqlToken->getSchema();
 
                     $introspectionQuery = sprintf(
                         '{ __type(name: "%s") { possibleTypes { name } } }',
@@ -1146,22 +1174,13 @@ class McpServerService extends Component
     private function sendGraphQLRequest(string $token, string $query): array
     {
         try {
+            $schema = $this->resolveGqlSchema($token);
             $gqlService = Craft::$app->getGql();
-            $gqlToken = $gqlService->getTokenByAccessToken($token);
-            $schema = $gqlToken->getSchema();
 
-            $result = $gqlService->executeQuery($schema, $query);
-
-            return $result;
-        } catch (\craft\errors\GqlException $e) {
-            Craft::error("Internal GraphQL execution failed: {$e->getMessage()}", 'mcp-wrapper');
-            throw new \Exception('GraphQL request failed: ' . $e->getMessage(), -32603);
-        } catch (\InvalidArgumentException $e) {
-            Craft::error("Invalid GraphQL access token: {$e->getMessage()}", 'mcp-wrapper');
-            throw new \Exception('Invalid GraphQL access token', -32603);
+            return $gqlService->executeQuery($schema, $query);
         } catch (\Exception $e) {
-            Craft::error("Unexpected error in GraphQL execution: {$e->getMessage()}", 'mcp-wrapper');
-            throw $e;
+            Craft::error("GraphQL execution failed: {$e->getMessage()}", 'mcp-wrapper');
+            throw new \Exception('GraphQL request failed: ' . $e->getMessage(), -32603);
         }
     }
     
