@@ -594,7 +594,7 @@ class McpServerService extends Component
             try {
                 $gqlToken = $gqlService->getTokenByAccessToken($tokenOrSchemaName);
                 return $gqlToken->getSchema();
-            } catch (\InvalidArgumentException $e) {
+            } catch (\yii\base\InvalidArgumentException | \InvalidArgumentException $e) {
                 // Not a valid token, try as schema name
                 Craft::info("Config value is not a valid access token, trying as schema name: {$tokenOrSchemaName}", 'mcp-wrapper');
             }
