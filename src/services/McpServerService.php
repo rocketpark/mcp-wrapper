@@ -1098,20 +1098,47 @@ class McpServerService extends Component
         $availableTypes = array_column($schema['types'], 'name');
         Craft::info("Available GraphQL types for {$sectionHandle}: " . implode(', ', array_filter($availableTypes, fn($t) => str_contains($t, 'Entry'))), 'mcp-wrapper');
 
+        // Get the actual union type members for this section to avoid invalid fragment spreads
+        // The union type contains only the entry types that belong to THIS section in GraphQL
+        $unionTypeName = $sectionHandle . 'SectionEntryUnion';
+        $unionMembers = [];
+        if (in_array($unionTypeName, $availableTypes, true)) {
+            try {
+                $gqlSchema = $this->resolveGqlSchema($token);
+                $gqlService = Craft::$app->getGql();
+                $introspectionQuery = sprintf(
+                    '{ __type(name: "%s") { possibleTypes { name } } }',
+                    $unionTypeName
+                );
+                $data = $gqlService->executeQuery($gqlSchema, $introspectionQuery);
+                $possibleTypes = $data['data']['__type']['possibleTypes'] ?? [];
+                $unionMembers = array_column($possibleTypes, 'name');
+                Craft::info("Union {$unionTypeName} has types: " . implode(', ', $unionMembers), 'mcp-wrapper');
+            } catch (\Exception $e) {
+                Craft::warning("Failed to introspect union type {$unionTypeName}: {$e->getMessage()}", 'mcp-wrapper');
+            }
+        }
+
         $entryTypeFragments = [];
         foreach ($section->getEntryTypes() as $entryType) {
             // GraphQL type name format is: typeHandle_Entry
             $typeName = $entryType->handle . '_Entry';
             
-            // Skip entry types that aren't registered in the current GraphQL schema
-            if (!in_array($typeName, $availableTypes, true)) {
+            // If we have union members, check against those (most accurate)
+            // Otherwise fall back to checking available schema types
+            if (!empty($unionMembers)) {
+                if (!in_array($typeName, $unionMembers, true)) {
+                    Craft::info("Skipping type not in union: {$typeName} (not in {$unionTypeName})", 'mcp-wrapper');
+                    continue;
+                }
+            } elseif (!in_array($typeName, $availableTypes, true)) {
                 Craft::info("Skipping unregistered type: {$typeName} (not in schema)", 'mcp-wrapper');
                 continue;
             }
             
             // Include all entry types registered in GraphQL, regardless of entry count
             // This ensures queries work even if sections are empty or entries are disabled
-            Craft::info("Including type: {$typeName} in query", 'mcp-wrapper');
+            Craft::info("Including type: {$typeName} in query for {$sectionHandle}", 'mcp-wrapper');
 
             $fields = [];
             foreach ($entryType->getFieldLayout()->getCustomFields() as $field) {
@@ -1139,6 +1166,10 @@ class McpServerService extends Component
                     $field instanceof \craft\fields\Users ||
                     $field instanceof \craft\fields\Assets) {
                     $fields[] = "{$handle} { id title }";
+                }
+                // Handle Linkit link fields (require sub-selection for Linkit_Link type)
+                elseif (str_contains($fieldClass, 'linkit') || str_contains($fieldClass, 'LinkIt') || str_contains($fieldClass, 'Linkit')) {
+                    $fields[] = "{$handle} { url text type target }";
                 }
                 // Skip Matrix and other complex field types that require special handling
                 elseif ($field instanceof \craft\fields\Matrix ||
