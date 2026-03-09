@@ -1,20 +1,20 @@
 {# 
 MCP Wrapper Analytics Dashboard
-Displays performance metrics and usage statistics
+Displays performance metrics and usage statistics for the plugin CP section
 #}
 
 {% extends "_layouts/cp" %}
 {% import "_includes/forms" as forms %}
 
-{% set title = "MCP Analytics Dashboard" %}
+{% set title = "MCP Analytics" %}
+{% set selectedSubnavItem = "analytics" %}
 {% set fullPageForm = false %}
 
 {% block content %}
 <div id="mcp-analytics-dashboard">
-    <!-- Header Controls -->
-    <div class="flex justify-between items-center mb-6">
-        <div class="flex gap-4">
-            <!-- Schema Selector -->
+    {# Header Controls #}
+    <div class="mcp-controls">
+        <div class="mcp-controls-left">
             {{ forms.selectField({
                 label: 'Schema',
                 id: 'schema-select',
@@ -22,8 +22,7 @@ Displays performance metrics and usage statistics
                 value: selectedSchema,
                 options: schemas|map(s => { label: s, value: s }),
             }) }}
-            
-            <!-- Date Range -->
+
             {{ forms.selectField({
                 label: 'Time Range',
                 id: 'days-select',
@@ -37,67 +36,66 @@ Displays performance metrics and usage statistics
                 ],
             }) }}
         </div>
-        
-        <div class="flex gap-2">
+
+        <div class="mcp-controls-right">
             <button type="button" class="btn" id="refresh-btn">
                 <span class="spinner hidden" id="refresh-spinner"></span>
                 Refresh
             </button>
-            <a href="{{ actionUrl('mcp-wrapper/analytics/export', { 
-                schemaHandle: selectedSchema, 
-                days: days 
-            }) }}" class="btn">Export CSV</a>
+            {% if canExport is defined and canExport %}
+                <a href="{{ actionUrl('mcp-wrapper/analytics/export', { 
+                    schemaHandle: selectedSchema, 
+                    days: days 
+                }) }}" class="btn">Export CSV</a>
+            {% endif %}
         </div>
     </div>
-    
-    <!-- Loading State -->
-    <div id="loading-state" class="text-center py-12">
+
+    {# Loading State #}
+    <div id="loading-state" class="mcp-loading">
         <div class="spinner spinner-big"></div>
-        <p class="mt-4 text-gray-500">Loading analytics...</p>
+        <p>Loading analytics&hellip;</p>
     </div>
-    
-    <!-- Dashboard Content -->
+
+    {# Dashboard Content #}
     <div id="dashboard-content" class="hidden">
-        <!-- Summary Cards -->
-        <div class="grid grid-cols-4 gap-4 mb-6">
-            <div class="stat-card">
-                <div class="stat-label">Total Requests</div>
-                <div class="stat-value" id="stat-total">-</div>
+        {# Summary Cards #}
+        <div class="mcp-stat-grid">
+            <div class="mcp-stat-card">
+                <div class="mcp-stat-label">Total Requests</div>
+                <div class="mcp-stat-value" id="stat-total">&ndash;</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">Success Rate</div>
-                <div class="stat-value" id="stat-success-rate">-</div>
+            <div class="mcp-stat-card">
+                <div class="mcp-stat-label">Success Rate</div>
+                <div class="mcp-stat-value" id="stat-success-rate">&ndash;</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">Avg Response Time</div>
-                <div class="stat-value" id="stat-avg-duration">-</div>
+            <div class="mcp-stat-card">
+                <div class="mcp-stat-label">Avg Response Time</div>
+                <div class="mcp-stat-value" id="stat-avg-duration">&ndash;</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">Cache Hit Rate</div>
-                <div class="stat-value" id="stat-cache-rate">-</div>
-            </div>
-        </div>
-        
-        <!-- Charts Row -->
-        <div class="grid grid-cols-2 gap-6 mb-6">
-            <!-- Top Tools -->
-            <div class="card">
-                <h2 class="text-lg font-semibold mb-4">Top Tools by Usage</h2>
-                <div id="top-tools-chart"></div>
-            </div>
-            
-            <!-- Response Time Distribution -->
-            <div class="card">
-                <h2 class="text-lg font-semibold mb-4">Response Time Distribution</h2>
-                <div id="response-time-chart"></div>
+            <div class="mcp-stat-card">
+                <div class="mcp-stat-label">Cache Hit Rate</div>
+                <div class="mcp-stat-value" id="stat-cache-rate">&ndash;</div>
             </div>
         </div>
-        
-        <!-- Tables Row -->
-        <div class="grid grid-cols-2 gap-6">
-            <!-- Slowest Requests -->
-            <div class="card">
-                <h2 class="text-lg font-semibold mb-4">Slowest Requests</h2>
+
+        {# Top Tools + Response Time #}
+        <div class="mcp-two-col">
+            <div class="mcp-panel">
+                <h2>Top Tools by Usage</h2>
+                <div id="top-tools-chart" class="mcp-chart-area"></div>
+            </div>
+
+            <div class="mcp-panel">
+                <h2>Response Time Distribution</h2>
+                <div id="response-time-chart" class="mcp-chart-area"></div>
+            </div>
+        </div>
+
+        {# Slowest Requests + Errors #}
+        <div class="mcp-two-col">
+            <div class="mcp-panel">
+                <h2>Slowest Requests</h2>
                 <table class="data fullwidth">
                     <thead>
                         <tr>
@@ -107,14 +105,13 @@ Displays performance metrics and usage statistics
                         </tr>
                     </thead>
                     <tbody id="slowest-requests-table">
-                        <tr><td colspan="3" class="text-center text-gray-500">No data</td></tr>
+                        <tr><td colspan="3" class="zilch">No data</td></tr>
                     </tbody>
                 </table>
             </div>
-            
-            <!-- Error Log -->
-            <div class="card">
-                <h2 class="text-lg font-semibold mb-4">Recent Errors</h2>
+
+            <div class="mcp-panel">
+                <h2>Recent Errors</h2>
                 <table class="data fullwidth">
                     <thead>
                         <tr>
@@ -124,7 +121,7 @@ Displays performance metrics and usage statistics
                         </tr>
                     </thead>
                     <tbody id="errors-table">
-                        <tr><td colspan="3" class="text-center text-gray-500">No errors</td></tr>
+                        <tr><td colspan="3" class="zilch">No errors</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -133,35 +130,153 @@ Displays performance metrics and usage statistics
 </div>
 
 <style>
-.stat-card {
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    padding: 1.5rem;
-}
+    /* ── Controls bar ─────────────────────────────────── */
+    .mcp-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+    .mcp-controls-left {
+        display: flex;
+        gap: 16px;
+        align-items: flex-end;
+    }
+    .mcp-controls-left .field {
+        margin-bottom: 0;
+    }
+    .mcp-controls-right {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
 
-.stat-label {
-    font-size: 0.875rem;
-    color: #6b7280;
-    margin-bottom: 0.5rem;
-}
+    /* ── Loading ──────────────────────────────────────── */
+    .mcp-loading {
+        text-align: center;
+        padding: 48px 0;
+    }
+    .mcp-loading p {
+        margin-top: 16px;
+        color: var(--gray-500);
+    }
 
-.stat-value {
-    font-size: 2rem;
-    font-weight: 600;
-    color: #111827;
-}
+    /* ── Stat cards ───────────────────────────────────── */
+    .mcp-stat-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+    @media (max-width: 900px) {
+        .mcp-stat-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    .mcp-stat-card {
+        background: var(--white);
+        border: 1px solid var(--hairline-color);
+        border-radius: var(--large-border-radius, 8px);
+        padding: 20px 24px;
+    }
+    .mcp-stat-label {
+        font-size: 13px;
+        color: var(--gray-500);
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.025em;
+    }
+    .mcp-stat-value {
+        font-size: 28px;
+        font-weight: 600;
+        color: var(--text-color);
+        line-height: 1.2;
+    }
 
-.card {
-    background: white;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    padding: 1.5rem;
-}
+    /* ── Two-column layout ────────────────────────────── */
+    .mcp-two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        margin-bottom: 24px;
+    }
+    @media (max-width: 900px) {
+        .mcp-two-col {
+            grid-template-columns: 1fr;
+        }
+    }
 
-#top-tools-chart, #response-time-chart {
-    height: 300px;
-}
+    /* ── Panel (card) ─────────────────────────────────── */
+    .mcp-panel {
+        background: var(--white);
+        border: 1px solid var(--hairline-color);
+        border-radius: var(--large-border-radius, 8px);
+        padding: 24px;
+    }
+    .mcp-panel h2 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0 0 16px;
+        color: var(--text-color);
+    }
+
+    /* ── Chart area ───────────────────────────────────── */
+    .mcp-chart-area {
+        min-height: 200px;
+    }
+
+    /* ── Tool row inside top-tools chart ──────────────── */
+    .mcp-tool-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--hairline-color);
+    }
+    .mcp-tool-row:last-child {
+        border-bottom: none;
+    }
+    .mcp-tool-name {
+        font-weight: 500;
+        color: var(--text-color);
+        word-break: break-all;
+    }
+    .mcp-tool-meta {
+        display: flex;
+        gap: 16px;
+        flex-shrink: 0;
+        margin-left: 12px;
+    }
+    .mcp-tool-meta span {
+        font-size: 13px;
+        color: var(--gray-500);
+        white-space: nowrap;
+    }
+
+    /* ── Badge helpers ────────────────────────────────── */
+    .mcp-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .mcp-badge--warning {
+        background: var(--yellow-050, #fef3c7);
+        color: var(--yellow-800, #92400e);
+    }
+    .mcp-badge--danger {
+        background: var(--red-050, #fef2f2);
+        color: var(--red-600, #dc2626);
+    }
+
+    /* ── Misc ─────────────────────────────────────────── */
+    .zilch {
+        text-align: center;
+        color: var(--gray-500);
+        padding: 16px 0;
+    }
 </style>
 
 <script>
@@ -171,33 +286,36 @@ Displays performance metrics and usage statistics
     const refreshBtn = document.getElementById('refresh-btn');
     const loadingState = document.getElementById('loading-state');
     const dashboardContent = document.getElementById('dashboard-content');
-    
-    let currentData = null;
-    
-    // Load analytics data
+
+    // Escape HTML to prevent XSS from untrusted log data
+    function esc(str) {
+        const el = document.createElement('span');
+        el.textContent = str;
+        return el.innerHTML;
+    }
+
     async function loadAnalytics() {
         const schema = schemaSelect?.value || '{{ selectedSchema }}';
         const days = daysSelect?.value || {{ days }};
-        
+
         loadingState.classList.remove('hidden');
         dashboardContent.classList.add('hidden');
-        
+
         try {
             const response = await fetch(
-                `{{ actionUrl('mcp-wrapper/analytics/data') }}?schemaHandle=${schema}&days=${days}`,
+                `{{ actionUrl('mcp-wrapper/analytics/data') }}?schemaHandle=${encodeURIComponent(schema)}&days=${encodeURIComponent(days)}`,
                 {
                     headers: {
                         'Accept': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-Token': '{{ craft.app.request.csrfToken }}'
                     }
                 }
             );
-            
+
             const result = await response.json();
-            
             if (result.success) {
-                currentData = result.data;
-                renderDashboard(currentData);
+                renderDashboard(result.data);
             } else {
                 Craft.cp.displayError('Failed to load analytics');
             }
@@ -209,87 +327,99 @@ Displays performance metrics and usage statistics
             dashboardContent.classList.remove('hidden');
         }
     }
-    
-    // Render dashboard with data
+
     function renderDashboard(data) {
-        // Summary stats
-        document.getElementById('stat-total').textContent = 
+        document.getElementById('stat-total').textContent =
             (data.total_requests || 0).toLocaleString();
-        document.getElementById('stat-success-rate').textContent = 
+        document.getElementById('stat-success-rate').textContent =
             (data.success_rate || 0).toFixed(1) + '%';
-        document.getElementById('stat-avg-duration').textContent = 
+        document.getElementById('stat-avg-duration').textContent =
             (data.avg_duration_ms || 0).toFixed(0) + 'ms';
-        document.getElementById('stat-cache-rate').textContent = 
+        document.getElementById('stat-cache-rate').textContent =
             (data.cache_hit_rate || 0).toFixed(1) + '%';
-        
-        // Top tools table
+
         renderTopTools(data.top_tools || []);
-        
-        // Slowest requests table
+        renderResponseTimeDistribution(data);
         renderSlowestRequests(data.slowest_requests || []);
-        
-        // Errors table  
         renderErrors(data.recent_errors || []);
     }
-    
+
     function renderTopTools(tools) {
-        const chartDiv = document.getElementById('top-tools-chart');
+        const el = document.getElementById('top-tools-chart');
         if (!tools.length) {
-            chartDiv.innerHTML = '<p class="text-center text-gray-500">No data available</p>';
+            el.innerHTML = '<p class="zilch">No data available</p>';
             return;
         }
-        
-        const html = tools.slice(0, 10).map(tool => `
-            <div class="flex justify-between items-center py-2 border-b">
-                <span class="font-medium">${tool.tool}</span>
-                <div class="flex gap-4">
-                    <span class="text-gray-600">${tool.count} calls</span>
-                    <span class="text-gray-500">${tool.avg_duration_ms.toFixed(0)}ms avg</span>
-                </div>
-            </div>
-        `).join('');
-        
-        chartDiv.innerHTML = html;
+        el.innerHTML = tools.slice(0, 10).map(function(t) {
+            return '<div class="mcp-tool-row">'
+                + '<span class="mcp-tool-name">' + esc(t.tool) + '</span>'
+                + '<span class="mcp-tool-meta">'
+                + '<span>' + Number(t.count).toLocaleString() + ' calls</span>'
+                + '<span>' + Number(t.avg_duration_ms).toFixed(0) + 'ms avg</span>'
+                + '</span></div>';
+        }).join('');
     }
-    
+
+    function renderResponseTimeDistribution(data) {
+        const el = document.getElementById('response-time-chart');
+        if (!data.top_tools || !data.top_tools.length) {
+            el.innerHTML = '<p class="zilch">No data available</p>';
+            return;
+        }
+        // Simple text-based distribution from available data
+        const buckets = { '<100ms': 0, '100-500ms': 0, '500ms-1s': 0, '>1s': 0 };
+        (data.slowest_requests || []).forEach(function(r) {
+            var d = r.duration_ms || 0;
+            if (d < 100) { buckets['<100ms']++; }
+            else if (d < 500) { buckets['100-500ms']++; }
+            else if (d < 1000) { buckets['500ms-1s']++; }
+            else { buckets['>1s']++; }
+        });
+        var html = '';
+        for (var key in buckets) {
+            html += '<div class="mcp-tool-row">'
+                + '<span class="mcp-tool-name">' + esc(key) + '</span>'
+                + '<span class="mcp-tool-meta"><span>' + buckets[key] + ' requests</span></span>'
+                + '</div>';
+        }
+        el.innerHTML = html;
+    }
+
     function renderSlowestRequests(requests) {
         const tbody = document.getElementById('slowest-requests-table');
         if (!requests.length) {
-            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-gray-500">No data</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="3" class="zilch">No data</td></tr>';
             return;
         }
-        
-        tbody.innerHTML = requests.slice(0, 10).map(req => `
-            <tr>
-                <td><code>${req.tool}</code></td>
-                <td><span class="badge ${req.duration_ms > 1000 ? 'badge-red' : 'badge-yellow'}">${req.duration_ms.toFixed(0)}ms</span></td>
-                <td class="text-sm text-gray-500">${new Date(req.timestamp).toLocaleString()}</td>
-            </tr>
-        `).join('');
+        tbody.innerHTML = requests.slice(0, 10).map(function(req) {
+            var cls = (req.duration_ms > 1000) ? 'mcp-badge--danger' : 'mcp-badge--warning';
+            return '<tr>'
+                + '<td><code>' + esc(req.tool) + '</code></td>'
+                + '<td><span class="mcp-badge ' + cls + '">' + Number(req.duration_ms).toFixed(0) + 'ms</span></td>'
+                + '<td style="color:var(--gray-500); font-size:13px;">' + esc(new Date(req.timestamp).toLocaleString()) + '</td>'
+                + '</tr>';
+        }).join('');
     }
-    
+
     function renderErrors(errors) {
         const tbody = document.getElementById('errors-table');
         if (!errors.length) {
-            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-gray-500">No errors</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="3" class="zilch">No errors</td></tr>';
             return;
         }
-        
-        tbody.innerHTML = errors.slice(0, 10).map(err => `
-            <tr>
-                <td><code>${err.tool || 'unknown'}</code></td>
-                <td class="text-sm">${err.error_message || 'Unknown error'}</td>
-                <td class="text-sm text-gray-500">${new Date(err.timestamp).toLocaleString()}</td>
-            </tr>
-        `).join('');
+        tbody.innerHTML = errors.slice(0, 10).map(function(err) {
+            return '<tr>'
+                + '<td><code>' + esc(err.tool || 'unknown') + '</code></td>'
+                + '<td style="font-size:13px;">' + esc(err.error_message || 'Unknown error') + '</td>'
+                + '<td style="color:var(--gray-500); font-size:13px;">' + esc(new Date(err.timestamp).toLocaleString()) + '</td>'
+                + '</tr>';
+        }).join('');
     }
-    
-    // Event listeners
+
     schemaSelect?.addEventListener('change', loadAnalytics);
     daysSelect?.addEventListener('change', loadAnalytics);
     refreshBtn?.addEventListener('click', loadAnalytics);
-    
-    // Initial load
+
     loadAnalytics();
 })();
 </script>

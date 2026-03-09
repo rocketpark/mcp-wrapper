@@ -29,7 +29,7 @@ class AnalyticsController extends Controller
      */
     public function actionIndex(?string $schemaHandle = null, int $days = 7): Response
     {
-        $this->requirePermission('utility:mcp-wrapper');
+        $this->requirePermission('mcp-wrapper:viewAnalytics');
         
         $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
         $schemas = array_keys($config['schemas'] ?? []);
@@ -39,10 +39,14 @@ class AnalyticsController extends Controller
             $schemaHandle = $schemas[0];
         }
         
+        $canExport = Craft::$app->getUser()->checkPermission('mcp-wrapper:exportAnalytics');
+        
         return $this->renderTemplate('mcp-wrapper/analytics/index', [
             'schemas' => $schemas,
             'selectedSchema' => $schemaHandle,
             'days' => $days,
+            'canExport' => $canExport,
+            'selectedSubnavItem' => 'analytics',
         ]);
     }
     
@@ -55,7 +59,7 @@ class AnalyticsController extends Controller
      */
     public function actionData(?string $schemaHandle = null, int $days = 7): Response
     {
-        $this->requirePermission('utility:mcp-wrapper');
+        $this->requirePermission('mcp-wrapper:viewAnalytics');
         $this->requireAcceptsJson();
         
         /** @var RequestLoggerService $logger */
@@ -81,7 +85,7 @@ class AnalyticsController extends Controller
      */
     public function actionExport(?string $schemaHandle = null, int $days = 7): Response
     {
-        $this->requirePermission('utility:mcp-wrapper');
+        $this->requirePermission('mcp-wrapper:exportAnalytics');
         
         /** @var RequestLoggerService $logger */
         $logger = Craft::$app->getModule('mcp-wrapper')->get('requestLogger');

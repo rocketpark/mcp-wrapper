@@ -1,0 +1,92 @@
+{#
+MCP Manifest Manager
+Displays schema manifests with rebuild capabilities
+#}
+
+{% extends "_layouts/cp" %}
+
+{% set title = "Manifest Manager" %}
+{% set selectedSubnavItem = "manifest" %}
+{% set fullPageForm = false %}
+
+{% block content %}
+<div id="mcp-manifest-manager">
+    <table class="data fullwidth">
+        <thead>
+            <tr>
+                <th>Schema Handle</th>
+                <th>Status</th>
+                <th>Last Generated</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for schema in schemas %}
+            <tr data-schema="{{ schema.handle }}">
+                <td><code>{{ schema.handle }}</code></td>
+                <td class="status-cell">
+                    {% if schema.exists %}
+                        <span class="status-cached status-label green">Cached</span>
+                    {% else %}
+                        <span class="status-notbuilt status-label orange">Not built</span>
+                    {% endif %}
+                    <span class="status-rebuilding status-label" style="display:none">Rebuilding&hellip;</span>
+                </td>
+                <td class="lastmodified-cell">{{ schema.lastModified ?? '&mdash;' }}</td>
+                <td>
+                    {% if schema.exists %}
+                        <a href="{{ schema.urlView }}" target="_blank" class="btn small">View JSON</a>
+                    {% endif %}
+                    <button class="btn small rebuild-btn" data-url="{{ schema.urlRebuild }}" data-handle="{{ schema.handle }}">Rebuild</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+document.querySelectorAll('.rebuild-btn').forEach(function(btn) {
+    btn.addEventListener('click', async function() {
+        var handle = this.dataset.handle;
+        var url = this.dataset.url;
+        var row = document.querySelector('tr[data-schema="' + handle + '"]');
+        var statusCell = row.querySelector('.status-cell');
+        var lastModifiedCell = row.querySelector('.lastmodified-cell');
+
+        statusCell.querySelectorAll('span').forEach(function(s) { s.style.display = 'none'; });
+        statusCell.querySelector('.status-rebuilding').style.display = 'inline';
+        this.disabled = true;
+
+        try {
+            var response = await fetch(url, {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+            var data = await response.json();
+
+            statusCell.querySelectorAll('span').forEach(function(s) { s.style.display = 'none'; });
+
+            if (data.status === 'success') {
+                var cached = statusCell.querySelector('.status-cached');
+                if (cached) {
+                    cached.style.display = 'inline';
+                } else {
+                    statusCell.innerHTML = '<span class="status-label green">Cached</span>';
+                }
+                lastModifiedCell.textContent = data.lastModified || 'Just now';
+                Craft.cp.displayNotice('Manifest rebuilt for ' + handle);
+            } else {
+                Craft.cp.displayError('Failed to rebuild manifest');
+            }
+        } catch (error) {
+            Craft.cp.displayError('Error rebuilding manifest: ' + error.message);
+        } finally {
+            this.disabled = false;
+        }
+    });
+});
+</script>
+{% endblock %}
