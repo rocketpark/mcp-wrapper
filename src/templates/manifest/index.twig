@@ -60,9 +60,11 @@ document.querySelectorAll('.rebuild-btn').forEach(function(btn) {
 
         try {
             var response = await fetch(url, {
+                method: 'POST',
                 headers: {
                     'Accept': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-Token': '{{ craft.app.request.csrfToken }}'
                 }
             });
             var data = await response.json();

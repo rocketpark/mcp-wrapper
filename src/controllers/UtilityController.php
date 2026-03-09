@@ -59,6 +59,7 @@ class UtilityController extends Controller
 
     public function actionRebuildManifest(string $schema): Response
     {
+        $this->requirePostRequest();
         $this->requirePermission('mcp-wrapper:manageManifest');
 
         $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
@@ -67,7 +68,7 @@ class UtilityController extends Controller
             throw new NotFoundHttpException("Unknown schema {$schema}");
         }
 
-        $builder = Craft::$app->getModule('mcpwrapper')->get('manifestBuilder');
+        $builder = Craft::$app->getModule('mcp-wrapper')->get('manifestBuilder');
         $builder->buildManifest($token, $schema, true);
 
         return $this->asJson([
