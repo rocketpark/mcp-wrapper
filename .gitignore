@@ -45,3 +45,6 @@ PRODUCTION-*.md
 *.backup
 src/**/*.backup
 .playwright-mcp/
+
+# VS Code workspace files
+*.code-workspace
