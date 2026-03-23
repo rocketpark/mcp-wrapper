@@ -661,7 +661,7 @@ class McpServerService extends Component
             $schema = $this->resolveGqlSchema($token);
             $gqlService = Craft::$app->getGql();
 
-            $query = '{ __schema { types { name } queryType { fields { name } } } }';
+            $query = '{ __schema { types { name } } }';
 
             Craft::info("Introspecting GraphQL schema via internal API", 'mcp-wrapper');
 
@@ -686,28 +686,18 @@ class McpServerService extends Component
     {
         try {
             $schema = $this->introspectGraphQLSchema($token);
+            $availableTypes = array_column($schema['types'], 'name');
 
-            // Get Query type fields to find category group query fields
-            $queryFields = [];
-            if (isset($schema['queryType']['fields'])) {
-                $queryFields = array_column($schema['queryType']['fields'], 'name');
-            }
-
-            if (empty($queryFields)) {
-                Craft::warning("No Query type fields found in introspection", 'mcp-wrapper');
-                return [];
-            }
-
-            Craft::info("Query type fields from introspection: " . implode(', ', $queryFields), 'mcp-wrapper');
-
-            // Match category groups by checking if {handle}Categories exists as a Query field
+            // Match category groups by checking if {handle}_Category type exists in schema
             $allCategoryGroups = Craft::$app->getCategories()->getAllGroups();
             $accessibleGroups = [];
 
             foreach ($allCategoryGroups as $group) {
-                $expectedField = $group->handle . 'Categories';
-                if (in_array($expectedField, $queryFields, true)) {
+                $typeName = $group->handle . '_Category';
+                if (in_array($typeName, $availableTypes, true)) {
                     $accessibleGroups[] = $group;
+                } else {
+                    Craft::info("Category group '{$group->handle}' type '{$typeName}' not found in schema", 'mcp-wrapper');
                 }
             }
 
