@@ -856,7 +856,6 @@ class McpServerService extends Component
         $limit = min(500, max(1, (int) ($args['limit'] ?? 100)));
 
         $filters = [
-            "group: \"{$categoryGroupHandle}\"",
             "limit: {$limit}",
         ];
 
