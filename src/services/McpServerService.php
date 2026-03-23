@@ -263,24 +263,18 @@ class McpServerService extends Component
 
     /**
      * List all available MCP tools (GraphQL queries + manual tools)
+     * Uses ToolRegistry which combines section tools, category group tools, and manual tools
      */
     private function handleToolsList(array $params): array
     {
-        $token = $this->getSchemaToken($params);
-        $sections = $this->getSectionsForSchema($token);
-        
-        // Build GraphQL query tools from sections
-        $tools = array_map(
-            fn($section) => $this->buildToolDefinition($section),
-            $sections
-        );
+        $schemaHandle = $params['schemaHandle'] ?? null;
+        if (!$schemaHandle) {
+            throw new \Exception('schemaHandle parameter required', -32602);
+        }
 
-        // Add manual tools from ToolRegistry
+        // Use ToolRegistry to get all tools (sections + category groups + manual)
         $toolRegistry = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('toolRegistry');
-        $manualTools = $toolRegistry->discoverManualTools();
-        
-        // Merge both arrays
-        $tools = array_merge($tools, $manualTools);
+        $tools = $toolRegistry->getAllTools($schemaHandle);
 
         // Filter tools based on security configuration
         $tools = $this->filterToolsBySecurityConfig($tools);
