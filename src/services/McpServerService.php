@@ -698,6 +698,8 @@ class McpServerService extends Component
                 return [];
             }
 
+            Craft::info("Query type fields from introspection: " . implode(', ', $queryFields), 'mcp-wrapper');
+
             // Match category groups by checking if {handle}Categories exists as a Query field
             $allCategoryGroups = Craft::$app->getCategories()->getAllGroups();
             $accessibleGroups = [];
@@ -904,12 +906,51 @@ class McpServerService extends Component
 
         $fields = [];
         foreach ($fieldLayout->getCustomFields() as $field) {
-            $fieldHandle = $field->handle;
+            $handle = $field->handle;
+            $fieldClass = get_class($field);
 
-            // Get proper GraphQL query fragment for this field type
-            $fieldFragment = $this->getGraphQLFieldFragment($field);
-            if ($fieldFragment) {
-                $fields[] = $fieldFragment;
+            // Skip sensitive fields
+            $sensitiveFields = [
+                'formSubmissionNotificationEmail',
+                'formSubmissionNotificationEmail2',
+                'internalNotes',
+                'internalComments',
+                'adminNotes',
+            ];
+
+            if (in_array($handle, $sensitiveFields, true)) {
+                continue;
+            }
+
+            // Handle relational fields
+            if (
+                $field instanceof \craft\fields\Entries ||
+                $field instanceof \craft\fields\Categories ||
+                $field instanceof \craft\fields\Tags ||
+                $field instanceof \craft\fields\Users ||
+                $field instanceof \craft\fields\Assets
+            ) {
+                $fields[] = "{$handle} { id title }";
+            }
+            // Handle Linkit link fields
+            elseif (str_contains($fieldClass, 'linkit') || str_contains($fieldClass, 'LinkIt') || str_contains($fieldClass, 'Linkit')) {
+                $fields[] = "{$handle} { url text type target }";
+            }
+            // Skip complex field types
+            elseif (
+                $field instanceof \craft\fields\Matrix ||
+                $field instanceof \craft\fields\Table ||
+                $fieldClass === 'benf\\neo\\Field' ||
+                str_contains($fieldClass, '\\neo\\') ||
+                str_contains($fieldClass, 'CKEditor') ||
+                str_contains($fieldClass, 'Freeform') ||
+                str_contains($fieldClass, 'SuperTable') ||
+                str_contains($fieldClass, 'seomatic')
+            ) {
+                continue;
+            } else {
+                // Plain fields (text, number, date, lightswitch, dropdown, etc.)
+                $fields[] = $handle;
             }
         }
 
