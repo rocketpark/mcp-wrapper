@@ -806,34 +806,76 @@ class McpServerService extends Component
     }
 
     /**
-     * Execute a category query
+     * Execute a category query using Craft's PHP API directly
+     * Bypasses GraphQL scope issues by querying categories natively
      */
     private function executeCategoryQuery(string $token, string $categoryGroupHandle, array $args, array $params = []): array
     {
         try {
-            $query = $this->buildCategoryGraphQLQuery($categoryGroupHandle, $args, $params);
-            Craft::info("Category GraphQL Query for {$categoryGroupHandle}: {$query}", 'mcp-wrapper');
-
-            $data = $this->sendGraphQLRequest($token, $query);
-
-            if (isset($data['errors'])) {
-                $errorJson = json_encode($data['errors']);
-                Craft::error("GraphQL errors: {$errorJson}", 'mcp-wrapper');
-                throw new \Exception('GraphQL error: ' . $errorJson, -32603);
+            $categoryGroup = Craft::$app->getCategories()->getGroupByHandle($categoryGroupHandle);
+            if (!$categoryGroup) {
+                throw new \Exception("Category group not found: {$categoryGroupHandle}", -32602);
             }
 
-            $result = $data['data'] ?? [];
-            // Result uses category group-specific field name (e.g., leadershipTeamsCategories)
-            $categoryField = $categoryGroupHandle . 'Categories';
-            $categories = $result[$categoryField] ?? $result['categories'] ?? [];
-            $categoryCount = count($categories);
-            Craft::info("GraphQL query returned {$categoryCount} categories from field '{$categoryField}'", 'mcp-wrapper');
+            $limit = min(500, max(1, (int) ($args['limit'] ?? 100)));
 
-            // Filter out sensitive fields
-            $categories = $this->filterSensitiveFields($categories);
+            $query = \craft\elements\Category::find()
+                ->group($categoryGroupHandle)
+                ->limit($limit)
+                ->status('enabled');
 
-            // Normalize result to use 'categories' key
-            return ['categories' => $categories];
+            if (isset($args['level'])) {
+                $query->level((int) $args['level']);
+            }
+
+            if (!empty($args['orderBy'])) {
+                $query->orderBy($args['orderBy']);
+            } else {
+                $query->orderBy('lft ASC');
+            }
+
+            $categories = $query->all();
+            $results = [];
+
+            foreach ($categories as $category) {
+                $item = [
+                    'id' => $category->id,
+                    'title' => $category->title,
+                    'slug' => $category->slug,
+                    'uri' => $category->uri,
+                    'level' => $category->level,
+                ];
+
+                // Include custom fields
+                foreach ($categoryGroup->getFieldLayout()->getCustomFields() as $field) {
+                    $handle = $field->handle;
+                    $value = $category->getFieldValue($handle);
+
+                    // Skip sensitive fields
+                    $sensitiveFields = ['internalNotes', 'internalComments', 'adminNotes'];
+                    if (in_array($handle, $sensitiveFields, true)) {
+                        continue;
+                    }
+
+                    // Handle relational fields
+                    if ($value instanceof \craft\elements\db\ElementQueryInterface) {
+                        $related = $value->all();
+                        $item[$handle] = array_map(fn($el) => [
+                            'id' => $el->id,
+                            'title' => $el->title,
+                        ], $related);
+                    } elseif (is_object($value) && method_exists($value, '__toString')) {
+                        $item[$handle] = (string) $value;
+                    } elseif (is_scalar($value) || is_null($value)) {
+                        $item[$handle] = $value;
+                    }
+                }
+
+                $results[] = $item;
+            }
+
+            Craft::info("Category query returned " . count($results) . " categories for '{$categoryGroupHandle}'", 'mcp-wrapper');
+            return ['categories' => $results];
         } catch (\Exception $e) {
             Craft::error("Failed to execute category query: {$e->getMessage()}", 'mcp-wrapper');
             throw $e;
