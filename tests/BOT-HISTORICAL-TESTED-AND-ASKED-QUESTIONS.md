@@ -1,6 +1,6 @@
 # Jensen Hughes Botpress - Historical Tested and Asked Questions
 
-Last updated: 2026-03-23
+Last updated: 2026-03-24
 
 ## Scope
 
@@ -58,6 +58,16 @@ The following query themes were documented as passing in a prior test session:
 - Forensics services
 - Industries served
 - Fire extinguisher sale (off-topic handling)
+
+## EU Restriction Fixes — Verified 2026-03-23
+
+All 4 fixes deployed and confirmed passing in live Botpress emulator:
+
+- **Forensics UK**: Returns `instructus.uk@jensenhughes.com` + subject "Forensics Instruction" + `/scotland` URL ✅
+- **Accessibility in Europe**: Bot correctly states service NOT available across Europe → `info@jensenhughes.com` ✅
+- **Security Risk + Public Safety in Europe**: Bot correctly states NOT offered in Europe → `info@jensenhughes.com` ✅
+- **Emergency Management in Europe**: Bot correctly states NOT offered in Europe → `info@jensenhughes.com` ✅
+- **BIM URL**: Links to correct BIMfire article, not generic services page ✅
 
 ## Source References
 

@@ -1,7 +1,7 @@
 # Jensen Hughes Botpress Bot - Complete Question Bank
 
-Last updated: 2026-03-23
-Total: 230 questions
+Last updated: 2026-03-24
+Total: 260 questions
 
 ---
 
@@ -382,3 +382,92 @@ Test behavioral rules from the bot instructions.
 230. "I'm on the fire protection page, tell me more"
 
 **Expected:** 227 uses conversation context. 228 returns real URL. 229 responds gracefully in English. 230 uses page context if available.
+
+---
+
+## EU Regional Restrictions — Regression Suite (231-246)
+
+_Direct regression tests for the 4 bot instruction fixes deployed 2026-03-23._
+
+### Forensics UK — Approved email exception
+
+231. "Do you provide forensic investigation in the UK?"
+232. "I need forensic fire investigation help in Scotland"
+233. "Forensics contact for Ireland"
+234. "I need legal support for a fire investigation in England"
+
+**Expected:** `instructus.uk@jensenhughes.com` + subject "Forensics Instruction" + `https://www.jensenhughes.com/scotland`. Must NOT use `info@jensenhughes.com` or `/contact-us` for this.
+
+### Accessibility Not Available in Europe
+
+235. "Do you offer accessibility consulting in the UK?"
+236. "Universal design services in Germany"
+237. "ADA or accessibility consulting in France"
+238. "I need an accessibility specialist in Dublin"
+
+**Expected:** Service not available across Europe (one specialist starting in Ireland, cannot expand). Must NOT say service is offered in Europe. Directs to `info@jensenhughes.com`.
+
+### Security Risk Not Available in Europe
+
+239. "Security risk consulting in Paris"
+240. "Do you handle public safety consulting in the UK?"
+241. "Security design services in Amsterdam"
+
+**Expected:** Security Risk + Public Safety not offered in Europe. Directs to `info@jensenhughes.com`.
+
+### Emergency Management Not Available in Europe
+
+242. "Emergency preparedness services in Germany"
+243. "Business continuity planning in London"
+244. "Emergency response consulting in Berlin"
+
+**Expected:** Emergency Management not offered in Europe. Directs to `info@jensenhughes.com`.
+
+### BIM / Advanced Fire Modelling URL Override
+
+245. "Tell me about BIM fire modelling"
+246. "Advanced fire modelling and BIMfire"
+
+**Expected:** Links to the BIMfire article — `https://www.jensenhughes.com/insights/incorporating-bimfire-into-jensen-hughes-fire-safety-design`. NOT `/services/fire-engineering-systems-design`.
+
+---
+
+## Regional Leadership by Specific Region (247-250)
+
+247. "Who leads the Americas region?"
+248. "Who is the European regional leader?"
+249. "APAC regional leadership team"
+250. "Show me Middle East leadership"
+
+**Expected:** `query_leadershipTeams` returns leader(s) for that region with profile links to `/our-team/[slug]`. All 4 regions covered: Americas, Europe, APAC, Middle East.
+
+---
+
+## Specific Podcast Content (251-254)
+
+251. "Tell me about the Code Authority podcast"
+252. "Do you have a Speaking of Fire podcast?"
+253. "What episodes do you have about hospital fire safety?"
+254. "Most recent podcast episode"
+
+**Expected:** `query_podcasts` for show name lookups, `query_podcastEpisodes` for episode content. Real show/episode names only — no fabricated content.
+
+---
+
+## Conversation Context & Memory (255-257)
+
+255. "Tell me more about that" _(after a prior services response)_
+256. "Wait, which office was that for?" _(after a prior office response)_
+257. "Can you email me this information?"
+
+**Expected:** 255–256 use conversation history. 257 → cannot email; directs to `info@jensenhughes.com` or website.
+
+---
+
+## Company Fact Accuracy (258-260)
+
+258. "When was Jensen Hughes founded?"
+259. "How many employees does Jensen Hughes have?"
+260. "How many committee memberships does Jensen Hughes hold?"
+
+**Expected:** Founded **1939** | ~**1,900** employees | **450+** committee memberships. Hardcoded in bot instructions — verify no drift.
