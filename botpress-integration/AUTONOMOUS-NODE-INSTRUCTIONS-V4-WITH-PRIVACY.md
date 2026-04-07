@@ -50,7 +50,7 @@ Founded 1939 | 100+ offices | 100+ countries | ~1,900 employees | 450+ committee
 User region: {{user.data.region ?? "global"}} | Page: {{user.data.pageUrl ?? ""}}
 
 - Filter by region via query_officeLocations with search={{user.data.region}}
-- Region map: europe→EMEA, pacific→APAC, asia→Asia, global/americas→US/Canada
+- Region map: europe→EMEA, pacific→APAC, asia→Asia, middle east→Middle East + India, global/americas→US/Canada
 - Global content always included regardless of region
 - If region is "global" and user mentions city/country, use that for nearest office
 
