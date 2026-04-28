@@ -398,28 +398,33 @@ class SyncKbController extends Controller
         // Sanitize content: remove null bytes and control characters (except newlines/tabs)
         $content = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $content);
 
-        $this->stdout("  Content size: " . number_format(strlen($content)) . " bytes\n");
+        $contentSize = strlen($content);
+        $this->stdout("  Content size: " . number_format($contentSize) . " bytes\n");
 
-        // Create multipart form data
-        $boundary = uniqid('boundary');
-        $body = "--{$boundary}\r\n";
-        $body .= "Content-Disposition: form-data; name=\"file\"; filename=\"{$filename}\"\r\n";
-        $body .= "Content-Type: text/plain; charset=utf-8\r\n\r\n";
-        $body .= $content . "\r\n";
-        $body .= "--{$boundary}--\r\n";
+        // Step 1: Create file record in Botpress (PUT /v1/files API)
+        $createPayload = json_encode([
+            'key' => $filename,
+            'size' => $contentSize,
+            'index' => true,
+            'tags' => [
+                'source' => 'knowledge-base',
+                'kbId' => $kbId,
+                'title' => ucfirst($kbName) . ' (auto-synced)',
+            ],
+        ]);
 
-        $url = "https://api.botpress.cloud/v1/files/knowledge-bases/{$kbId}/files";
+        $url = 'https://api.botpress.cloud/v1/files';
 
         $ch = curl_init($url);
         curl_setopt_array($ch, [
-            CURLOPT_POST => true,
+            CURLOPT_CUSTOMREQUEST => 'PUT',
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER => [
-                "Authorization: Bearer {$pat}",
-                "x-bot-id: {$botId}",
-                "Content-Type: multipart/form-data; boundary={$boundary}",
+                'Authorization: Bearer ' . $pat,
+                'x-bot-id: ' . $botId,
+                'Content-Type: application/json',
             ],
-            CURLOPT_POSTFIELDS => $body,
+            CURLOPT_POSTFIELDS => $createPayload,
         ]);
 
         $response = curl_exec($ch);
@@ -428,7 +433,44 @@ class SyncKbController extends Controller
         curl_close($ch);
 
         if ($error) {
-            $this->stderr("  cURL error: {$error}\n", Console::FG_RED);
+            $this->stderr("  cURL error (create): {$error}\n", Console::FG_RED);
+            return false;
+        }
+
+        $responseData = json_decode($response, true);
+
+        if ($httpCode < 200 || $httpCode >= 300) {
+            $message = $responseData['message'] ?? 'HTTP ' . $httpCode;
+            $this->stderr("  File create failed: {$message}\n", Console::FG_RED);
+            return false;
+        }
+
+        $uploadUrl = $responseData['file']['uploadUrl'] ?? null;
+        if (!$uploadUrl) {
+            $this->stderr("  No uploadUrl in response\n", Console::FG_RED);
+            return false;
+        }
+
+        $this->stdout("  File record created, uploading content...\n");
+
+        // Step 2: Upload actual content to the presigned URL
+        $ch = curl_init($uploadUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_CUSTOMREQUEST => 'PUT',
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: text/plain; charset=utf-8',
+            ],
+            CURLOPT_POSTFIELDS => $content,
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($error) {
+            $this->stderr("  cURL error (upload): {$error}\n", Console::FG_RED);
             return false;
         }
 
@@ -437,10 +479,7 @@ class SyncKbController extends Controller
             return true;
         }
 
-        $responseData = json_decode($response, true);
-        $message = $responseData['message'] ?? "HTTP {$httpCode}";
-        $this->stderr("  Upload failed: {$message}\n", Console::FG_RED);
-
+        $this->stderr("  Upload failed: HTTP {$httpCode}\n", Console::FG_RED);
         return false;
     }
 }
