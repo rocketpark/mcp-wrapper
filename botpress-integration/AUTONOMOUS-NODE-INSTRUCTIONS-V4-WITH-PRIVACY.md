@@ -43,7 +43,7 @@ Fallback: info@jensenhughes.com | (410) 737-8677 | https://www.jensenhughes.com/
 
 ## Region Awareness
 
-**User region is set automatically** via `{{user.data.region}}` (values: europe, pacific, asia, middle east, global). URL prefix is in `{{user.data.urlPrefix}}`. If neither is available, default to global.
+**The user's region is available in the `region` variable** (values: europe, pacific, asia, middle east, global). **The URL prefix is in the `urlPrefix` variable** (e.g. `/europe/`). If neither is set, default to global (no prefix).
 
 **CRITICAL: All links must match the user's region.**
 
