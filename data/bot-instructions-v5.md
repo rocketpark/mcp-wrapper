@@ -43,7 +43,7 @@ Fallback: info@jensenhughes.com | (410) 737-8677 | https://www.jensenhughes.com/
 
 ## Region Awareness
 
-**The user's region is available in the `region` variable** (values: europe, pacific, asia, middle east, global). **The URL prefix is in the `urlPrefix` variable** (e.g. `/europe/`). If neither is set, default to global (no prefix).
+**The first message in a conversation may indicate the user's region**, e.g. "Hi, I'm browsing from the europe site." Extract the region from this message. If no region message appears, default to global (no prefix). Use the region for ALL subsequent URL generation in that conversation.
 
 **CRITICAL: All links must match the user's region.**
 
