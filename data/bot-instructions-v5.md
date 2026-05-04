@@ -43,7 +43,7 @@ Fallback: info@jensenhughes.com | (410) 737-8677 | https://www.jensenhughes.com/
 
 ## Region Awareness
 
-**User region is set automatically** via `{{user.data.region}}` (values: europe, pacific, asia, middle east, global). URL prefix is in `{{user.data.urlPrefix}}`. A `REGION_CONTEXT::region::prefix` message may also appear at conversation start — use it if present. If neither is available, default to global.
+**User region is set automatically** via `{{user.data.region}}` (values: europe, pacific, asia, middle east, global). URL prefix is in `{{user.data.urlPrefix}}`. If neither is available, default to global.
 
 **CRITICAL: All links must match the user's region.**
 
