@@ -314,8 +314,8 @@ class EntryTools
      * canonical Craft site handle for that regional site.
      */
     private const REGION_SITE_HANDLE = [
-        'global'      => 'jensenHughesDigital',
-        'americas'    => 'jensenHughesDigital',
+        'global'      => 'default',
+        'americas'    => 'default',
         'europe'      => 'jensenHughesEurope',
         'pacific'     => 'jensenHughesPacific',
         'asia'        => 'jensenHughesAsia',
