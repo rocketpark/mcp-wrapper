@@ -583,7 +583,9 @@ class EntryTools
                 return Response::notFound("Office not found with slug '{$slug}'");
             }
 
-            // Walk contactLinks → extract phone + contact form from contactDetails HTML
+            // Walk contactLinks → extract phone + contact form from contactDetails HTML.
+            // contactDetails can be a Redactor/CKEditor FieldData object, so cast to string
+            // and decode HTML entities before pattern matching.
             $phone = null;
             $phoneHref = null;
             $contactForm = null;
@@ -592,18 +594,23 @@ class EntryTools
                     ? $office->contactLinks->all()
                     : [];
                 foreach ($links as $link) {
-                    $detail = $link->contactDetails ?? null;
-                    if (!$detail || !is_string($detail)) {
+                    $raw = $link->contactDetails ?? null;
+                    if ($raw === null) {
                         continue;
                     }
-                    if (!$phone && preg_match('/href="tel:([^"]+)"[^>]*>([^<]+)</i', $detail, $m)) {
+                    $detail = is_string($raw) ? $raw : (string)$raw;
+                    $detail = html_entity_decode($detail, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                    if ($detail === '') {
+                        continue;
+                    }
+                    if (!$phone && preg_match('/href=["\']tel:([^"\']+)["\'][^>]*>([^<]+)</i', $detail, $m)) {
                         $phoneHref = 'tel:' . $m[1];
                         $phone = trim($m[2]);
-                    } elseif (!$phone && preg_match('/href="(tel:[^"]+)"/i', $detail, $m)) {
+                    } elseif (!$phone && preg_match('/href=["\'](tel:[^"\']+)["\']/i', $detail, $m)) {
                         $phoneHref = $m[1];
                         $phone = preg_replace('/^tel:/', '', $m[1]);
                     }
-                    if (!$contactForm && preg_match('/href="(https?:[^"]+)"/i', $detail, $m)) {
+                    if (!$contactForm && preg_match('/href=["\'](https?:[^"\']+)["\']/i', $detail, $m)) {
                         $contactForm = $m[1];
                     }
                 }
