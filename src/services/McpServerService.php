@@ -520,12 +520,7 @@ class McpServerService extends Component
             $result = $toolRegistry->executeTool($toolName, $arguments);
 
             return [
-                'content' => [
-                    [
-                        'type' => 'text',
-                        'text' => json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
-                    ],
-                ],
+                'content' => [$this->wrapResultAsContent($result)],
                 'isError' => false,
             ];
         }
@@ -547,14 +542,36 @@ class McpServerService extends Component
         }
 
         return [
-            'content' => [
-                [
-                    'type' => 'text',
-                    'text' => json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
-                ],
-            ],
+            'content' => [$this->wrapResultAsContent($result)],
             'isError' => false,
         ];
+    }
+
+    /**
+     * Wrap a tool's return value into an MCP content item.
+     *
+     * Always includes the standard {type: "text", text: <json>} pair so
+     * spec-conformant clients keep working. Additionally exposes any
+     * top-level scalar fields from $result directly on the content item
+     * so LLM-driven clients (e.g., Botpress LLMz) can read
+     * result.content[0].url without having to JSON.parse(...text).
+     * Only scalars/null are promoted; nested arrays stay only inside text.
+     */
+    private function wrapResultAsContent(array $result): array
+    {
+        $item = [
+            'type' => 'text',
+            'text' => json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
+        ];
+        foreach ($result as $k => $v) {
+            if ($k === 'type' || $k === 'text') {
+                continue;
+            }
+            if (is_scalar($v) || $v === null) {
+                $item[$k] = $v;
+            }
+        }
+        return $item;
     }
 
     /**
