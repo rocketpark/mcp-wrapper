@@ -344,26 +344,26 @@ class EntryTools
      */
     #[Tool(
         name: 'craft_resolve_regional_url',
-        description: 'Resolve canonical regional URL + availability for a service or industry intent. Call BEFORE emitting any /services/* or /industries/* URL in a bot response. Returns {available, url, fallbackUrl, matchedSlug, matchedTitle} so the bot can avoid 404 deep links and skip enumerating capabilities for services that do not exist in the region.',
+        description: 'Resolve canonical regional URL + availability for a service or industry intent. Call BEFORE emitting any /services/* or /industries/* URL in a bot response. Args use wrapper-compatible names: search=intent, title=region, slug=contentType. Returns {available, url, fallbackUrl, matchedSlug, matchedTitle} so the bot can avoid 404 deep links and skip enumerating capabilities for services that do not exist in the region.',
         inputSchema: [
             'type' => 'object',
             'properties' => [
-                'region' => [
+                'search' => [
+                    'type' => 'string',
+                    'description' => 'Service keyword/intent (e.g., "fire engineering", "forensic investigation", "accessibility"). Aliased as intent.',
+                ],
+                'title' => [
                     'type' => 'string',
                     'enum' => ['global', 'americas', 'europe', 'pacific', 'asia', 'middle_east'],
-                    'description' => "User's region (from user.data.region set by the webchat embed)",
+                    'description' => "User's region code from user.data.region. Aliased as region. Wrapper-compatible field name.",
                 ],
-                'contentType' => [
+                'slug' => [
                     'type' => 'string',
                     'enum' => ['services', 'industries'],
-                    'description' => 'Section to search',
-                ],
-                'intent' => [
-                    'type' => 'string',
-                    'description' => 'Service keyword/intent (e.g., "fire engineering", "forensic investigation", "accessibility")',
+                    'description' => 'Section to search. Aliased as contentType. Wrapper-compatible field name.',
                 ],
             ],
-            'required' => ['region', 'contentType', 'intent'],
+            'required' => ['search', 'title', 'slug'],
         ],
         outputSchema: [
             'type' => 'object',
@@ -381,9 +381,21 @@ class EntryTools
         costHint: 'low',
         confidentialityHint: 'low',
     )]
-    public function resolveRegionalUrl(string $region, string $contentType, string $intent): array
+    public function resolveRegionalUrl(array $args): array
     {
-        return SafeExecution::run(function() use ($region, $contentType, $intent) {
+        return SafeExecution::run(function() use ($args) {
+            // Accept both wrapper-compatible names (search/title/slug) and
+            // semantic names (intent/region/contentType) for direct MCP callers
+            // (sync scripts, curl, future integrations). Wrapper-compat names win
+            // if both supplied because Botpress queryContent only emits those.
+            $intent      = $args['search']      ?? $args['intent']      ?? '';
+            $region      = $args['title']       ?? $args['region']      ?? '';
+            $contentType = $args['slug']        ?? $args['contentType'] ?? '';
+
+            if ($intent === '' || $region === '' || $contentType === '') {
+                return Response::error("Missing required args. Need search (intent), title (region), and slug (contentType).", 400);
+            }
+
             $region = strtolower(trim($region));
             $contentType = strtolower(trim($contentType));
 
