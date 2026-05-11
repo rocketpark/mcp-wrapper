@@ -332,16 +332,43 @@ export default new bp.Integration({
             })
             
             logger.forBot().info(`Filtered ${filtered.length} offices from ${allEntries.length} total`)
-            
+
             // Apply limit and offset to filtered results
             const limit = queryArgs.limit || 10
             const offset = queryArgs.offset || 0
             const paginatedResults = filtered.slice(offset, offset + limit)
-            
+
+            // Enrich each office with phone + address via craft_get_office_contact_info.
+            // This way the bot gets phone even if it picked query_officeLocations
+            // instead of craft_get_office_contact_info — eliminates the LLM
+            // tool-selection ambiguity that causes "phone not listed" answers.
+            const enriched = await Promise.all(paginatedResults.map(async (entry: any) => {
+              if (!entry?.slug) return entry
+              try {
+                const contactResult = await client.callTool('craft_get_office_contact_info', { slug: entry.slug })
+                const contactText = contactResult?.content?.[0]?.text
+                if (!contactText) return entry
+                const contact = JSON.parse(contactText)
+                if (contact?.found && contact.office) {
+                  return {
+                    ...entry,
+                    phone: contact.office.phone,
+                    phoneHref: contact.office.phoneHref,
+                    address: contact.office.address,
+                    googleMaps: contact.office.googleMaps,
+                    contactForm: contact.office.contactForm,
+                  }
+                }
+              } catch (e) {
+                logger.forBot().warn(`Enrichment failed for ${entry.slug}: ${(e as Error).message}`)
+              }
+              return entry
+            }))
+
             return {
               content: [{
                 type: 'text',
-                text: JSON.stringify({ entries: paginatedResults })
+                text: JSON.stringify({ entries: enriched })
               }],
             }
           }
@@ -366,9 +393,47 @@ export default new bp.Integration({
         if (queryArgs.orderBy) toolArguments.orderBy = queryArgs.orderBy
 
         const result = await client.callTool(toolName, toolArguments)
-        
+
         logger.forBot().info(`Query result: ${JSON.stringify(result).substring(0, 200)}...`)
-        
+
+        // Enrich query_officeLocations results with phone/address so the bot can
+        // answer "phone for X office" regardless of which toolName the LLM picked.
+        if (toolName === 'query_officeLocations' && result?.content?.[0]?.text) {
+          try {
+            const data = JSON.parse(result.content[0].text)
+            const entries = data?.entries
+            if (Array.isArray(entries) && entries.length > 0) {
+              const enriched = await Promise.all(entries.map(async (entry: any) => {
+                if (!entry?.slug) return entry
+                try {
+                  const contactResult = await client.callTool('craft_get_office_contact_info', { slug: entry.slug })
+                  const contactText = contactResult?.content?.[0]?.text
+                  if (!contactText) return entry
+                  const contact = JSON.parse(contactText)
+                  if (contact?.found && contact.office) {
+                    return {
+                      ...entry,
+                      phone: contact.office.phone,
+                      phoneHref: contact.office.phoneHref,
+                      address: contact.office.address,
+                      googleMaps: contact.office.googleMaps,
+                      contactForm: contact.office.contactForm,
+                    }
+                  }
+                } catch (e) {
+                  logger.forBot().warn(`Enrichment failed for ${entry.slug}: ${(e as Error).message}`)
+                }
+                return entry
+              }))
+              return {
+                content: [{ type: 'text', text: JSON.stringify({ ...data, entries: enriched }) }],
+              }
+            }
+          } catch (e) {
+            logger.forBot().warn(`Enrichment skipped (parse failed): ${(e as Error).message}`)
+          }
+        }
+
         // MCP tools/call returns: { content: [{ type: 'text', text: '...' }], isError: false }
         // The 'text' field contains JSON-encoded GraphQL results
         return {
