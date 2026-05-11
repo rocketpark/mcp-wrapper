@@ -517,6 +517,156 @@ class EntryTools
     }
 
     /**
+     * Get flattened office contact info (phone, address, maps URL) for a specific office slug.
+     *
+     * Walks the nested contactLinks + address entries that hold the actual phone numbers
+     * and addresses, and returns a single flat object the bot can use directly without
+     * having to chain multiple tool calls.
+     */
+    #[Tool(
+        name: 'craft_get_office_contact_info',
+        description: 'Get flattened office contact info (phone, address, Google Maps, region) for a specific office slug. Use this for any "phone number / contact / address for the X office" question. Slug examples: oakland-san-leandro, roseville, mumbai, london, sydney.',
+        inputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'slug' => [
+                    'type' => 'string',
+                    'description' => 'Office slug (e.g., oakland-san-leandro, roseville, mumbai)',
+                ],
+                'siteId' => [
+                    'type' => 'integer',
+                    'description' => 'Site ID (optional, defaults to primary site)',
+                ],
+            ],
+            'required' => ['slug'],
+        ],
+        outputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'found' => ['type' => 'boolean'],
+                'office' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'title' => ['type' => 'string'],
+                        'slug' => ['type' => 'string'],
+                        'url' => ['type' => 'string'],
+                        'phone' => ['type' => ['string', 'null']],
+                        'phoneHref' => ['type' => ['string', 'null']],
+                        'contactForm' => ['type' => ['string', 'null']],
+                        'address' => ['type' => ['string', 'null']],
+                        'googleMaps' => ['type' => ['string', 'null']],
+                        'region' => ['type' => ['string', 'null']],
+                    ],
+                ],
+                'message' => ['type' => 'string'],
+            ],
+            'required' => ['found'],
+        ],
+        dangerous: false,
+        costHint: 'low',
+        confidentialityHint: 'public',
+    )]
+    public function getOfficeContactInfo(string $slug, ?int $siteId = null): array
+    {
+        return SafeExecution::run(function() use ($slug, $siteId) {
+            $query = Entry::find()
+                ->section('officeLocations')
+                ->slug($slug);
+
+            if ($siteId) {
+                $query->siteId($siteId);
+            }
+
+            $office = $query->one();
+
+            if (!$office) {
+                return Response::notFound("Office not found with slug '{$slug}'");
+            }
+
+            // Walk contactLinks → extract phone + contact form from contactDetails HTML
+            $phone = null;
+            $phoneHref = null;
+            $contactForm = null;
+            if (isset($office->contactLinks)) {
+                $links = is_object($office->contactLinks) && method_exists($office->contactLinks, 'all')
+                    ? $office->contactLinks->all()
+                    : [];
+                foreach ($links as $link) {
+                    $detail = $link->contactDetails ?? null;
+                    if (!$detail || !is_string($detail)) {
+                        continue;
+                    }
+                    if (!$phone && preg_match('/href="tel:([^"]+)"[^>]*>([^<]+)</i', $detail, $m)) {
+                        $phoneHref = 'tel:' . $m[1];
+                        $phone = trim($m[2]);
+                    } elseif (!$phone && preg_match('/href="(tel:[^"]+)"/i', $detail, $m)) {
+                        $phoneHref = $m[1];
+                        $phone = preg_replace('/^tel:/', '', $m[1]);
+                    }
+                    if (!$contactForm && preg_match('/href="(https?:[^"]+)"/i', $detail, $m)) {
+                        $contactForm = $m[1];
+                    }
+                }
+            }
+
+            // Walk address (entry relation) → try common readable field names
+            $addressText = null;
+            if (isset($office->address)) {
+                $addresses = is_object($office->address) && method_exists($office->address, 'all')
+                    ? $office->address->all()
+                    : [];
+                foreach ($addresses as $a) {
+                    foreach (['streetAddress', 'addressLine1', 'address1', 'fullAddress', 'addressText'] as $f) {
+                        if (isset($a->$f) && is_string($a->$f) && trim($a->$f) !== '') {
+                            $addressText = trim($a->$f);
+                            break 2;
+                        }
+                    }
+                    if ($a->title && trim($a->title) !== '') {
+                        $addressText = trim($a->title);
+                        break;
+                    }
+                }
+            }
+
+            // Region: take the most specific (last) category in the chain
+            $region = null;
+            if (isset($office->region)) {
+                $cats = is_object($office->region) && method_exists($office->region, 'all')
+                    ? $office->region->all()
+                    : [];
+                if (!empty($cats)) {
+                    $region = end($cats)->title;
+                }
+            }
+
+            // Google Maps: build from googleMapId if present
+            $googleMaps = null;
+            $mapId = $office->googleMapId ?? null;
+            if ($mapId && is_string($mapId) && trim($mapId) !== '') {
+                $googleMaps = 'https://maps.google.com/?cid=' . urlencode(trim($mapId));
+            } elseif (!empty($office->googleMyBusiness) && is_string($office->googleMyBusiness)) {
+                $googleMaps = trim($office->googleMyBusiness);
+            }
+
+            return [
+                'found' => true,
+                'office' => [
+                    'title' => $office->title,
+                    'slug' => $office->slug,
+                    'url' => $office->url,
+                    'phone' => $phone,
+                    'phoneHref' => $phoneHref,
+                    'contactForm' => $contactForm,
+                    'address' => $addressText,
+                    'googleMaps' => $googleMaps,
+                    'region' => $region,
+                ],
+            ];
+        });
+    }
+
+    /**
      * Serialize entry to array with all fields
      */
     private function serializeEntry(?Entry $entry): ?array
