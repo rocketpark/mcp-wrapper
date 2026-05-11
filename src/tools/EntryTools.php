@@ -579,8 +579,52 @@ class EntryTools
 
             $office = $query->one();
 
+            // Fuzzy fallback: if exact slug miss, try matching by slug prefix or title contains
+            $suggestions = [];
             if (!$office) {
-                return Response::notFound("Office not found with slug '{$slug}'");
+                $term = trim($slug);
+                $fuzzy = Entry::find()
+                    ->section('officeLocations')
+                    ->status(null)
+                    ->orderBy('title ASC');
+                if ($siteId) {
+                    $fuzzy->siteId($siteId);
+                }
+                $candidates = $fuzzy->all();
+                $needle = strtolower($term);
+                $matches = [];
+                foreach ($candidates as $c) {
+                    $cSlug = strtolower((string)$c->slug);
+                    $cTitle = strtolower((string)$c->title);
+                    if ($cSlug === $needle) {
+                        $office = $c;
+                        break;
+                    }
+                    if (str_starts_with($cSlug, $needle . '-') || str_contains($cSlug, $needle) || str_contains($cTitle, $needle)) {
+                        $matches[] = $c;
+                    }
+                }
+                if (!$office && count($matches) === 1) {
+                    $office = $matches[0];
+                } elseif (!$office && count($matches) > 1) {
+                    $suggestions = array_map(fn($m) => [
+                        'slug' => $m->slug,
+                        'title' => $m->title,
+                        'url' => $m->url,
+                    ], array_slice($matches, 0, 10));
+                }
+            }
+
+            if (!$office) {
+                $resp = [
+                    'found' => false,
+                    'message' => "Office not found with slug '{$slug}'",
+                ];
+                if (!empty($suggestions)) {
+                    $resp['suggestions'] = $suggestions;
+                    $resp['message'] .= '. Did you mean: ' . implode(', ', array_column($suggestions, 'slug'));
+                }
+                return $resp;
             }
 
             // Walk contactLinks → extract phone + contact form from contactDetails HTML.
