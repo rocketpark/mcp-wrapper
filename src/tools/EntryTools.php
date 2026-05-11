@@ -310,6 +310,138 @@ class EntryTools
     }
 
     /**
+     * Map region handles passed by the webchat (user.data.region) to the
+     * canonical Craft site handle for that regional site.
+     */
+    private const REGION_SITE_HANDLE = [
+        'global'      => 'jensenHughesDigital',
+        'americas'    => 'jensenHughesDigital',
+        'europe'      => 'jensenHughesEurope',
+        'pacific'     => 'jensenHughesPacific',
+        'asia'        => 'jensenHughesAsia',
+        'middle_east' => 'jensenHughesMiddleEast',
+    ];
+
+    /**
+     * URL prefix on jensenhughes.com per region. Used to build the fallback
+     * landing URL when no specific entry matches.
+     */
+    private const REGION_URL_PREFIX = [
+        'global'      => '',
+        'americas'    => '',
+        'europe'      => '/europe',
+        'pacific'     => '/pacific',
+        'asia'        => '/asia',
+        'middle_east' => '/middle-east',
+    ];
+
+    /**
+     * Resolve canonical regional URL + availability for a service or industry intent
+     *
+     * Used by Botpress AI Helper to verify a URL exists in the user's region before
+     * emitting it in a response. Replaces the previous static URL prefix table baked
+     * into the bot's instructions (which produced 404s for region-specific slugs).
+     */
+    #[Tool(
+        name: 'craft_resolve_regional_url',
+        description: 'Resolve canonical regional URL + availability for a service or industry intent. Call BEFORE emitting any /services/* or /industries/* URL in a bot response. Returns {available, url, fallbackUrl, matchedSlug, matchedTitle} so the bot can avoid 404 deep links and skip enumerating capabilities for services that do not exist in the region.',
+        inputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'region' => [
+                    'type' => 'string',
+                    'enum' => ['global', 'americas', 'europe', 'pacific', 'asia', 'middle_east'],
+                    'description' => "User's region (from user.data.region set by the webchat embed)",
+                ],
+                'contentType' => [
+                    'type' => 'string',
+                    'enum' => ['services', 'industries'],
+                    'description' => 'Section to search',
+                ],
+                'intent' => [
+                    'type' => 'string',
+                    'description' => 'Service keyword/intent (e.g., "fire engineering", "forensic investigation", "accessibility")',
+                ],
+            ],
+            'required' => ['region', 'contentType', 'intent'],
+        ],
+        outputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'available' => ['type' => 'boolean', 'description' => 'Whether a matching entry was found in this region'],
+                'url' => ['type' => ['string', 'null'], 'description' => 'Canonical URL if available'],
+                'fallbackUrl' => ['type' => 'string', 'description' => 'Region services/industries landing page (always valid)'],
+                'matchedSlug' => ['type' => ['string', 'null'], 'description' => 'Slug that matched the intent'],
+                'matchedTitle' => ['type' => ['string', 'null'], 'description' => 'Title of the matched entry'],
+                'region' => ['type' => 'string', 'description' => 'Echo of region for traceability'],
+            ],
+            'required' => ['available', 'fallbackUrl', 'region'],
+        ],
+        dangerous: false,
+        costHint: 'low',
+        confidentialityHint: 'low',
+    )]
+    public function resolveRegionalUrl(string $region, string $contentType, string $intent): array
+    {
+        return SafeExecution::run(function() use ($region, $contentType, $intent) {
+            $region = strtolower(trim($region));
+            $contentType = strtolower(trim($contentType));
+
+            if (!isset(self::REGION_SITE_HANDLE[$region])) {
+                return Response::error("Unknown region '{$region}'. Expected one of: " . implode(', ', array_keys(self::REGION_SITE_HANDLE)), 400);
+            }
+            if (!in_array($contentType, ['services', 'industries'], true)) {
+                return Response::error("Unknown contentType '{$contentType}'. Expected 'services' or 'industries'.", 400);
+            }
+
+            $siteHandle  = self::REGION_SITE_HANDLE[$region];
+            $prefix      = self::REGION_URL_PREFIX[$region];
+            $fallbackUrl = 'https://www.jensenhughes.com' . $prefix . '/' . $contentType;
+
+            $site = Craft::$app->sites->getSiteByHandle($siteHandle);
+            if (!$site) {
+                Craft::warning("resolveRegionalUrl: site handle '{$siteHandle}' not found for region '{$region}'", 'mcp-wrapper');
+                return Response::success([
+                    'available'    => false,
+                    'url'          => null,
+                    'fallbackUrl'  => $fallbackUrl,
+                    'matchedSlug'  => null,
+                    'matchedTitle' => null,
+                    'region'       => $region,
+                ]);
+            }
+
+            $entry = Entry::find()
+                ->section($contentType)
+                ->siteId($site->id)
+                ->search($intent)
+                ->status(['live'])
+                ->orderBy(['score' => SORT_DESC])
+                ->one();
+
+            if (!$entry) {
+                return Response::success([
+                    'available'    => false,
+                    'url'          => null,
+                    'fallbackUrl'  => $fallbackUrl,
+                    'matchedSlug'  => null,
+                    'matchedTitle' => null,
+                    'region'       => $region,
+                ]);
+            }
+
+            return Response::success([
+                'available'    => true,
+                'url'          => $entry->url,
+                'fallbackUrl'  => $fallbackUrl,
+                'matchedSlug'  => $entry->slug,
+                'matchedTitle' => $entry->title,
+                'region'       => $region,
+            ]);
+        });
+    }
+
+    /**
      * Get entry by slug
      */
     #[Tool(
