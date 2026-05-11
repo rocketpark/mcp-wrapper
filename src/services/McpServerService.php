@@ -1047,8 +1047,9 @@ class McpServerService extends Component
         }
 
         // Status filters
-        if (!empty($args['status']) && is_array($args['status'])) {
-            $statusStr = implode(',', array_map(fn($s) => '"' . $this->escapeGraphQLString($s) . '"', $args['status']));
+        if (!empty($args['status'])) {
+            $statuses = (array) $args['status'];
+            $statusStr = implode(',', array_map(fn($s) => '"' . $this->escapeGraphQLString($s) . '"', $statuses));
             $filters[] = "status: [{$statusStr}]";
         }
 
@@ -1113,24 +1114,25 @@ class McpServerService extends Component
         }
 
         // Multi-site
-        if (!empty($args['site']) && is_array($args['site'])) {
-            $sitesStr = implode(',', array_map(fn($s) => '"' . $this->escapeGraphQLString($s) . '"', $args['site']));
+        if (!empty($args['site'])) {
+            $sites = (array) $args['site'];
+            $sitesStr = implode(',', array_map(fn($s) => '"' . $this->escapeGraphQLString($s) . '"', $sites));
             $filters[] = "site: [{$sitesStr}]";
         }
 
-        if (!empty($args['siteId']) && is_array($args['siteId'])) {
-            $siteIdsStr = implode(',', array_map('intval', $args['siteId']));
+        if (!empty($args['siteId'])) {
+            $siteIds = (array) $args['siteId'];
+            $siteIdsStr = implode(',', array_map('intval', $siteIds));
             $filters[] = "siteId: [{$siteIdsStr}]";
         }
 
         // Get custom fields for this section
         $fieldsList = $this->getFieldsListForQuery($sectionHandle, $params);
 
-        // Use section-specific GraphQL field (e.g., servicesBrowseEntries) instead of generic entries
-        $sectionField = $sectionHandle . 'Entries';
-
-        // Remove section filter since we're using section-specific field
-        $filters = array_filter($filters, fn($f) => !str_contains($f, 'section:'));
+        // Use generic `entries` field with section: filter (Craft 5 canonical pattern).
+        // Section-specific fields like `servicesEntries` have schema-cache fragility
+        // when site/status args are supplied — see McpServerService changelog 2026-05-11.
+        $sectionField = 'entries';
 
         // If we have inline fragments (entry type specific fields), use them
         if (!empty($fieldsList)) {
