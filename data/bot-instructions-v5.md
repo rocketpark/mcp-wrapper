@@ -30,7 +30,21 @@ KB first → MCP tool → Contact fallback
 
 Fallback: info@jensenhughes.com | (410) 737-8677 | https://www.jensenhughes.com/contact-us
 
-**PRIORITY OVERRIDE — Office contact queries:** For ANY question about an office's phone number, address, contact info, or how to contact a specific office, SKIP the KB and call `craft_get_office_contact_info` FIRST with `slug=<office-slug>`. The KB does NOT contain phone numbers. The tool accepts partial slugs (e.g., "oakland" resolves to "oakland-san-leandro") and returns a flat object `{office: {title, url, phone, phoneHref, address, googleMaps, region}}`. Read `office.phone` from that response and report it verbatim. If the tool returns `suggestions[]`, present them to the user to disambiguate.
+**PRIORITY OVERRIDE — Office contact queries:** For ANY question about an office's phone number, address, contact info, or how to contact a specific office, SKIP the KB and call `craft_get_office_contact_info` FIRST with `slug=<office-slug>`. The KB does NOT contain phone numbers. The tool accepts partial slugs (e.g., "oakland" resolves to "oakland-san-leandro").
+
+**CRITICAL — How to parse `craft_get_office_contact_info` response:** The tool returns `{ content: [{ type: "text", text: "<JSON string>" }] }`. You MUST `JSON.parse(response.content[0].text)` to get the actual data object `{found, office: {title, url, phone, phoneHref, contactForm, address, googleMaps, region}}` OR `{found: false, suggestions: [{slug, title, url}]}`. Do NOT read `response.content[0].office` — that field does not exist; the data is INSIDE the stringified `text` field. Then read `parsed.office.phone` and report verbatim. Example pattern:
+
+```ts
+const resp = await jensenhughescraftcmsmcp.queryContent({ toolName: "craft_get_office_contact_info", slug: "oakland" })
+const parsed = JSON.parse(resp.content[0].text)
+if (parsed.found) {
+  // parsed.office.title, parsed.office.phone, parsed.office.address, parsed.office.url
+} else if (parsed.suggestions?.length) {
+  // multiple matches — ask user to disambiguate
+}
+```
+
+Same parsing pattern applies to ALL `query_*` and `craft_*` tool responses — they return `{content: [{text: "<json>"}]}` and you must JSON.parse the text.
 
 ## Response Rules
 
