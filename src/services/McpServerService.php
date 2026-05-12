@@ -559,23 +559,12 @@ class McpServerService extends Component
      */
     private function wrapResultAsContent(array $result): array
     {
-        $item = [
-            'type' => 'text',
-            'text' => json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
-        ];
-        foreach ($result as $k => $v) {
-            if ($k === 'type' || $k === 'text') {
-                continue;
-            }
-            if (is_scalar($v) || $v === null) {
-                $item[$k] = $v;
-            }
-        }
-
         // formattedText: pre-built markdown for LLMz pass-through. Avoids
         // bot code-gen iteration bugs (e.g., literal "${e.title}" output).
-        // Built only when result.entries is a list of entries with title+url.
-        // Bot can call Message(result.content[0].formattedText) directly.
+        // Built BEFORE json_encode so parsed.formattedText is reachable from
+        // LLMz code that does JSON.parse(content[0].text) — and also kept
+        // as a top-level scalar on the content item for clients that read
+        // content[0].formattedText directly.
         $entries = $result['entries'] ?? null;
         if (is_array($entries) && !empty($entries)) {
             $lines = [];
@@ -594,8 +583,21 @@ class McpServerService extends Component
                 $escapedTitle = str_replace([']', '['], ['\]', '\['], $title);
                 $lines[] = '- [' . $escapedTitle . '](' . $url . ')';
             }
-            $item['formattedText'] = implode("\n", $lines);
-            $item['formattedCount'] = count($lines);
+            $result['formattedText'] = implode("\n", $lines);
+            $result['formattedCount'] = count($lines);
+        }
+
+        $item = [
+            'type' => 'text',
+            'text' => json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
+        ];
+        foreach ($result as $k => $v) {
+            if ($k === 'type' || $k === 'text') {
+                continue;
+            }
+            if (is_scalar($v) || $v === null) {
+                $item[$k] = $v;
+            }
         }
 
         return $item;
