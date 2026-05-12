@@ -571,6 +571,33 @@ class McpServerService extends Component
                 $item[$k] = $v;
             }
         }
+
+        // formattedText: pre-built markdown for LLMz pass-through. Avoids
+        // bot code-gen iteration bugs (e.g., literal "${e.title}" output).
+        // Built only when result.entries is a list of entries with title+url.
+        // Bot can call Message(result.content[0].formattedText) directly.
+        $entries = $result['entries'] ?? null;
+        if (is_array($entries) && !empty($entries)) {
+            $lines = [];
+            foreach ($entries as $entry) {
+                if (!is_array($entry)) {
+                    continue;
+                }
+                $title = $entry['title'] ?? null;
+                $url   = $entry['url']   ?? null;
+                if (!is_string($title) || trim($title) === '' || strtolower(trim($title)) === 'untitled') {
+                    continue;
+                }
+                if (!is_string($url) || trim($url) === '') {
+                    continue;
+                }
+                $escapedTitle = str_replace([']', '['], ['\]', '\['], $title);
+                $lines[] = '- [' . $escapedTitle . '](' . $url . ')';
+            }
+            $item['formattedText'] = implode("\n", $lines);
+            $item['formattedCount'] = count($lines);
+        }
+
         return $item;
     }
 

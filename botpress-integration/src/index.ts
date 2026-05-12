@@ -391,6 +391,11 @@ export default new bp.Integration({
         if (queryArgs.dateCreated) toolArguments.dateCreated = queryArgs.dateCreated
         if (queryArgs.dateUpdated) toolArguments.dateUpdated = queryArgs.dateUpdated
         if (queryArgs.orderBy) toolArguments.orderBy = queryArgs.orderBy
+        // Region-aware queries: pass site handle so returned entry URLs use the
+        // correct regional prefix (e.g., /europe/insights/... vs /insights/...).
+        if (queryArgs.site) toolArguments.site = queryArgs.site
+        if (queryArgs.siteId) toolArguments.siteId = queryArgs.siteId
+        if (queryArgs.section) toolArguments.section = queryArgs.section
 
         const result = await client.callTool(toolName, toolArguments)
 

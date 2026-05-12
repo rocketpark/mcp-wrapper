@@ -54,11 +54,15 @@ export default new IntegrationDefinition({
           limit: z.number().default(10).describe('Maximum number of entries to return (1-100)'),
           offset: z.number().default(0).describe('Number of entries to skip'),
           orderBy: z.string().optional().describe('Order results (e.g., "dateCreated DESC", "title ASC")'),
+          // Region-aware queries: pass site handle to get URLs with correct regional prefix
+          site: z.union([z.string(), z.array(z.string())]).optional().describe('Craft site handle for region-aware URLs (jensenHughesEurope, jensenHughesPacific, jensenHughesAsia, jensenHughesMiddleEast, jensenHughesDigital)'),
+          siteId: z.number().optional().describe('Craft site ID (alternative to site handle)'),
+          section: z.union([z.string(), z.array(z.string())]).optional().describe('Section handle for craft_search_entries (e.g., insights, services, industries, ourTeam)'),
         }),
       },
       output: {
         schema: z.object({
-          content: z.array(z.any()).describe('Raw MCP response content'),
+          content: z.array(z.any()).describe('Raw MCP response content. When tool returns a list of entries, content[0].formattedText is pre-built markdown link list ready for Message() pass-through.'),
         }),
       },
     },
