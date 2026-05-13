@@ -433,6 +433,7 @@ class EntryTools
 
             // Fallback: full-text search index may be stale for non-default sites.
             // Try title-based keyword match against all live entries in the section.
+            // First try full phrase; if that fails, try each significant word individually.
             if (!$entry) {
                 $keyword = strtolower($intent);
                 $candidates = Entry::find()
@@ -440,10 +441,23 @@ class EntryTools
                     ->siteId($site->id)
                     ->status(['live'])
                     ->all();
+                // Pass 1: full phrase match
                 foreach ($candidates as $candidate) {
                     if (stripos($candidate->title, $keyword) !== false) {
                         $entry = $candidate;
                         break;
+                    }
+                }
+                // Pass 2: any significant word match (handles "accessibility consulting" → "Accessibility + Universal Design")
+                if (!$entry) {
+                    $words = array_filter(explode(' ', $keyword), fn($w) => strlen($w) > 3);
+                    foreach ($candidates as $candidate) {
+                        foreach ($words as $word) {
+                            if (stripos($candidate->title, $word) !== false) {
+                                $entry = $candidate;
+                                break 2;
+                            }
+                        }
                     }
                 }
             }
