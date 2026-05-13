@@ -442,25 +442,30 @@ class EntryTools
                 }
             }
 
-            // Pass 2: scored word-by-word title match — most matching words wins.
-            // Stopwords: only truly generic terms. Domain-specific terms like "fire", "safety",
-            // "security", "risk", "testing" are intentionally kept so they discriminate correctly
-            // between services (e.g. "fire testing" → "Fire Testing" beats "Fire Engineering").
+            // Pass 2: scored word-by-word match against entry SLUGS with minimum-score gate.
+            // Matching slugs (not titles) avoids false positives from long titles that happen to
+            // share fire-safety vocabulary. E.g. "Fire + Life Safety Building Commissioning" title
+            // matches "fire safety engineering" with score 2, but its slug "commissioning" scores 0.
+            // A minimum score of min(2, wordCount) prevents weak single-word matches when the query
+            // has multiple meaningful words: "fire testing" (2 words, minScore=2) will NOT match
+            // "fire-engineering-systems-design" (only "fire" in slug → score 1 < 2 → no match →
+            // correct available:false for Asia where fire-testing entry does not exist).
             if (!$entry) {
-                $stopwords = ['consulting', 'services', 'service', 'design', 'engineering', 'management',
-                              'systems', 'analysis', 'assessment', 'planning', 'solutions', 'strategy',
-                              'code', 'review', 'support'];
+                $stopwords = ['consulting', 'services', 'service', 'solutions', 'strategy',
+                              'support', 'management'];
                 $words = array_values(array_filter(
                     explode(' ', $keyword),
                     fn($w) => strlen($w) > 3 && !in_array($w, $stopwords)
                 ));
                 if (!empty($words)) {
+                    $minScore  = min(2, count($words));
                     $bestScore = 0;
                     $bestEntry = null;
                     foreach ($candidates as $candidate) {
+                        $slugParts = explode('-', $candidate->slug);
                         $score = 0;
                         foreach ($words as $word) {
-                            if (stripos($candidate->title, $word) !== false) {
+                            if (in_array($word, $slugParts)) {
                                 $score++;
                             }
                         }
@@ -469,7 +474,7 @@ class EntryTools
                             $bestEntry = $candidate;
                         }
                     }
-                    if ($bestEntry) {
+                    if ($bestEntry && $bestScore >= $minScore) {
                         $entry = $bestEntry;
                     }
                 }
