@@ -431,6 +431,23 @@ class EntryTools
                 ->orderBy(['score' => SORT_DESC])
                 ->one();
 
+            // Fallback: full-text search index may be stale for non-default sites.
+            // Try title-based keyword match against all live entries in the section.
+            if (!$entry) {
+                $keyword = strtolower($intent);
+                $candidates = Entry::find()
+                    ->section($contentType)
+                    ->siteId($site->id)
+                    ->status(['live'])
+                    ->all();
+                foreach ($candidates as $candidate) {
+                    if (stripos($candidate->title, $keyword) !== false) {
+                        $entry = $candidate;
+                        break;
+                    }
+                }
+            }
+
             if (!$entry) {
                 return Response::success([
                     'available'    => false,
