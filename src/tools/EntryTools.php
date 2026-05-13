@@ -449,8 +449,12 @@ class EntryTools
                     }
                 }
                 // Pass 2: any significant word match (handles "accessibility consulting" → "Accessibility + Universal Design")
+                // Stopwords are generic terms that appear in many service titles and would cause false positives.
                 if (!$entry) {
-                    $words = array_filter(explode(' ', $keyword), fn($w) => strlen($w) > 3);
+                    $stopwords = ['consulting', 'services', 'service', 'design', 'engineering', 'management',
+                                  'systems', 'analysis', 'assessment', 'planning', 'solutions', 'strategy',
+                                  'safety', 'security', 'risk', 'fire', 'code', 'testing', 'review', 'support'];
+                    $words = array_filter(explode(' ', $keyword), fn($w) => strlen($w) > 3 && !in_array($w, $stopwords));
                     foreach ($candidates as $candidate) {
                         foreach ($words as $word) {
                             if (stripos($candidate->title, $word) !== false) {
