@@ -423,47 +423,67 @@ class EntryTools
                 ]);
             }
 
-            $entry = Entry::find()
+            // Title-matching passes run first to avoid FTS body-content false positives
+            // (e.g. "Greater China" region page ranking above "Fire Engineering + Systems Design"
+            // because it mentions fire engineering in its body). FTS is used only as last resort.
+            $keyword    = strtolower($intent);
+            $candidates = Entry::find()
                 ->section($contentType)
                 ->siteId($site->id)
-                ->search($intent)
                 ->status(['live'])
-                ->orderBy(['score' => SORT_DESC])
-                ->one();
+                ->all();
+            $entry = null;
 
-            // Fallback: full-text search index may be stale for non-default sites.
-            // Try title-based keyword match against all live entries in the section.
-            // First try full phrase; if that fails, try each significant word individually.
-            if (!$entry) {
-                $keyword = strtolower($intent);
-                $candidates = Entry::find()
-                    ->section($contentType)
-                    ->siteId($site->id)
-                    ->status(['live'])
-                    ->all();
-                // Pass 1: full phrase match
-                foreach ($candidates as $candidate) {
-                    if (stripos($candidate->title, $keyword) !== false) {
-                        $entry = $candidate;
-                        break;
-                    }
+            // Pass 1: full phrase in title
+            foreach ($candidates as $candidate) {
+                if (stripos($candidate->title, $keyword) !== false) {
+                    $entry = $candidate;
+                    break;
                 }
-                // Pass 2: any significant word match (handles "accessibility consulting" → "Accessibility + Universal Design")
-                // Stopwords are generic terms that appear in many service titles and would cause false positives.
-                if (!$entry) {
-                    $stopwords = ['consulting', 'services', 'service', 'design', 'engineering', 'management',
-                                  'systems', 'analysis', 'assessment', 'planning', 'solutions', 'strategy',
-                                  'safety', 'security', 'risk', 'fire', 'code', 'testing', 'review', 'support'];
-                    $words = array_filter(explode(' ', $keyword), fn($w) => strlen($w) > 3 && !in_array($w, $stopwords));
+            }
+
+            // Pass 2: scored word-by-word title match — most matching words wins.
+            // Stopwords: only truly generic terms. Domain-specific terms like "fire", "safety",
+            // "security", "risk", "testing" are intentionally kept so they discriminate correctly
+            // between services (e.g. "fire testing" → "Fire Testing" beats "Fire Engineering").
+            if (!$entry) {
+                $stopwords = ['consulting', 'services', 'service', 'design', 'engineering', 'management',
+                              'systems', 'analysis', 'assessment', 'planning', 'solutions', 'strategy',
+                              'code', 'review', 'support'];
+                $words = array_values(array_filter(
+                    explode(' ', $keyword),
+                    fn($w) => strlen($w) > 3 && !in_array($w, $stopwords)
+                ));
+                if (!empty($words)) {
+                    $bestScore = 0;
+                    $bestEntry = null;
                     foreach ($candidates as $candidate) {
+                        $score = 0;
                         foreach ($words as $word) {
                             if (stripos($candidate->title, $word) !== false) {
-                                $entry = $candidate;
-                                break 2;
+                                $score++;
                             }
                         }
+                        if ($score > $bestScore) {
+                            $bestScore = $score;
+                            $bestEntry = $candidate;
+                        }
+                    }
+                    if ($bestEntry) {
+                        $entry = $bestEntry;
                     }
                 }
+            }
+
+            // Pass 3: FTS fallback — searches body content too, less precise
+            if (!$entry) {
+                $entry = Entry::find()
+                    ->section($contentType)
+                    ->siteId($site->id)
+                    ->search($intent)
+                    ->status(['live'])
+                    ->orderBy(['score' => SORT_DESC])
+                    ->one();
             }
 
             if (!$entry) {
