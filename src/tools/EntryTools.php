@@ -502,9 +502,26 @@ class EntryTools
                 ]);
             }
 
+            // Ensure the region prefix is present in the returned URL.
+            // Craft's $entry->url uses the site's base URL, which may omit the
+            // region path prefix when the server's REGION_SITE_URL env var is
+            // configured without it (common on staging). Normalize defensively.
+            $url = $entry->url;
+            if ($prefix !== '' && !empty($url)) {
+                $parsed = parse_url($url);
+                $path   = $parsed['path'] ?? '/';
+                if (!str_starts_with($path, $prefix . '/') && $path !== $prefix) {
+                    $scheme   = $parsed['scheme'] ?? 'https';
+                    $host     = $parsed['host'] ?? '';
+                    $query    = isset($parsed['query'])    ? '?' . $parsed['query']    : '';
+                    $fragment = isset($parsed['fragment']) ? '#' . $parsed['fragment'] : '';
+                    $url      = $scheme . '://' . $host . $prefix . $path . $query . $fragment;
+                }
+            }
+
             return Response::success([
                 'available'    => true,
-                'url'          => $entry->url,
+                'url'          => $url,
                 'fallbackUrl'  => $fallbackUrl,
                 'matchedSlug'  => $entry->slug,
                 'matchedTitle' => $entry->title,
