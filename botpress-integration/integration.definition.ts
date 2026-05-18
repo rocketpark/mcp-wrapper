@@ -2,7 +2,7 @@ import { IntegrationDefinition, z } from '@botpress/sdk'
 
 export default new IntegrationDefinition({
   name: 'craftcms-mcp',
-  version: '1.0.7',
+  version: '1.0.8',
   title: 'Craft CMS via MCP',
   description: 'Query Craft CMS content through the Model Context Protocol (MCP) server',
   icon: 'icon.svg',
@@ -132,7 +132,27 @@ export default new IntegrationDefinition({
 
   events: {},
   channels: {},
+  // User tags MUST be declared here for Botpress to accept tag writes
+  // (window.botpress.updateUser({tags: ...}) — see _meta_footer.twig).
+  // The Twig footer writes these on every page load from a JH regional site.
   user: {
-    tags: {},
+    tags: {
+      region: {
+        title: 'User region',
+        description: 'Visitor region detected from currentSite.handle (europe, pacific, asia, middle_east, americas)',
+      },
+      siteHandle: {
+        title: 'Craft site handle',
+        description: 'currentSite.handle (e.g. jensenHughesEurope)',
+      },
+      language: {
+        title: 'Language code',
+        description: 'currentSite.language (e.g. en, fr)',
+      },
+      urlPrefix: {
+        title: 'Regional URL prefix',
+        description: 'Regional path prefix (e.g. /europe/, /pacific/)',
+      },
+    },
   },
 })
