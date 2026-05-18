@@ -187,10 +187,12 @@ export default new bp.Integration({
         let resolved = siteFromRegion(normalizeRegion(queryArgs.region))
         let derivedFrom = resolved ? `input.region=${queryArgs.region}` : null
 
-        // Strategy 2: discover most recently-updated user with data.region.
-        // Webchat updateUser is async, so first call after page load can race.
-        // 5 attempts with 800ms backoff = up to 4s wait — covers the race
-        // without making non-region queries slow.
+        // Strategy 2: discover most recently-updated user with tags.region.
+        // Webchat updateUser writes both `data` and `tags`. Only `tags` survive
+        // to the Botpress backend — `data` is a webchat-only field absent from
+        // the listUsers/getUser User shape (per @botpress/client SDK types).
+        // Race: updateUser is async on the backend; first call after page load
+        // can race. 5 attempts with 800ms backoff = up to 4s wait.
         if (!resolved) {
           const maxAttempts = 5
           for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -201,7 +203,7 @@ export default new bp.Integration({
               const usersResp = await bpClient.listUsers({})
               const users = (usersResp as any)?.users || []
               const candidates = users
-                .filter((u: any) => u?.data?.region && typeof u.data.region === 'string')
+                .filter((u: any) => u?.tags?.region && typeof u.tags.region === 'string')
                 .sort((a: any, b: any) => {
                   const at = a?.updatedAt ? new Date(a.updatedAt).getTime() : 0
                   const bt = b?.updatedAt ? new Date(b.updatedAt).getTime() : 0
@@ -209,11 +211,11 @@ export default new bp.Integration({
                 })
               const candidate = candidates[0]
               if (candidate) {
-                const r = normalizeRegion(candidate.data.region)
+                const r = normalizeRegion(candidate.tags.region)
                 const s = siteFromRegion(r)
                 if (s) {
                   resolved = s
-                  derivedFrom = `user(${candidate.id}).data.region=${candidate.data.region}${attempt > 0 ? ` (after ${attempt} retries)` : ''}`
+                  derivedFrom = `user(${candidate.id}).tags.region=${candidate.tags.region}${attempt > 0 ? ` (after ${attempt} retries)` : ''}`
                   break
                 }
               }
@@ -222,7 +224,7 @@ export default new bp.Integration({
             }
           }
           if (!resolved) {
-            logger.forBot().info(`No user with data.region found after ${maxAttempts} attempts; using default site`)
+            logger.forBot().info(`No user with tags.region found after ${maxAttempts} attempts; using default site`)
           }
         }
 
