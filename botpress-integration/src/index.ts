@@ -145,13 +145,93 @@ export default new bp.Integration({
     /**
      * Query Craft CMS content
      */
-    queryContent: async ({ ctx, input, logger }) => {
+    queryContent: async ({ ctx, input, client: bpClient, logger }) => {
       const { mcpServerUrl, schemaHandle } = ctx.configuration
       if (!mcpServerUrl || !schemaHandle) {
         throw new Error('MCP Server URL and Schema Handle are required')
       }
-      
+
       const { toolName, ...queryArgs } = input
+
+      // Auto-derive the Craft site handle from the user region.
+      //
+      // Two strategies, most-explicit -> most-implicit:
+      //   1. Bot passed `region` directly. Map via REGION_TO_SITE. This is the
+      //      reliable path: the bot reads {{user.data.region}} (set by Twig at
+      //      page load) and passes it. The schema description tells the LLM to
+      //      always do this.
+      //   2. Bot forgot to pass region. Look up the most recently-updated
+      //      Botpress user that has `data.region` set and use that. Webchat
+      //      updateUser is async, so first-call race retried with backoff.
+      //
+      // An integration-level state cache was considered but rejected: it
+      // would bleed across users from different regions on the same bot.
+      // Per-user caching needs the calling user's ID, which IntegrationContext
+      // doesn't expose for actions, so we rely on bot-side passing instead.
+      const REGION_TO_SITE: Record<string, string> = {
+        europe: 'jensenHughesEurope',
+        pacific: 'jensenHughesPacific',
+        asia: 'jensenHughesAsia',
+        middle_east: 'jensenHughesMiddleEast',
+      }
+      const normalizeRegion = (r: unknown): string | null => {
+        if (typeof r !== 'string') return null
+        return r.toLowerCase().trim().replace(/\s+/g, '_')
+      }
+      const siteFromRegion = (r: string | null): string | null => {
+        return r && REGION_TO_SITE[r] ? REGION_TO_SITE[r] : null
+      }
+
+      if (!queryArgs.site) {
+        // Strategy 1: explicit region in input
+        let resolved = siteFromRegion(normalizeRegion(queryArgs.region))
+        let derivedFrom = resolved ? `input.region=${queryArgs.region}` : null
+
+        // Strategy 2: discover most recently-updated user with data.region.
+        // Webchat updateUser is async, so first call after page load can race.
+        // 5 attempts with 800ms backoff = up to 4s wait — covers the race
+        // without making non-region queries slow.
+        if (!resolved) {
+          const maxAttempts = 5
+          for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            if (attempt > 0) {
+              await new Promise(r => setTimeout(r, 800))
+            }
+            try {
+              const usersResp = await bpClient.listUsers({})
+              const users = (usersResp as any)?.users || []
+              const candidates = users
+                .filter((u: any) => u?.data?.region && typeof u.data.region === 'string')
+                .sort((a: any, b: any) => {
+                  const at = a?.updatedAt ? new Date(a.updatedAt).getTime() : 0
+                  const bt = b?.updatedAt ? new Date(b.updatedAt).getTime() : 0
+                  return bt - at
+                })
+              const candidate = candidates[0]
+              if (candidate) {
+                const r = normalizeRegion(candidate.data.region)
+                const s = siteFromRegion(r)
+                if (s) {
+                  resolved = s
+                  derivedFrom = `user(${candidate.id}).data.region=${candidate.data.region}${attempt > 0 ? ` (after ${attempt} retries)` : ''}`
+                  break
+                }
+              }
+            } catch (e) {
+              logger.forBot().warn(`Region auto-discovery attempt ${attempt + 1} failed: ${(e as Error).message}`)
+            }
+          }
+          if (!resolved) {
+            logger.forBot().info(`No user with data.region found after ${maxAttempts} attempts; using default site`)
+          }
+        }
+
+        if (resolved) {
+          queryArgs.site = resolved
+          logger.forBot().info(`Auto-derived site=${resolved} (source: ${derivedFrom})`)
+        }
+      }
+
       const client = new MCPClient(mcpServerUrl, schemaHandle, logger)
 
       try {
