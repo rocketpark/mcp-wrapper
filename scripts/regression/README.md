@@ -7,10 +7,10 @@ test plan. Use it before every prompt or KB change to catch regressions
 
 ## Why
 
-Jonathan's recurring complaint pattern in 2026-01 → 2026-05 was *"these
-questions are not being re-tested."* This script removes the human-cost
-floor for re-testing. Run it locally before publishing prompt/KB updates;
-if it stays green, you've verified ~21 critical paths in ~10 minutes.
+Manual regression testing across 5 regions and a dozen topics is slow and
+easy to skip. This script removes the human-cost floor — run it before
+publishing any prompt or KB update and you've verified ~21 critical paths
+in ~10 minutes.
 
 ## Test coverage (21 scenarios)
 
@@ -89,8 +89,8 @@ This suite covers ~21 of the 230+ questions in the Botpress Bot Question
 Bank doc (`dguda-14691` in ClickUp). Highest-priority categories covered:
 office contact, forensics, restrictions, BIM, privacy. Open gaps: industries,
 insights/case studies, complex multi-part queries, edge cases (jokes,
-nonsense input), real-customer scenarios. Add tests as bugs are found in
-the field.
+nonsense input), real-customer scenarios. Add tests as gaps are identified
+in the field.
 
 ## CI integration (optional)
 
