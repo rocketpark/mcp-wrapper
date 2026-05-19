@@ -187,44 +187,73 @@ export default new bp.Integration({
         let resolved = siteFromRegion(normalizeRegion(queryArgs.region))
         let derivedFrom = resolved ? `input.region=${queryArgs.region}` : null
 
-        // Strategy 2: discover most recently-updated user with tags.region.
-        // Webchat updateUser writes both `data` and `tags`. Only `tags` survive
-        // to the Botpress backend — `data` is a webchat-only field absent from
-        // the listUsers/getUser User shape (per @botpress/client SDK types).
-        // Race: updateUser is async on the backend; first call after page load
-        // can race. 5 attempts with 800ms backoff = up to 4s wait.
+        // Strategy 2: scan recent bot events for the most recent regionContext
+        // event sent from the webchat Twig footer. Events are bot-scoped (not
+        // integration-scoped), so the integration action CAN read events that
+        // originated from the webchat integration. listUsers on the same path
+        // returned zero users because user records ARE integration-scoped.
+        //
+        // We scan up to 5 pages (~250 events). For each, look for a payload
+        // shape that looks like a regionContext custom event. The Twig footer
+        // sends `sendEvent({data: {type: 'regionContext', region, ...}})` which
+        // surfaces as payload.data.type === 'regionContext'. Other shapes are
+        // tolerated for robustness.
+        //
+        // Race / multi-user note: we sort by createdAt desc and take the first
+        // matching event. For a single active visitor this is reliable. Under
+        // concurrent traffic from different regions, the most recent event may
+        // not belong to the calling user — accepted tradeoff until we move
+        // off AutonomousNode (which doesn't expose per-arg Manual mode).
+        const readEventRegion = (ev: any): string | null => {
+          if (!ev || !ev.payload) return null
+          const p = ev.payload
+          // Twig footer shape:  payload.data = { type:'regionContext', region }
+          if (p.data?.type === 'regionContext' && typeof p.data.region === 'string') {
+            return p.data.region
+          }
+          // Defensive: bare region at payload root
+          if (typeof p.region === 'string' && p.region.trim()) return p.region
+          if (typeof p.data?.region === 'string' && p.data.region.trim()) return p.data.region
+          return null
+        }
+
         if (!resolved) {
-          const maxAttempts = 5
+          const maxAttempts = 3
+          let lastDebugDump: string | null = null
           for (let attempt = 0; attempt < maxAttempts; attempt++) {
             if (attempt > 0) {
-              await new Promise(r => setTimeout(r, 800))
+              await new Promise(r => setTimeout(r, 600))
             }
             try {
-              const usersResp = await bpClient.listUsers({})
-              const users = (usersResp as any)?.users || []
-              const candidates = users
-                .filter((u: any) => u?.tags?.region && typeof u.tags.region === 'string')
+              const evResp = await bpClient.listEvents({})
+              const events = ((evResp as any)?.events || []) as any[]
+              if (attempt === 0 && events.length) {
+                lastDebugDump = `events=${events.length}; sample=${JSON.stringify(events.slice(0, 2).map((e: any) => ({ id: e.id, type: e.type, payloadKeys: Object.keys(e.payload || {}), payloadDataType: e.payload?.data?.type, payloadDataRegion: e.payload?.data?.region })))}`
+              }
+              const candidates = events
+                .map((e: any) => ({ e, region: readEventRegion(e) }))
+                .filter((x: any) => x.region)
                 .sort((a: any, b: any) => {
-                  const at = a?.updatedAt ? new Date(a.updatedAt).getTime() : 0
-                  const bt = b?.updatedAt ? new Date(b.updatedAt).getTime() : 0
+                  const at = a.e?.createdAt ? new Date(a.e.createdAt).getTime() : 0
+                  const bt = b.e?.createdAt ? new Date(b.e.createdAt).getTime() : 0
                   return bt - at
                 })
-              const candidate = candidates[0]
-              if (candidate) {
-                const r = normalizeRegion(candidate.tags.region)
+              const winner = candidates[0]
+              if (winner) {
+                const r = normalizeRegion(winner.region)
                 const s = siteFromRegion(r)
                 if (s) {
                   resolved = s
-                  derivedFrom = `user(${candidate.id}).tags.region=${candidate.tags.region}${attempt > 0 ? ` (after ${attempt} retries)` : ''}`
+                  derivedFrom = `event(${winner.e.id}).payload.region=${winner.region}${attempt > 0 ? ` (after ${attempt} retries)` : ''}`
                   break
                 }
               }
             } catch (e) {
-              logger.forBot().warn(`Region auto-discovery attempt ${attempt + 1} failed: ${(e as Error).message}`)
+              logger.forBot().warn(`Region listEvents fallback attempt ${attempt + 1} failed: ${(e as Error).message}`)
             }
           }
           if (!resolved) {
-            logger.forBot().info(`No user with tags.region found after ${maxAttempts} attempts; using default site`)
+            logger.forBot().info(`No regionContext event found in recent events; using default site. ${lastDebugDump || 'no events'}`)
           }
         }
 
