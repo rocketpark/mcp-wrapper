@@ -699,7 +699,9 @@ class EntryTools
                 ];
                 if (!empty($suggestions)) {
                     $resp['suggestions'] = $suggestions;
-                    $resp['message'] .= '. Did you mean: ' . implode(', ', array_column($suggestions, 'slug'));
+                    // Show TITLES to user (not internal slugs). LLM uses titles to re-prompt;
+                    // it can match user's pick back to a slug from the suggestions[] array.
+                    $resp['message'] .= '. Did you mean: ' . implode(', ', array_column($suggestions, 'title'));
                 }
                 return $resp;
             }

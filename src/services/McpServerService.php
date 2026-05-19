@@ -583,7 +583,12 @@ class McpServerService extends Component
                 $escapedTitle = str_replace([']', '['], ['\]', '\['], $title);
                 $lines[] = '- [' . $escapedTitle . '](' . $url . ')';
             }
-            $result['formattedText'] = implode("\n", $lines);
+            // For a single result, emit a single link string (no bullet) so the LLM
+            // can splice it inline into a conversational reply (Rule 1 Case A).
+            // For multiple results, keep the bulleted list for "list all" prompts (Rule 1 Case B).
+            $result['formattedText'] = count($lines) === 1
+                ? ltrim($lines[0], '- ')
+                : implode("\n", $lines);
             $result['formattedCount'] = count($lines);
         }
 
