@@ -92,6 +92,93 @@ const TESTS = [
   { id: 'Privacy-refuse',  region: 'NA', tag: 'privacy', q: 'What is Brian Meacham email address?',
     expect: ['info@jensenhughes.com'],
     deny: ['brian.meacham@', '@jensenhughes.com\nemail:', 'meacham@jensenhughes'] },
+  // Gap coverage: non-NA office locator, podcast, careers, partners, multi-part
+  { id: 'Pacific-sydney-office', region: 'Pacific', tag: 'office', q: 'What is the phone number for the Sydney office?',
+    expect: ['Sydney'], deny: ['not currently available'] },
+  { id: 'NA-podcast', region: 'NA', tag: 'podcast', q: 'Do you have a podcast?',
+    // Bot links URL containing "forensics-uncovered-podcast" — accept either form
+    expect: [],
+    expectAny: ['Forensics Uncovered', 'forensics-uncovered-podcast'],
+    deny: [] },
+  { id: 'NA-careers', region: 'NA', tag: 'careers', q: 'Are you hiring?',
+    expect: ['careers'], deny: [] },
+  { id: 'NA-multi-part', region: 'NA', tag: 'multi-part', q: 'Do you offer both fire engineering and security risk consulting?',
+    expect: ['fire engineering', 'security risk'], deny: ['not currently available'] },
+  // V6 — Aldiana 11/17 ticket coverage
+  { id: 'NA-combustible-dust-experts', region: 'NA', tag: 'aldiana-v6', q: 'Who are your experts in combustible dust?',
+    expect: ['combustible-dust-safety'],
+    deny: ['${', '{prefix', '{region', '$&#123;', 'I couldn\'t find anyone'] },
+  { id: 'NA-bess-experts', region: 'NA', tag: 'aldiana-v6', q: 'Who are your experts in BESS?',
+    expect: ['lithium-ion-risk-consulting'],
+    deny: ['${', '{prefix', '{region', '$&#123;'] },
+  { id: 'NA-lithium-ion-services', region: 'NA', tag: 'aldiana-v6', q: 'Do you offer services for lithium ion batteries?',
+    // Both lithium-ion-risk-consulting AND emerging-hazards are valid landings per V6 Rule 10
+    expect: ['jensenhughes.com'],
+    expectAny: ['lithium-ion-risk-consulting', 'emerging-hazards'],
+    deny: ['${', '{prefix', '$&#123;'] },
+  { id: 'NA-lsft-info', region: 'NA', tag: 'aldiana-v6', q: 'Tell me about LSFT',
+    expect: ['Large-Scale Fire Testing', 'fire-testing'],
+    deny: ['${', '{prefix', '$&#123;', '\\n \\n'] },
+  { id: 'NA-lng-experts', region: 'NA', tag: 'aldiana-v6', q: 'Who are your experts in LNG?',
+    expect: ['process-safety'],
+    deny: ['${', '{prefix', '$&#123;'] },
+  { id: 'NA-sydney-disambig-no-slug', region: 'Pacific', tag: 'aldiana-v6', q: 'What is the phone number for the Sydney office?',
+    expect: ['Sydney'],
+    // slug strings MUST NOT leak to user
+    deny: ['slug:', '(slug', 'sydney-castlereagh-street', 'sydney-australia'] },
+  { id: 'NA-single-service-no-list-dump', region: 'NA', tag: 'aldiana-v6', q: 'Do you offer fire engineering services?',
+    // Should be conversational lead + ONE link, NOT bulleted list dump
+    expect: ['fire-engineering-systems-design'],
+    deny: ['${', '{prefix', '$&#123;'] },
+  { id: 'EU-bim-no-fire-eng', region: 'EU', tag: 'aldiana-v6', q: 'Do you offer BIM services?',
+    expect: ['incorporating-bimfire-into-jensen-hughes-fire-safety-design'],
+    deny: ['fire-engineering-systems-design', 'fire-engineering-consultancy'] },
+  // V6 — region × content-surface coverage (Jonathan's "all stuff is different per region" feedback)
+  // Industries per region
+  { id: 'EU-industries', region: 'EU', tag: 'region-surface', q: 'What industries do you serve?',
+    expect: ['Europe'], deny: ['${', '$&#123;'] },
+  { id: 'Pacific-industries', region: 'Pacific', tag: 'region-surface', q: 'What industries do you serve?',
+    expect: ['Pacific'], deny: ['${', '$&#123;'] },
+  { id: 'Asia-industries', region: 'Asia', tag: 'region-surface', q: 'What industries do you serve?',
+    expect: ['Asia'], deny: ['${', '$&#123;'] },
+  { id: 'ME-industries', region: 'ME', tag: 'region-surface', q: 'What industries do you serve?',
+    expect: ['Middle East'], deny: ['${', '$&#123;'] },
+  // Marine Forensics — Jonathan's May 13 specific complaint
+  { id: 'EU-marine-forensics', region: 'EU', tag: 'jonathan', q: 'Do you provide Marine Forensics services?',
+    expect: ['marine-fire-forensics', 'instructus.uk@jensenhughes.com'],
+    deny: ['${', '$&#123;', 'what country', 'what city'] },
+  { id: 'NA-marine-forensics', region: 'NA', tag: 'jonathan', q: 'Do you provide Marine Forensics services?',
+    expect: ['investigations'], deny: ['${', '$&#123;'] },
+  // Digital Solutions per region
+  { id: 'NA-digital', region: 'NA', tag: 'region-surface', q: 'What digital solutions do you offer?',
+    // Accept any digital product mention OR the /services/digital landing — KB doesn't surface specific product names yet
+    expect: ['Digital'],
+    expectAny: ['Advisr', '/services/digital', 'SMARTPLAN'],
+    deny: ['${', '$&#123;'] },
+  { id: 'EU-digital', region: 'EU', tag: 'region-surface', q: 'What digital solutions do you offer?',
+    expect: ['Europe'], deny: ['${', '$&#123;'] },
+  // Insights per region
+  { id: 'EU-insights', region: 'EU', tag: 'region-surface', q: 'Do you have any case studies or insights for Europe?',
+    expect: ['Europe'], deny: ['${', '$&#123;'] },
+  { id: 'Pacific-insights', region: 'Pacific', tag: 'region-surface', q: 'Do you have any case studies or insights for Pacific?',
+    expect: ['Pacific'], deny: ['${', '$&#123;'] },
+  // Careers per region
+  { id: 'EU-careers', region: 'EU', tag: 'region-surface', q: 'Are you hiring in Europe?',
+    expect: ['careers'], deny: ['${', '$&#123;'] },
+  { id: 'Pacific-careers', region: 'Pacific', tag: 'region-surface', q: 'Are you hiring in Pacific?',
+    expect: ['careers'], deny: ['${', '$&#123;'] },
+  // About / company overview per region — should NOT region-gate "about Jensen Hughes" since company info is global
+  { id: 'NA-about', region: 'NA', tag: 'region-surface', q: 'Tell me about Jensen Hughes.',
+    expect: ['1939', 'jensenhughes.com'], deny: ['${', '$&#123;'] },
+  { id: 'EU-about', region: 'EU', tag: 'region-surface', q: 'Tell me about Jensen Hughes.',
+    expect: ['1939'], deny: ['${', '$&#123;'] },
+  // Contact page per region
+  { id: 'EU-contact', region: 'EU', tag: 'region-surface', q: 'How can I get in touch with Jensen Hughes in Europe?',
+    expect: ['Europe'], deny: ['${', '$&#123;'] },
+  { id: 'Asia-contact', region: 'Asia', tag: 'region-surface', q: 'How can I contact Jensen Hughes in Asia?',
+    expect: ['Asia'], deny: ['${', '$&#123;'] },
+  { id: 'ME-contact', region: 'ME', tag: 'region-surface', q: 'How do I contact Jensen Hughes in the Middle East?',
+    expect: ['Middle East'], deny: ['${', '$&#123;'] },
 ];
 
 function parseArgs(argv) {
@@ -99,6 +186,7 @@ function parseArgs(argv) {
   for (let i = 2; i < argv.length; i++) {
     if (argv[i] === '--region') args.region = argv[++i];
     if (argv[i] === '--tag') args.tag = argv[++i];
+    if (argv[i] === '--ids') args.ids = argv[++i].split(',');
     if (argv[i] === '--verbose' || argv[i] === '-v') args.verbose = true;
   }
   return args;
@@ -136,7 +224,8 @@ async function ask(page, question) {
   await page.evaluate(async (q) => {
     await window.botpress.sendMessage(q);
   }, question);
-  await page.waitForTimeout(28000);
+  // 45s covers multi-part queries that fire 2+ tool calls (~50s observed)
+  await page.waitForTimeout(45000);
   return await page.evaluate(() => {
     const hosts = Array.from(document.querySelectorAll('*')).filter(el => el.shadowRoot);
     for (const h of hosts) {
@@ -159,27 +248,38 @@ function evaluateExpectations(reply, test) {
   const replyLow = reply.toLowerCase();
   const missing = test.expect.filter(s => !replyLow.includes(s.toLowerCase()));
   const banned = test.deny.filter(s => replyLow.includes(s.toLowerCase()));
-  return { pass: missing.length === 0 && banned.length === 0, missing, banned };
+  // expectAny: pass if ANY of the strings appears (used when multiple valid URLs/keywords exist)
+  let anyMissing = false;
+  if (test.expectAny && test.expectAny.length) {
+    anyMissing = !test.expectAny.some(s => replyLow.includes(s.toLowerCase()));
+  }
+  return {
+    pass: missing.length === 0 && banned.length === 0 && !anyMissing,
+    missing: anyMissing ? [...missing, `expectAny: ${test.expectAny.join(' OR ')}`] : missing,
+    banned
+  };
 }
 
 async function main() {
   const args = parseArgs(process.argv);
-  const filtered = TESTS.filter(t => (!args.region || t.region === args.region) && (!args.tag || t.tag === args.tag));
+  const filtered = TESTS.filter(t =>
+    (!args.region || t.region === args.region) &&
+    (!args.tag || t.tag === args.tag) &&
+    (!args.ids || args.ids.includes(t.id))
+  );
   console.log(`Running ${filtered.length} tests (of ${TESTS.length})\n`);
 
   const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({ httpCredentials: HTTP_AUTH });
-  const page = await context.newPage();
 
   const results = [];
-  let currentRegion = null;
   for (const test of filtered) {
-    if (currentRegion !== test.region) {
-      currentRegion = test.region;
-      await setupSession(page, REGIONS[test.region]);
-    }
+    // Fresh context per test = clean webchat user, no conversation carry-over
+    const context = await browser.newContext({ httpCredentials: HTTP_AUTH });
+    const page = await context.newPage();
+    await setupSession(page, REGIONS[test.region]);
     const transcript = await ask(page, test.q);
     const reply = lastBotReply(transcript, test.q);
+    await context.close();
     const result = evaluateExpectations(reply, test);
     results.push({ test, reply, result });
     const status = result.pass ? '✓ PASS' : '✗ FAIL';
