@@ -105,16 +105,13 @@ function parseArgs(argv) {
 }
 
 async function setupSession(page, regionCfg) {
-  await page.evaluate(() => {
-    document.cookie.split(';').forEach(c => {
-      const n = c.split('=')[0].trim();
-      document.cookie = `${n}=;expires=Thu, 01 Jan 1970;path=/`;
-      document.cookie = `${n}=;expires=Thu, 01 Jan 1970;path=/;domain=${location.hostname}`;
-    });
-    localStorage.clear();
-    sessionStorage.clear();
-  });
+  // Clear cookies via browser context (works even on about:blank)
+  await page.context().clearCookies();
   await page.goto(STAGING_URL + regionCfg.path + '?_t=' + Date.now(), { waitUntil: 'load' });
+  // Clear page-scoped storage after navigation
+  await page.evaluate(() => {
+    try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
+  });
   await page.evaluate(async (cfg) => {
     const t0 = Date.now();
     while (!(window.botpress && typeof window.botpress.open === 'function') && Date.now() - t0 < 20000) {
