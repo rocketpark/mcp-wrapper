@@ -1,7 +1,7 @@
 # Jensen Hughes Regional Service Availability + URL Reference
 
-Last updated: 2026-05-11
-Source: Live jensenhughes.com per-region sitemaps
+Last updated: 2026-05-19 (corrected against prod-site audit of jensenhughes.com)
+Source: Live jensenhughes.com per-region sitemaps + service pages
 
 Each region has its own URL prefix AND its own service taxonomy/slugs. Service slugs differ between regions — do NOT assume the global slug works under a regional prefix.
 
@@ -9,13 +9,13 @@ Each region has its own URL prefix AND its own service taxonomy/slugs. Service s
 
 ## URL Prefix per Region
 
-| Region        | URL Prefix      | Services Landing                                    |
-|---------------|-----------------|-----------------------------------------------------|
-| Global / Americas | (none)        | https://www.jensenhughes.com/services               |
-| Europe        | /europe/        | https://www.jensenhughes.com/europe/services        |
-| Pacific       | /pacific/       | https://www.jensenhughes.com/pacific/services       |
-| Asia          | /asia/          | https://www.jensenhughes.com/asia/services          |
-| Middle East   | /middle-east/   | https://www.jensenhughes.com/middle-east/services   |
+| Region            | URL Prefix      | Services Landing                                    |
+|-------------------|-----------------|-----------------------------------------------------|
+| North America / Americas | (none)   | https://www.jensenhughes.com/services               |
+| Europe            | /europe/        | https://www.jensenhughes.com/europe/services        |
+| Pacific           | /pacific/       | https://www.jensenhughes.com/pacific/services       |
+| Asia              | /asia/          | https://www.jensenhughes.com/asia/services          |
+| Middle East + India | /middle-east/ | https://www.jensenhughes.com/middle-east/services   |
 
 NOTE: Middle East has its own URL prefix `/middle-east/`. Do NOT use global URLs for Middle East users.
 
@@ -25,11 +25,24 @@ NOTE: Middle East has its own URL prefix `/middle-east/`. Do NOT use global URLs
 
 1. If you know the user's region AND the exact regional slug for the service they asked about, use the deep URL.
 2. If you DO NOT know the exact regional slug, link ONLY to the region's services landing page (e.g., /europe/services). Do not guess a slug.
-3. NEVER assume a global slug works for a regional URL — many slugs differ (Europe uses "fire-engineering-consultancy", Pacific uses "fire-engineering", Global uses "fire-engineering-systems-design").
+3. NEVER assume a global slug works for a regional URL — many slugs differ (Europe uses "fire-engineering-consultancy" or "fire-engineering-code-consulting", Pacific uses "fire-engineering", Global uses "fire-engineering-systems-design").
 
 ---
 
-## Service Availability per Region (verified May 2026)
+## Service Availability per Region (verified 2026-05-19)
+
+### North America / Americas (Global)
+All services available. Use no URL prefix.
+- /services/fire-engineering-systems-design
+- /services/investigations (Forensics / fire investigations — PRIMARY forensics landing)
+- /services/accessibility
+- /services/security-risk-consulting
+- /services/security-risk-public-safety
+- /services/emergency-management-response
+- /services/process-safety
+- /services/wildfire-risk-mitigation
+- /services/lithium-ion-risk-consulting
+(and more — see prod site /services index)
 
 ### Europe
 Available services include:
@@ -39,7 +52,7 @@ Available services include:
 - Advanced Modelling (advanced-modelling)
 - Emerging Hazards (emerging-hazards)
 - Energy + Utilities (energy-utilities)
-- Forensic Investigation (forensic-investigation) — has dedicated page
+- **Forensic Investigation (forensic-investigation) — PRIMARY EU forensics page**
 - Civil + Structural Failure (civil-structural-failure)
 - Escape of Water (escape-of-water)
 - Expert Witness + Litigation Support (expert-witness-litigation-support)
@@ -68,8 +81,8 @@ Available services include:
 - Decommissioning + Waste Management (decommissioning-waste-management)
 - Long-Term Operation / Life Extension (long-term-operation-life-extension)
 
-NOT available in Europe (per stakeholder confirmation):
-- Accessibility + Universal Design — only 1 specialist in Ireland, not yet regional
+NOT available in Europe:
+- Accessibility + Universal Design
 - Security Risk + Public Safety
 - Emergency Management + Response
 
@@ -115,7 +128,9 @@ NOT available in Pacific:
 - Forensic Investigation (no dedicated service page in region)
 - Security Risk + Public Safety
 - Emergency Management + Response
-- Energy + Utilities (broader; specific energy/sustainability subset available)
+- Energy + Utilities (Pacific offers Energy + Sustainability instead — different brand)
+- Emerging Hazards
+- Process Safety
 
 ### Asia
 Available services include:
@@ -142,10 +157,12 @@ Available services include:
 
 NOT available in Asia:
 - Forensic Investigation
+- Accessibility + Universal Design
 - Security Risk + Public Safety
 - Emergency Management + Response
+- Large-Scale Fire Testing
 
-### Middle East (UAE, Saudi Arabia, Qatar, etc.)
+### Middle East + India (UAE, Saudi Arabia, Qatar, India)
 Available services include:
 - Fire Engineering + Systems Design (fire-engineering-systems-design)
 - Code Consulting + Built Environment (code-consulting-built-environment)
@@ -175,30 +192,25 @@ Available services include:
 - Threat + Violence Risk Management (threat-violence-risk-management)
 - QA + ISO Certifications (qa-iso-certifications)
 
-Middle East offices: Abu Dhabi, Dubai, Doha (Qatar), Riyadh (Saudi Arabia)
+NOT available in Middle East + India:
+- Forensic Investigation (no dedicated /middle-east/services/forensic-* page on prod)
 
-Forensics in Middle East: Forensics services are offered by Middle East offices (per office page descriptions: "forensics and emergency management" — Dubai office) but Middle East does NOT have a dedicated forensics service landing page. For forensics inquiries from Middle East users, enumerate capabilities from the Forensics KB, then route to the closest Middle East office via query_officeLocations, plus info@jensenhughes.com fallback.
-
-### Global / Americas
-All services available. Use no URL prefix. Examples:
-- /services/fire-engineering-systems-design
-- /services/accessibility
-- /services/security-risk-consulting
-- /services/emergency-management-response
-- /services/investigations (Due Diligence Investigations — security/risk, NOT fire forensics)
-
-Note: Global site does NOT have a dedicated `/services/forensics` page. For Americas forensics inquiries, enumerate capabilities, then route to nearest US/Canada office or info@jensenhughes.com.
+Middle East + India offices: Abu Dhabi, Dubai, Doha (Qatar), Riyadh (Saudi Arabia), Mumbai (India)
 
 ---
 
-## Forensics Pages (canonical reference)
+## Forensics Pages (canonical reference, verified 2026-05-19)
 
-| Region        | Forensics Landing                                                    |
-|---------------|----------------------------------------------------------------------|
-| Europe (UK+Ireland) | https://www.jensenhughes.com/scotland (Will Hutchinson, UK forensics MD hub) + https://www.jensenhughes.com/europe/services/forensic-investigation |
-| Europe contact form | https://www.jensenhughes.com/europe/country/scotland/contact |
-| Europe email  | instructus.uk@jensenhughes.com (subject: "Forensics Instruction") |
-| Americas      | No dedicated page. Route to office + info@jensenhughes.com |
-| Middle East   | No dedicated page. Route to ME office + info@jensenhughes.com |
-| Asia          | Not available |
-| Pacific       | Not available |
+| Region | Available | Primary Forensic URL | Forensics Email |
+|--------|-----------|----------------------|-----------------|
+| North America / Americas | YES | https://www.jensenhughes.com/services/investigations | info@jensenhughes.com |
+| Europe | YES | https://www.jensenhughes.com/europe/services/forensic-investigation | instructus.uk@jensenhughes.com (subject: "Forensics Instruction") |
+| Europe — Marine sub | YES | https://www.jensenhughes.com/europe/services/marine-fire-forensics | instructus.uk@jensenhughes.com |
+| Europe — Product Liability sub | YES | https://www.jensenhughes.com/europe/services/product-liability-investigations | instructus.uk@jensenhughes.com |
+| Pacific | NO | — | info@jensenhughes.com |
+| Asia | NO | — | info@jensenhughes.com |
+| Middle East + India | NO | — | info@jensenhughes.com |
+
+NEVER link `/scotland` for forensics queries. Scotland is a country page, NOT the forensics hub.
+NEVER link `/services/fire-engineering-systems-design` as a forensics fallback — that's fire engineering.
+For unavailable regions: phrase "Forensic investigation is not currently available in [regionLabel]. For forensic inquiries, contact info@jensenhughes.com."

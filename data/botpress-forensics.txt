@@ -1,54 +1,78 @@
-Jensen Hughes Forensics + Fire Investigation Services
-Last updated: 2026-04-27
-Source: https://www.jensenhughes.com/scotland
+# Jensen Hughes Forensics + Fire Investigation Services
+Last updated: 2026-05-19 (corrected against prod-site audit of jensenhughes.com)
+Sources:
+- https://www.jensenhughes.com/services/investigations (North America)
+- https://www.jensenhughes.com/europe/services/forensic-investigation (Europe)
+- https://www.jensenhughes.com/europe/services/marine-fire-forensics (Europe sub)
+- https://www.jensenhughes.com/europe/services/product-liability-investigations (Europe sub)
 
 ---
 
 ## Forensic Investigation Services
 
-Jensen Hughes provides forensic investigation services primarily through our Scotland and UK offices (Glasgow and Edinburgh). Our forensics team undertakes complex investigations of incidents and failures, including fire, explosion, and escape of water.
+Jensen Hughes provides forensic investigation services through dedicated regional service pages in North America and Europe. For incidents including fire, explosion, escape of water, structural or product failure, Jensen Hughes applies the scientific method through expert engineers, scientists, and investigators.
 
-For incidents including fire, escape of water, chemicals, structural or product failure, Jensen Hughes applies the scientific method through our expert team of engineers, scientists, and expert investigators.
+### Availability by Region
 
-### Key Forensics Capabilities
-- Expert Witness / Litigation support
+| Region | Available | Primary URL | Forensics Email |
+|--------|-----------|-------------|-----------------|
+| North America (Americas) | YES | https://www.jensenhughes.com/services/investigations | info@jensenhughes.com |
+| Europe | YES | https://www.jensenhughes.com/europe/services/forensic-investigation | instructus.uk@jensenhughes.com (subject "Forensics Instruction") |
+| Pacific (Australia + New Zealand) | NO | — | info@jensenhughes.com |
+| Asia | NO | — | info@jensenhughes.com |
+| Middle East + India | NO | — | info@jensenhughes.com |
+
+### Europe Sub-Services
+- Marine forensics: https://www.jensenhughes.com/europe/services/marine-fire-forensics
+- Product liability investigations: https://www.jensenhughes.com/europe/services/product-liability-investigations
+
+### Key Forensics Capabilities (NA + EU only)
 - Fire cause and origin determination
 - Explosion investigation
 - Escape of water investigations
 - Structural failure analysis
 - Product failure investigation
+- Expert witness / litigation support
+- On-site inspections
+- DSEAR/ATEX support
 - Scientific-based analysis for legal investigations
 - Conclusive reports, robust evidence, and expert testimony
 - Rapid response to incidents
 
-### Scotland Services
-- Sprinkler Design
-- Fire Risk Assessments
-- Expert Witness / Litigation
-- On-Site Inspections
-- DSEAR/ATEX
+### UK + Europe Forensics Team
+- Forensics lead: Will Hutchinson, Managing Director of Forensics, UK + Ireland
+- Forensics offices with dedicated phone lines: London, Dublin, Galway, Belfast, Birmingham, Manchester, Edinburgh, Glasgow
+- UK Forensics business unit: Jensen Hughes United Kingdom Forensics / International Fire Investigators and Consultants Limited (Glasgow, UK)
 
 ### How to Request a Forensic Investigation
 
-**For UK and Europe:**
-- Email: instructus.uk@jensenhughes.com (subject: "Forensics Instruction")
-- This is a shared inbox — a permitted email exception
-- Contact page: https://www.jensenhughes.com/europe/country/scotland/contact
-- Learn more: https://www.jensenhughes.com/scotland
-
-**For all other regions:**
+**North America:**
+- Service page: https://www.jensenhughes.com/services/investigations
 - Email: info@jensenhughes.com
 - Phone: (410) 737-8677
-- Contact form: https://www.jensenhughes.com/contact-us
-- Service page: https://www.jensenhughes.com/services/fire-engineering-systems-design
+
+**Europe:**
+- Service page: https://www.jensenhughes.com/europe/services/forensic-investigation
+- Email: instructus.uk@jensenhughes.com (subject: "Forensics Instruction") — shared inbox, permitted email exception
+- Office contact: any of the 8 UK/Ireland forensics offices listed above
+
+**Pacific / Asia / Middle East + India:**
+Forensic investigation is NOT currently offered as a dedicated service in these regions. For inquiries:
+- Email: info@jensenhughes.com
+- Phone: (410) 737-8677
+- Global contact form: https://www.jensenhughes.com/contact-us
 
 ### Forensics Uncovered Podcast
 Jensen Hughes produces the "Forensics Uncovered" podcast where forensics experts discuss their work and investigation methods.
 - Listen: https://www.jensenhughes.com/podcasts/forensics-uncovered-podcast/maritime-safety-exploration
-
-### Jensen Hughes UK Forensics Certifications
-Jensen Hughes United Kingdom Forensics / International Fire Investigators and Consultants Limited (Glasgow, UK) holds relevant certifications for forensic investigation work.
+(Only surface this link if user explicitly asks about podcasts or media.)
 
 ---
 
-IMPORTANT: Forensics services are led by the Scotland/UK team. When users ask about forensics from Europe, always direct to instructus.uk@jensenhughes.com and the Scotland page. For users outside Europe, direct to the general contact and Fire Engineering + Systems Design service page.
+## IMPORTANT NOTES FOR THE BOT
+
+1. `/scotland` is a Jensen Hughes country page (Will Hutchinson team + UK office content) — it is NOT the forensics landing page. Never link `/scotland` for forensics queries.
+2. `/services/fire-engineering-systems-design` is fire engineering, NOT forensics. Never link it as a forensics fallback.
+3. The Europe primary forensic services page is `/europe/services/forensic-investigation` — always use this for EU forensic routing.
+4. The North America primary forensic services page is `/services/investigations` — always use this for NA forensic routing.
+5. For Pacific/Asia/ME: forensic services are NOT available. Direct to info@jensenhughes.com only. Do NOT enumerate capabilities or suggest a service URL.
