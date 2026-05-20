@@ -4,7 +4,14 @@ Fallback contact: info@jensenhughes.com | (410) 737-8677 | https://www.jensenhug
 
 ## Change log
 
-- **2026-05-20 — V6.9 (URL audit fix, pending paste):**
+- **2026-05-20 — V6.10 (FAQ Table fast path, pending paste):**
+  - Adds **Rule -1 (FAQ TABLE FAST PATH)** at the top of the prompt — highest priority. When `workflow.faqMatch` is set (populated by the new Find Records card in Standard2), the bot copies `workflow.faqMatch.answer_template` verbatim and STOPS — no tool calls, no LLMz routing, no paraphrasing.
+  - When `workflow.faqMatch` is empty/null, full Rules 0-13 logic applies (Find Records missed; bot does normal work).
+  - Closes the FAQ Tables short-circuit gap. Without Rule -1 the table query fired but the bot ignored its result. With Rule -1 the bot uses the table when it matches.
+  - Target: top-60 questions in the JhFaqV1Table answer in ~5-8s (LLM verbatim emit only — no MCP tool calls) instead of 35-45s.
+  - Studio flow already wired: Start → Standard1 (region) → Standard2 (Find Records) → AutonomousNode (this prompt) → End.
+
+- **2026-05-20 — V6.9 (URL audit fix, published 2026-05-20):**
   - Rule 13 corrected Pacific contact URL. Was `/pacific/contact-us` (which 404s on prod). Now `/pacific/contact/office-locations` (200 OK). Verified live via curl HEAD batch 2026-05-20. Pacific does NOT have a `/contact-us` landing — uses `/contact/office-locations` instead.
   - Companion fix in `data/botpress-faq-table-seed.csv`: 4 stale URLs corrected (`/about-us` → `/about`, `/services/accessibility-universal-design` → `/services/accessibility`, `/middle-east/services/accessibility-universal-design` → `/middle-east/services/accessibility`, `/pacific/contact-us` → `/pacific/contact/office-locations`).
   - All 42 unique URLs in the FAQ seed now return HTTP 200.
