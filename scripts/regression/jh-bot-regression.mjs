@@ -179,6 +179,62 @@ const TESTS = [
     expect: ['Asia'], deny: ['${', '$&#123;'] },
   { id: 'ME-contact', region: 'ME', tag: 'region-surface', q: 'How do I contact Jensen Hughes in the Middle East?',
     expect: ['Middle East'], deny: ['${', '$&#123;'] },
+  // V6.7 — gap coverage 2026-05-20 (off-topic refusal, override, bridge, named expert, disambig, deep insights, India)
+  { id: 'G1-NA-joke-refuse', region: 'NA', tag: 'gap-2026-05-20', q: 'Tell me a joke.',
+    expect: ['Jensen Hughes'],
+    expectAny: ['focused on Jensen Hughes', 'services', 'How can I help'],
+    deny: ['${', '$&#123;'] },
+  { id: 'G2-EU-weather-refuse', region: 'EU', tag: 'gap-2026-05-20', q: 'What is the weather in London?',
+    expect: ['Jensen Hughes'],
+    expectAny: ['focused on Jensen Hughes', 'fire', 'forensic', 'services'],
+    deny: ['${', '$&#123;', 'sunny', 'rain', 'temperature', '°C', '°F'] },
+  { id: 'G3-NA-pricing-refuse', region: 'NA', tag: 'gap-2026-05-20', q: 'How much does fire engineering cost?',
+    expect: ['Jensen Hughes'],
+    expectAny: ['focused on Jensen Hughes', 'contact', 'info@jensenhughes.com'],
+    deny: ['${', '$&#123;', '$1,', '$10,', '$100', 'starts at', 'per hour', '/hour'] },
+  { id: 'G4-NA-competitor-refuse', region: 'NA', tag: 'gap-2026-05-20', q: 'How are you better than Arup?',
+    expect: ['Jensen Hughes'],
+    expectAny: ['focused on Jensen Hughes', 'services', 'capabilities'],
+    deny: ['${', '$&#123;', 'better than Arup', 'Arup is worse', 'compared to Arup'] },
+  { id: 'G5-NA-user-region-override', region: 'NA', tag: 'gap-2026-05-20', q: 'Do you offer fire engineering services in Europe?',
+    // User explicitly names region → Rule 0 USER-ASKED OVERRIDE → emit EU URL even though session region=NA
+    expect: ['/europe/'],
+    deny: ['${', '$&#123;', '/services/fire-engineering-systems-design'] },
+  { id: 'G6-NA-bridge-and-also', region: 'NA', tag: 'gap-2026-05-20', q: 'Do you offer fire engineering? And also tell me about your security risk consulting.',
+    // Rule 11 bridge: "and also" allows combining → bot should address both
+    expect: ['fire'],
+    expectAny: ['security', 'risk consulting', 'security-risk'],
+    deny: ['${', '$&#123;'] },
+  { id: 'G7-NA-named-expert', region: 'NA', tag: 'gap-2026-05-20', q: 'Tell me about Sean Lebel.',
+    // Integration name-match path: searches ALL members, not just Regional Leadership
+    // Bot should find Sean Lebel OR fall back to info@ if not in CMS
+    expect: [],
+    expectAny: ['Sean', 'Lebel', 'info@jensenhughes.com'],
+    deny: ['${', '$&#123;'] },
+  { id: 'G8-NA-unknown-person', region: 'NA', tag: 'gap-2026-05-20', q: 'Tell me about Joaquim Vandermeerschen.',
+    // Fabricated name — must NOT hallucinate a bio
+    expect: [],
+    expectAny: ['couldn\'t find', 'no results', 'info@jensenhughes.com', 'not sure', 'don\'t have'],
+    deny: ['${', '$&#123;', 'Director of', 'Managing Director', 'VP of'] },
+  { id: 'G9-Pacific-sydney-cbd', region: 'Pacific', tag: 'gap-2026-05-20', q: 'What is the phone number for the Sydney CBD office?',
+    // Tests partial slug + region — Rule 3 says partials work ("oakland"→"oakland-san-leandro")
+    expect: ['Sydney'],
+    deny: ['${', '$&#123;', 'slug:', '(slug', 'not currently available'] },
+  { id: 'G10-EU-insights-deep', region: 'EU', tag: 'gap-2026-05-20', q: 'Do you have case studies on data centers in Europe?',
+    // Rule 13 region scope + Rule 2 insights empty → retry / fallback to /europe/ landing
+    expect: ['Europe'],
+    expectAny: ['/europe/', 'case stud', 'insights', 'data center'],
+    deny: ['${', '$&#123;'] },
+  { id: 'G11-NA-forensics-deep', region: 'NA', tag: 'gap-2026-05-20', q: 'What about expert witness services?',
+    // Rule 5 forensics umbrella — NA template + investigations URL
+    expect: ['Jensen Hughes'],
+    expectAny: ['/services/investigations', 'expert witness', 'forensic'],
+    deny: ['${', '$&#123;', '/scotland'] },
+  { id: 'G12-ME-india-presence', region: 'ME', tag: 'gap-2026-05-20', q: 'Do you have offices in India?',
+    // Rule 0 regionLabel "Middle East + India" — bot should affirm India presence
+    expect: [],
+    expectAny: ['India', 'Mumbai', '/middle-east/', 'Middle East'],
+    deny: ['${', '$&#123;'] },
 ];
 
 function parseArgs(argv) {
