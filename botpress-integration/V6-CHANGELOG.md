@@ -4,6 +4,11 @@ Fallback contact: info@jensenhughes.com | (410) 737-8677 | https://www.jensenhug
 
 ## Change log
 
+- **2026-05-20 — Integration v1.0.17 (tighter listEvents freshness 60s → 10s):**
+  - v1.0.15 set the listEvents fallback freshness window to 60 seconds. Live testing today 2026-05-20 caught a cross-user leak even within that window (EU test fired ~2 min after an Asia test, integration's listEvents picked up the stale Asia event because workflow.region was empty on the EU session and the Asia event was just barely outside 60s — but the test repro also showed a 30s contamination).
+  - Tightening to 10s. The Twig footer re-emits regionContext on EVERY webchat:messageSent, so the current user's event is always within ~1-2 seconds of any bot query. 10s is plenty for the legitimate case, much tighter than 60s on cross-user contamination.
+  - Real fix remains User Variables wiring (docs/USER-VARIABLES-STUDIO-SETUP.md) — this is the cheap pre-Studio-wiring hardening.
+
 - **2026-05-20 — Integration v1.0.16 (Matt Booth findability fix):**
   - `query_ourTeam` now passes the bot's `search` term through to MCP instead of fetching unconditional + filtering in JS. MCP's no-search query_ourTeam caps at ~100 entries (CMS has 101+ team members). Members alphabetically past the cap (Matt Booth, others) never reached the JS name-match filter, so the bot incorrectly told users "I can't find a directory entry for [Person]" even when the person had a live profile on jensenhughes.com/experts/[slug].
   - Confirmed wild bug 2026-05-20: bot returned person-not-found for Matt Booth despite `/experts/matt-booth` returning HTTP 200 and direct MCP search returning his record. MCP fetch with limit=200 returned 100 entries, Matt Booth at position -1 (not in slice).
@@ -14,7 +19,15 @@ Fallback contact: info@jensenhughes.com | (410) 737-8677 | https://www.jensenhug
   - 60s window is conservative — the Twig footer re-emits regionContext on every `webchat:messageSent`, so the current user's event is always within seconds of the bot's query. Stale events older than 60s are ignored.
   - Does not fully eliminate the race under genuine concurrent traffic (two users from different regions both active within 60s), but reduces the window dramatically. Real fix remains User Variables refactor (see audit doc Tier 2 item #5).
 
-- **2026-05-20 — V6.17 (per-region experts directory + broken-URL guards, pending paste):**
+- **2026-05-20 — V6.18 (simpler human-tone replies, pending paste):**
+  - Rule 5 STEP 0 marine/product-liability templates **simplified** — Liz pushback: "shouldn't it answer better than this? mentioning Europe AND Asia in one reply is too much." V6.16 templates referenced 3 regions in one Asia reply (Europe-based + UK team + "from Asia"). V6.18 strips the cross-region soup:
+    - Pacific/Asia/ME marine reply now: "Marine forensics is handled by our UK forensic team. Email instructus.uk@jensenhughes.com (subject: Marine Forensics Instruction) for inquiries." — one sentence, no `/europe/` URL dangle, no user-region mention.
+    - NA marine reply: "handled by our UK forensic team — they take inquiries globally" + instructus.uk@ + secondary NA `/services/investigations`.
+    - EU marine reply: unchanged (page is theirs).
+  - Rule 3 office contact rewritten to **lead with most likely match** when multiple offices fit (e.g., "London" main first + brief mention of "London - Austin Friars" alternate), instead of upfront "Which one did you mean?" question. More conversational, less form-letter.
+  - Added "SOUND HUMAN" header before Rule 5 STEP 0 templates: templates are *shape*, not literal — vary the conversational lead-in.
+
+- **2026-05-20 — V6.17 (per-region experts directory + broken-URL guards, published 2026-05-20):**
   - Phase 1 full content inventory completed today via research-agent. Scraped 5 regions across services / insights / industries / careers / contact / about / podcasts / events / team. Inventory at `docs/JH-REGIONAL-CONTENT-INVENTORY.md`.
   - Caught 9 broken URLs the bot was (or could be) linking. Patched Rule 2.5 person-not-found template to use REGION-AWARE experts-directory URL:
     - NA / unknown → `/our-experts`

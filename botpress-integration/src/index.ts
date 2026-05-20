@@ -312,15 +312,17 @@ export default new bp.Integration({
               if (attempt === 0 && events.length) {
                 lastDebugDump = `events=${events.length}; sample=${JSON.stringify(events.slice(0, 2).map((e: any) => ({ id: e.id, type: e.type, payloadKeys: Object.keys(e.payload || {}), payloadType: e.payload?.type, payloadDataType: e.payload?.data?.type, payloadDataDataType: e.payload?.data?.data?.type, payloadDataDataRegion: e.payload?.data?.data?.region })))}`
               }
-              // Filter to events from the last 60 seconds only. The Twig footer
+              // Filter to events from the last 10 seconds only. The Twig footer
               // re-emits regionContext on every webchat:messageSent, so the
-              // CURRENT user's event will always be recent. Stale events from
-              // earlier sessions (potentially different visitors with different
-              // regions) get filtered out. Closes the cross-user region leak
-              // confirmed in the wild 2026-05-20 (Jonathan on Global region got
-              // routed to /asia/services because an earlier test session left
-              // an Asia regionContext event in the workspace event log).
-              const FRESHNESS_MS = 60 * 1000
+              // CURRENT user's event will always be within ~1-2 seconds of the
+              // bot's query. Stale events from earlier sessions get filtered.
+              // V1.0.15 used 60s; testing today 2026-05-20 showed back-to-back
+              // tests within 60s contaminated each other (EU test picked up a
+              // 2-minute-old Asia event). Tightening to 10s reduces the leak
+              // window dramatically. Real fix is User Variables (see
+              // docs/USER-VARIABLES-STUDIO-SETUP.md) — this is the cheap
+              // hardening pre-Studio-wiring.
+              const FRESHNESS_MS = 10 * 1000
               const nowMs = Date.now()
               const candidates = events
                 .map((e: any) => ({ e, region: readEventRegion(e), createdAtMs: e?.createdAt ? new Date(e.createdAt).getTime() : 0 }))
