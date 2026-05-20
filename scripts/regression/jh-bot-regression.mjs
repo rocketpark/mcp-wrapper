@@ -267,12 +267,16 @@ async function setupSession(page, regionCfg) {
     window.botpress.open();
     await new Promise(r => setTimeout(r, 1500));
     await window.botpress.updateUser({
-      data: { region: cfg.region, siteHandle: cfg.siteHandle, urlPrefix: cfg.urlPrefix },
-      tags: { region: cfg.region }
+      data: { region: cfg.region, siteHandle: cfg.siteHandle, urlPrefix: cfg.urlPrefix, language: 'en' }
     });
+    // Match the Twig footer's exact sendEvent payload shape — the bot integration
+    // expects payload.data.data.type === 'regionContext' (see
+    // mcp-wrapper/botpress-integration/src/index.ts:217). Earlier regression
+    // version wrapped in `{type:'trigger', payload:{...}}` which the integration
+    // doesn't recognize, so workflow.region never populated and the bot replied
+    // with empty / off-topic responses on every test. Reproduced 2026-05-20.
     await window.botpress.sendEvent({
-      type: 'trigger',
-      payload: { data: { type: 'regionContext', region: cfg.region, siteHandle: cfg.siteHandle, urlPrefix: cfg.urlPrefix } }
+      data: { type: 'regionContext', region: cfg.region, siteHandle: cfg.siteHandle, urlPrefix: cfg.urlPrefix, language: 'en' }
     });
   }, regionCfg);
   // race: workflow.region needs ≥10s after sendEvent (memory: project_jh_botpress_region)
@@ -283,16 +287,29 @@ async function ask(page, question) {
   await page.evaluate(async (q) => {
     await window.botpress.sendMessage(q);
   }, question);
-  // 45s covers multi-part queries that fire 2+ tool calls (~50s observed)
-  await page.waitForTimeout(45000);
-  return await page.evaluate(() => {
+  // Adaptive wait: poll for reply to grow + stabilize. Bumped from fixed 45s to
+  // adaptive 90s max — 2026-05-20 staging tests showed bot occasionally
+  // taking 50-70s under load (no FAQ fast path). Fixed 45s was cutting off
+  // legit replies that arrived at 50s.
+  const getInner = async () => page.evaluate(() => {
     const hosts = Array.from(document.querySelectorAll('*')).filter(el => el.shadowRoot);
-    for (const h of hosts) {
-      const c = h.shadowRoot.querySelector('.bpContainer');
-      if (c) return c.innerText;
-    }
+    for (const h of hosts) { const c = h.shadowRoot.querySelector('.bpContainer'); if (c) return c.innerText; }
     return '';
   });
+  const baseline = await getInner();
+  const baseLen = baseline.length;
+  const ts = Date.now();
+  let lastLen = baseLen;
+  let stableSince = null;
+  while (Date.now() - ts < 90000) {
+    await page.waitForTimeout(500);
+    const cur = await getInner();
+    const len = cur.length;
+    if (len > lastLen) { lastLen = len; stableSince = null; }
+    else if (stableSince === null) stableSince = Date.now();
+    else if (Date.now() - stableSince > 6000 && len > baseLen + 80) break;
+  }
+  return await getInner();
 }
 
 function lastBotReply(transcript, userQ) {
