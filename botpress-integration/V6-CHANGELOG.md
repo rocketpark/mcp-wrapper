@@ -4,7 +4,17 @@ Fallback contact: info@jensenhughes.com | (410) 737-8677 | https://www.jensenhug
 
 ## Change log
 
-- **2026-05-20 — V6.11 (FAQ Table fast path REVERTED, pending paste):**
+- **2026-05-20 — Integration v1.0.15 (cross-user region-leak fix):**
+  - `listEvents` fallback in `src/index.ts:315` now filters events by `createdAt within last 60 seconds` instead of returning the most-recent-ever regionContext event in the workspace. Closes the wild-confirmed race: Jonathan on Global region got `/asia/services` because an earlier test session left a stale Asia regionContext event in the workspace event log; bot's fallback picked it up despite it being unrelated to Jonathan's user.
+  - 60s window is conservative — the Twig footer re-emits regionContext on every `webchat:messageSent`, so the current user's event is always within seconds of the bot's query. Stale events older than 60s are ignored.
+  - Does not fully eliminate the race under genuine concurrent traffic (two users from different regions both active within 60s), but reduces the window dramatically. Real fix remains User Variables refactor (see audit doc Tier 2 item #5).
+
+- **2026-05-20 — V6.12 (Jonathan bugs caught, pending paste):**
+  - **Rule 5 STEP 0 (NEW)** — Marine Forensics + Product Liability sub-topic override BEFORE region routing. Sub-areas exist only on EU site but apply globally. NA/Asia/Pacific/ME user asking for "marine forensics" now gets the EU `/europe/services/marine-fire-forensics` URL + `instructus.uk@jensenhughes.com` email. Previously: bot fell through to NA Step 2 template (`/services/investigations`) — wrong URL, wrong email. Confirmed by Jonathan on Global region today.
+  - **Rule 2.5 NEW — Person Lookup fallback** — when `query_ourTeam` returns 0 results for a specific named person (e.g. "Matt Booth"), bot now emits the **person-not-found template** linking the global team directory (`/our-team`) + `info@jensenhughes.com`. Previously bot fell through to Rule 10 services-page template (e.g. `/asia/services`) which is wrong for a person query. Confirmed by Jonathan today.
+  - Identified separately: a cross-user region-leak race in the integration's `listEvents` fallback (caused Jonathan's Global-region query to route to Asia). Fix shipping in integration v1.0.15 separately.
+
+- **2026-05-20 — V6.11 (FAQ Table fast path REVERTED, published 2026-05-20):**
   - Reverts the V6.10 Rule -1 (FAQ TABLE FAST PATH) because Botpress Tables' native `contains` filter does not support `@variable contains column` direction. The Studio Find Records card can express `topic_pattern contains @event.preview` (column-on-LHS) but NOT `@event.preview contains topic_pattern` (variable-on-LHS — the right-hand side is parsed as a literal string). Per-pattern row expansion didn't help because the filter direction is fundamentally one-way.
   - The Studio flow keeps Find Records in place as a no-op (`workflow.faqMatch` always null with the current filter). Cost: ~50-100ms idle Botpress Table query per message. Removable later if needed.
   - Future ship path for FAQ fast path: replace Find Records with an **Execute Code** card that does the substring-match in JavaScript (`table.rows.find(r => event.preview.toLowerCase().includes(r.topic_pattern))`) and sets `workflow.faqMatch` from there. Deferred to Tier 2 / next session — needs a clean Botpress JS scaffold + testing.
