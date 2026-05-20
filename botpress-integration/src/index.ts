@@ -40,11 +40,17 @@ class MCPClient {
   ) {}
 
   /**
-   * Make a JSON-RPC 2.0 request to the MCP server
+   * Make a JSON-RPC 2.0 request to the MCP server.
+   *
+   * Retries on transient 5xx + network errors. A transient Forge blip or
+   * Craft opcache rebuild used to kill the entire bot reply — bot would
+   * emit "I couldn't reach our knowledge base" with no fallback. Two
+   * retries with exponential backoff (250ms, then 500ms) absorb the
+   * common cases. 4xx errors (auth, validation) are NOT retried — they
+   * won't fix themselves.
    */
   private async makeRequest(method: string, params: any = {}): Promise<any> {
     const endpoint = `${this.baseUrl}/mcp/${this.schemaHandle}`
-    
     const request = {
       jsonrpc: '2.0',
       id: Date.now(),
@@ -55,40 +61,75 @@ class MCPClient {
     this.logger.forBot().info(`🔵 MCP Request to ${endpoint}`)
     this.logger.forBot().info(`🔵 Request body: ${JSON.stringify(request)}`)
 
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request),
-      })
+    const maxAttempts = 3
+    const backoffMs = [0, 250, 500]
+    let lastError: Error | null = null
 
-      this.logger.forBot().info(`🔵 Response status: ${response.status} ${response.statusText}`)
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        this.logger.forBot().error(`🔴 HTTP Error Response: ${errorText}`)
-        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`)
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (attempt > 0) {
+        await new Promise(r => setTimeout(r, backoffMs[attempt]))
+        this.logger.forBot().info(`🔁 MCP retry attempt ${attempt + 1}/${maxAttempts} (waited ${backoffMs[attempt]}ms)`)
       }
 
-      const responseText = await response.text()
-      this.logger.forBot().info(`🔵 Raw response: ${responseText}`)
-      
-      const data = JSON.parse(responseText)
-      
-      if ((data as any).error) {
-        this.logger.forBot().error(`🔴 MCP Error: ${JSON.stringify((data as any).error)}`)
-        throw new Error(`MCP Error: ${(data as any).error.message} (code: ${(data as any).error.code})`)
-      }
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(request),
+        })
 
-      this.logger.forBot().info(`🟢 MCP Success! Result: ${JSON.stringify((data as any).result)}`)
-      return (data as any).result
-    } catch (error) {
-      this.logger.forBot().error(`🔴 MCP request failed: ${error}`)
-      this.logger.forBot().error(`🔴 Error stack: ${(error as Error).stack}`)
-      throw error
+        this.logger.forBot().info(`🔵 Response status: ${response.status} ${response.statusText}`)
+
+        // 5xx = transient. Retry.
+        if (response.status >= 500 && response.status < 600) {
+          const errorText = await response.text()
+          lastError = new Error(`HTTP ${response.status} (transient): ${errorText}`)
+          this.logger.forBot().warn(`🟡 ${lastError.message} — will retry`)
+          continue
+        }
+
+        // 4xx = client error. Don't retry, fail fast.
+        if (!response.ok) {
+          const errorText = await response.text()
+          this.logger.forBot().error(`🔴 HTTP Error Response (no retry): ${errorText}`)
+          throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`)
+        }
+
+        const responseText = await response.text()
+        this.logger.forBot().info(`🔵 Raw response: ${responseText}`)
+
+        const data = JSON.parse(responseText)
+
+        if ((data as any).error) {
+          this.logger.forBot().error(`🔴 MCP Error: ${JSON.stringify((data as any).error)}`)
+          throw new Error(`MCP Error: ${(data as any).error.message} (code: ${(data as any).error.code})`)
+        }
+
+        this.logger.forBot().info(`🟢 MCP Success! Result: ${JSON.stringify((data as any).result)}`)
+        return (data as any).result
+      } catch (error) {
+        // Network errors (DNS failure, connection refused, timeout) are retryable.
+        // JSON.parse errors + thrown MCP errors are NOT retryable — they're shape
+        // problems, not connectivity problems. We distinguish by checking if a
+        // response was received.
+        lastError = error as Error
+        const msg = lastError.message || ''
+        const isNetworkError = msg.includes('fetch failed') || msg.includes('ECONN') || msg.includes('ETIMEDOUT') || msg.includes('ENOTFOUND')
+        if (isNetworkError && attempt < maxAttempts - 1) {
+          this.logger.forBot().warn(`🟡 Network error: ${msg} — will retry`)
+          continue
+        }
+        // Non-retryable error OR last attempt — give up.
+        this.logger.forBot().error(`🔴 MCP request failed (attempt ${attempt + 1}): ${error}`)
+        if (attempt === maxAttempts - 1) {
+          this.logger.forBot().error(`🔴 Error stack: ${(error as Error).stack}`)
+        }
+        throw error
+      }
     }
+
+    // All attempts exhausted with retryable errors.
+    throw lastError ?? new Error('MCP request failed after all retries')
   }
 
   /**

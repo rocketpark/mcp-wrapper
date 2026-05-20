@@ -4,6 +4,9 @@ Fallback contact: info@jensenhughes.com | (410) 737-8677 | https://www.jensenhug
 
 ## Change log
 
+- **2026-05-20 — Integration v1.0.14 (MCP retry on transient errors):**
+  - `makeRequest()` now retries 5xx + network errors (ECONN/ETIMEDOUT/ENOTFOUND/fetch failed) with exponential backoff (250ms, 500ms — max 3 attempts total). 4xx errors and parsed MCP errors fail fast (won't fix themselves). Closes the "transient Forge blip kills entire bot reply" failure mode. Pure defense — no behavior change on the happy path.
+
 - **2026-05-20 — Integration v1.0.13 (non-functional safety net):**
   - Adds `warnOnConfigDrift()` — module-level one-shot warning logged via `logger.forBot().warn()` when `mcpServerUrl === 'https://servicecurator.com'` AND `schemaHandle` is a JH-style handle (`MCPSchema` / `ai` / `jensenhughes`). Surfaces the historical "config reset on integration bump" failure mode as an obvious log entry on the next queryContent / listTools call after a bad deploy.
   - No behavior change for correctly-configured bots. Pure defense-in-depth.

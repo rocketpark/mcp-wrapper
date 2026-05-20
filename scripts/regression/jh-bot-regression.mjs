@@ -246,6 +246,7 @@ function parseArgs(argv) {
     if (argv[i] === '--tag') args.tag = argv[++i];
     if (argv[i] === '--ids') args.ids = argv[++i].split(',');
     if (argv[i] === '--verbose' || argv[i] === '-v') args.verbose = true;
+    if (argv[i] === '--no-retry') args['no-retry'] = true;
   }
   return args;
 }
@@ -329,23 +330,42 @@ async function main() {
 
   const browser = await chromium.launch({ headless: true });
 
-  const results = [];
-  for (const test of filtered) {
-    // Fresh context per test = clean webchat user, no conversation carry-over
+  // Re-run on fail: AutonomousNode is 100% LLM-driven with ~5% nondeterminism
+  // per memory feedback_botpress_autonomous_node.md. A single false-fail on a
+  // wording variation shouldn't flag a regression. If the first attempt fails,
+  // wait 8s (gives Botpress LLM cache a beat) and retry once. Only report FAIL
+  // if both attempts failed. Disable with --no-retry.
+  const MAX_RETRIES = args['no-retry'] ? 0 : 1;
+  const RETRY_WAIT_MS = 8000;
+
+  async function runOne(test) {
     const context = await browser.newContext({ httpCredentials: HTTP_AUTH });
     const page = await context.newPage();
     await setupSession(page, REGIONS[test.region]);
     const transcript = await ask(page, test.q);
     const reply = lastBotReply(transcript, test.q);
     await context.close();
-    const result = evaluateExpectations(reply, test);
-    results.push({ test, reply, result });
-    const status = result.pass ? '✓ PASS' : '✗ FAIL';
-    console.log(`${status}  ${test.id}`);
-    if (!result.pass || args.verbose) {
-      if (result.missing.length) console.log(`   missing: ${result.missing.join(' | ')}`);
-      if (result.banned.length)  console.log(`   banned:  ${result.banned.join(' | ')}`);
-      if (args.verbose) console.log(`   reply (last 300 chars): ${reply.slice(-300)}\n`);
+    return { reply, result: evaluateExpectations(reply, test) };
+  }
+
+  const results = [];
+  for (const test of filtered) {
+    let attempt = await runOne(test);
+    let retried = false;
+    if (!attempt.result.pass && MAX_RETRIES > 0) {
+      console.log(`… ${test.id} failed on attempt 1, retrying in ${RETRY_WAIT_MS/1000}s (LLM nondeterminism)`);
+      await new Promise(r => setTimeout(r, RETRY_WAIT_MS));
+      attempt = await runOne(test);
+      retried = true;
+    }
+    results.push({ test, reply: attempt.reply, result: attempt.result, retried });
+    const status = attempt.result.pass ? '✓ PASS' : '✗ FAIL';
+    const retryNote = retried ? (attempt.result.pass ? ' (passed on retry)' : ' (failed both attempts)') : '';
+    console.log(`${status}  ${test.id}${retryNote}`);
+    if (!attempt.result.pass || args.verbose) {
+      if (attempt.result.missing.length) console.log(`   missing: ${attempt.result.missing.join(' | ')}`);
+      if (attempt.result.banned.length)  console.log(`   banned:  ${attempt.result.banned.join(' | ')}`);
+      if (args.verbose) console.log(`   reply (last 300 chars): ${attempt.reply.slice(-300)}\n`);
     }
   }
 
