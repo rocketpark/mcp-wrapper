@@ -41,6 +41,7 @@ INTEGRATION_DIR="$( cd "$SCRIPT_DIR/../botpress-integration" && pwd )"
 
 PROFILE_PATH="${BOTPRESS_PROFILE_PATH:-$HOME/.botpress/profiles.json}"
 BOT_ID="${BOTPRESS_BOT_ID:-208ffbe5-a209-4a10-a52c-d79de4577f45}"
+WORKSPACE_ID="${BOTPRESS_WORKSPACE_ID:-wkspace_01KCPQEH096HZE66R7G994M5SR}"
 API_BASE="${BOTPRESS_API_URL:-https://api.botpress.cloud}"
 
 SNAP_BEFORE="${BPDEPLOY_SNAP_BEFORE:-/tmp/bp-config-snapshot-before.json}"
@@ -70,6 +71,19 @@ if [ -z "$PAT" ] && [ -f "$PROFILE_PATH" ]; then
       process.stdout.write(p[k].token || '');
     } catch (e) { process.exit(1); }
   " 2>/dev/null || true)
+  # Also pull workspaceId from profile if not env-overridden.
+  if [ -z "${BOTPRESS_WORKSPACE_ID:-}" ]; then
+    PROFILE_WS=$(node -e "
+      try {
+        const p = JSON.parse(require('fs').readFileSync('$PROFILE_PATH','utf8'));
+        const k = Object.keys(p)[0];
+        process.stdout.write(p[k].workspaceId || '');
+      } catch (e) { process.exit(1); }
+    " 2>/dev/null || true)
+    if [ -n "$PROFILE_WS" ]; then
+      WORKSPACE_ID="$PROFILE_WS"
+    fi
+  fi
 fi
 
 if [ -z "$PAT" ]; then
@@ -81,11 +95,23 @@ fi
 
 snapshot() {
   local out="$1"
-  curl -fsS \
-    -H "Authorization: Bearer $PAT" \
-    -H "Accept: application/json" \
-    "$API_BASE/v1/admin/bots/$BOT_ID" > "$out.tmp"
-  jq '.' "$out.tmp" > "$out"
+  # Botpress admin API requires both Bearer token AND workspace header.
+  # Use --fail-with-body so HTTP errors are printed (not silently swallowed
+  # by -f). --max-time 20 caps a hung connection from blocking the wrapper.
+  if ! curl --fail-with-body -sS --max-time 20 \
+      -H "Authorization: Bearer $PAT" \
+      -H "x-workspace-id: $WORKSPACE_ID" \
+      -H "Accept: application/json" \
+      "$API_BASE/v1/admin/bots/$BOT_ID" > "$out.tmp" 2>&1; then
+    err "Bot fetch failed (see body in $out.tmp)"
+    return 1
+  fi
+  jq '.' "$out.tmp" > "$out" 2>/dev/null || {
+    err "Response is not valid JSON. Head:"
+    head -c 300 "$out.tmp" >&2
+    echo >&2
+    return 1
+  }
   rm -f "$out.tmp"
   echo "$out ($(wc -c < "$out" | tr -d ' ') bytes)"
 }
