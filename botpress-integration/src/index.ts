@@ -3,6 +3,33 @@ import * as bp from '../.botpress'
 import fetch from 'node-fetch'
 
 /**
+ * Default mcpServerUrl from integration.definition.ts. If a bot's installed
+ * integration config gets reset on a bp deploy bump (Botpress historically
+ * has not been 100% reliable about preserving per-bot config across schema
+ * updates), the bot will silently start hitting servicecurator.com instead
+ * of the per-tenant Craft host. warnOnConfigDrift fires a one-shot log
+ * warning the first time a JH-style schemaHandle is paired with the
+ * default host — a strong "this is wrong" signal that surfaces in
+ * Botpress runtime logs.
+ */
+const SERVICECURATOR_DEFAULT = 'https://servicecurator.com'
+const JH_SCHEMA_HANDLES = new Set(['MCPSchema', 'ai', 'jensenhughes'])
+let configDriftWarned = false
+
+function warnOnConfigDrift(ctx: any, logger: any): void {
+  if (configDriftWarned) return
+  const url = ctx?.configuration?.mcpServerUrl
+  const handle = ctx?.configuration?.schemaHandle
+  if (url === SERVICECURATOR_DEFAULT && typeof handle === 'string' && JH_SCHEMA_HANDLES.has(handle)) {
+    configDriftWarned = true
+    logger.forBot().warn(
+      `Config drift detected: mcpServerUrl is the default '${SERVICECURATOR_DEFAULT}' but schemaHandle '${handle}' is JH-specific. ` +
+      `Per-bot config likely reset on the last integration update. Set mcpServerUrl to the staging or prod Craft host before further use.`
+    )
+  }
+}
+
+/**
  * MCP Client for communicating with Craft CMS MCP server
  */
 class MCPClient {
@@ -98,6 +125,7 @@ export default new bp.Integration({
      * List all available Craft CMS content types
      */
     listTools: async ({ ctx, logger }) => {
+      warnOnConfigDrift(ctx, logger)
       const { mcpServerUrl, schemaHandle } = ctx.configuration
       logger.forBot().info(`Configuration: URL=${mcpServerUrl}, Schema=${schemaHandle}`)
       
@@ -146,6 +174,7 @@ export default new bp.Integration({
      * Query Craft CMS content
      */
     queryContent: async ({ ctx, input, client: bpClient, logger }) => {
+      warnOnConfigDrift(ctx, logger)
       const { mcpServerUrl, schemaHandle } = ctx.configuration
       if (!mcpServerUrl || !schemaHandle) {
         throw new Error('MCP Server URL and Schema Handle are required')

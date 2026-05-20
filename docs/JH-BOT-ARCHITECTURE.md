@@ -325,7 +325,7 @@ sequenceDiagram
 |---|---|---|
 | Twig footer | `Herd/jensenhughes/templates/_partials/_meta_footer.twig` | git push → Forge auto-deploy |
 | MCP wrapper (PHP) | composer dep `rocket-park/mcp-wrapper` | `composer update rocket-park/mcp-wrapper` in Herd/jensenhughes, push to trigger Forge |
-| Botpress integration (TS) | `mcp-wrapper/botpress-integration` | `cd botpress-integration && bp deploy` (writes to Botpress Cloud) |
+| Botpress integration (TS) | `mcp-wrapper/botpress-integration` | `./scripts/bp-deploy-safe.sh` (snapshots bot config, runs `bp deploy`, diffs after — catches config-reset). Plain `bp deploy` works too but no safety net. |
 | AutonomousNode prompt | Studio paste from `AUTONOMOUS-NODE-INSTRUCTIONS-V6.md` | Studio → AutonomousNode → Instructions → paste lines 11+ → Save → **Publish bot** |
 | KB topic-routing | `data/botpress-topic-routing.txt` | Studio → Services KB → Add doc → upload file → wait Indexed |
 | Webchat snippet (CDN) | `files.bpcontent.cloud/.../20251217175917-M8VO1C7X.js` | Studio → Webchat config → Save → CDN URL refreshes; update Twig if URL changes |
