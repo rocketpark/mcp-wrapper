@@ -20,28 +20,29 @@ The bot still feels conversational because the answer templates ARE conversation
 
 ---
 
-## Step 1 — Create the Table in Studio
+## Steps 1 + 2 — DONE via `scripts/import-faq-table-to-botpress.mjs`
 
+The table and 59 rows are already in the JH bot. Imported via:
+
+```bash
+cd /Volumes/LizsDisk/mcp-wrapper
+node scripts/import-faq-table-to-botpress.mjs               # safe — refuses if table exists
+node scripts/import-faq-table-to-botpress.mjs --recreate    # wipe + reimport (after CSV edits)
+node scripts/import-faq-table-to-botpress.mjs --dry-run     # parse only, no API
+```
+
+The script:
+- Reads `data/botpress-faq-table-seed.csv`
+- Auths via `~/.botpress/profiles.json` (or `BOTPRESS_PAT` env)
+- Creates table `JhFaqV1Table` with schema `{topic_pattern, region, answer_template, url, priority, notes}` and `required: [topic_pattern, region, answer_template]`
+- Inserts rows in chunks of 25
+
+**Verify it exists:**
 1. Open Studio: https://studio.botpress.cloud/208ffbe5-a209-4a10-a52c-d79de4577f45
-2. Left sidebar → **Tables** → **+ New Table**
-3. Name: `jh_faq_v1`
-4. Description: "Region-scoped fast-path Q&A. First Find Records card in AutonomousNode flow."
-5. **Columns** — add each in this order:
-   - `topic_pattern` (text, indexed)
-   - `region` (text, indexed) — values: `na` / `europe` / `pacific` / `asia` / `middle_east` / `global`
-   - `answer_template` (text, long)
-   - `url` (text)
-   - `priority` (number) — 1=hot, 2=warm, 3=cold (controls match precedence)
-   - `notes` (text, long)
-6. Save schema.
+2. Left sidebar → **Tables** → confirm `JhFaqV1Table` with 59 rows
+3. Spot-check 3 rows: forensics EU, fire engineering ME, BIM global. Templates + URLs should look right.
 
-## Step 2 — Import the seed CSV
-
-1. Tables → `jh_faq_v1` → **⋯ menu** → **Import CSV**
-2. Upload `/Volumes/LizsDisk/mcp-wrapper/data/botpress-faq-table-seed.csv`
-3. Map columns 1-to-1 (the CSV headers match the Table schema exactly).
-4. Confirm import. Should show 60 rows imported.
-5. Spot-check 3 rows: forensics EU, fire engineering ME, BIM global. Verify the template + URL look right.
+**To edit rows going forward:** edit `data/botpress-faq-table-seed.csv` in repo → run `node scripts/import-faq-table-to-botpress.mjs --recreate`. Single source of truth in git; live table reflects it.
 
 ## Step 3 — Wire Find Records card in AutonomousNode flow
 
@@ -49,7 +50,7 @@ In Studio's AutonomousNode flow editor:
 
 1. Open the flow that contains the AutonomousNode.
 2. **Before** the AutonomousNode card, add a **Find Records** card:
-   - Source: `jh_faq_v1`
+   - Source: `JhFaqV1Table`
    - Filter:
      ```
      (topic_pattern matches user.lastMessage)
@@ -91,11 +92,11 @@ Most matched scenarios should now report **<5s latency** in the verbose output (
 ## How to add / edit rows
 
 **Quick edit (single row):**
-- Studio → Tables → `jh_faq_v1` → click row → edit cell → Save → Publish bot.
+- Studio → Tables → `JhFaqV1Table` → click row → edit cell → Save → Publish bot.
 - Change is live within seconds.
 
 **Bulk edit:**
-- Studio → Tables → `jh_faq_v1` → **Export CSV** → edit locally → **Import CSV** with "Replace all" option.
+- Studio → Tables → `JhFaqV1Table` → **Export CSV** → edit locally → **Import CSV** with "Replace all" option.
 - OR edit `data/botpress-faq-table-seed.csv` in this repo → re-import.
 
 **Add a new pattern:**
