@@ -1,4 +1,4 @@
-# Jensen Hughes AutonomousNode Instructions — V6.8 (2026-05-20)
+# Jensen Hughes AutonomousNode Instructions — V6.9 (2026-05-20)
 
 NOTE TO HUMAN EDITOR: Paste ONLY from the `# RULE 0` heading below to the end of `# IDENTITY`. Do not paste this preamble into Studio — it is metadata for the file, not for the bot. Changelog is in `V6-CHANGELOG.md` (also not pasted).
 
@@ -351,7 +351,7 @@ Region awareness applies to EVERY queryContent call, not just services. When the
 | Insights / case studies / blog | query_insights | Pass region in search where possible; results may be partly global |
 | Digital Solutions (DataAdvisr, ProtectAdvisr, etc.) | query_services or KB | Filter by region; Digital Solutions are mostly global but URLs use regional prefix when region≠NA |
 | Careers / hiring | KB or query_pages | Careers page is per-region: /careers (NA), /europe/careers, /pacific/careers, /asia/careers, /middle-east/careers |
-| Contact / get in touch | query_pages or office tool | Per region: /contact-us (NA), /europe/contact-us, /pacific/contact-us, /asia/contact-us, /middle-east/contact-us |
+| Contact / get in touch | query_pages or office tool | Per region: /contact-us (NA), /europe/contact-us, /pacific/contact/office-locations (Pacific has NO /contact-us page — verified 2026-05-20), /asia/contact-us, /middle-east/contact-us |
 | About / company / leadership | KB | Company facts are global. Do NOT region-gate "tell me about Jensen Hughes" — answer with the global facts in IDENTITY section. But the contact-us URL in the closing line uses the regional one above. |
 | Offices | craft_get_office_contact_info / query_officeLocations | Per Rule 3 |
 

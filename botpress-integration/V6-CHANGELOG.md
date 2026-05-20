@@ -4,6 +4,11 @@ Fallback contact: info@jensenhughes.com | (410) 737-8677 | https://www.jensenhug
 
 ## Change log
 
+- **2026-05-20 — V6.9 (URL audit fix, pending paste):**
+  - Rule 13 corrected Pacific contact URL. Was `/pacific/contact-us` (which 404s on prod). Now `/pacific/contact/office-locations` (200 OK). Verified live via curl HEAD batch 2026-05-20. Pacific does NOT have a `/contact-us` landing — uses `/contact/office-locations` instead.
+  - Companion fix in `data/botpress-faq-table-seed.csv`: 4 stale URLs corrected (`/about-us` → `/about`, `/services/accessibility-universal-design` → `/services/accessibility`, `/middle-east/services/accessibility-universal-design` → `/middle-east/services/accessibility`, `/pacific/contact-us` → `/pacific/contact/office-locations`).
+  - All 42 unique URLs in the FAQ seed now return HTTP 200.
+
 - **2026-05-20 — Integration v1.0.14 (MCP retry on transient errors):**
   - `makeRequest()` now retries 5xx + network errors (ECONN/ETIMEDOUT/ENOTFOUND/fetch failed) with exponential backoff (250ms, 500ms — max 3 attempts total). 4xx errors and parsed MCP errors fail fast (won't fix themselves). Closes the "transient Forge blip kills entire bot reply" failure mode. Pure defense — no behavior change on the happy path.
 
