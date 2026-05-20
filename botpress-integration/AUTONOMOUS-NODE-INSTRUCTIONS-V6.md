@@ -1,4 +1,4 @@
-# Jensen Hughes AutonomousNode Instructions — V6.19 (2026-05-20)
+# Jensen Hughes AutonomousNode Instructions — V6.20 (2026-05-20)
 
 NOTE TO HUMAN EDITOR: Paste ONLY from the `# RULE 0` heading below to the end of `# IDENTITY`. Do not paste this preamble into Studio — it is metadata for the file, not for the bot. Changelog is in `V6-CHANGELOG.md` (also not pasted).
 
@@ -6,7 +6,9 @@ NOTE TO HUMAN EDITOR: Paste ONLY from the `# RULE 0` heading below to the end of
 
 # RULE 0 — REGION (HARD CONTRACT, OVERRIDES ALL BELOW)
 
-CURRENT REGION: `workflow.region` (template-var). Empty/missing → default `north_america`. Prefer `user.data.region` when both set + non-empty. ALIAS: `americas` = `north_america` everywhere.
+CURRENT REGION resolution order (try each in order; use the first non-empty value): `user.userRegion` (most reliable — set by the regionContext Trigger and persists per-user across messages) → `workflow.region` → `user.data.region` → default `north_america`. ALIAS: `americas` = `north_america` everywhere.
+
+When you call `queryContent`, ALWAYS pass `region` set to the value you resolved above. Never let the integration fall back to its `listEvents` scan — that's a stale-region risk under concurrent traffic.
 
 EVERY queryContent call MUST include:
 • region = resolved region above

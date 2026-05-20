@@ -19,7 +19,12 @@ Fallback contact: info@jensenhughes.com | (410) 737-8677 | https://www.jensenhug
   - 60s window is conservative — the Twig footer re-emits regionContext on every `webchat:messageSent`, so the current user's event is always within seconds of the bot's query. Stale events older than 60s are ignored.
   - Does not fully eliminate the race under genuine concurrent traffic (two users from different regions both active within 60s), but reduces the window dramatically. Real fix remains User Variables refactor (see audit doc Tier 2 item #5).
 
-- **2026-05-20 — V6.19 (marine framing corrected: NOT UK-only, pending paste):**
+- **2026-05-20 — V6.20 (read region from user.userRegion, pending paste):**
+  - Studio side now has a Trigger1 → SetUserRegion node that captures `user.userRegion` from every regionContext event (wired tonight). This persists region per-user across messages, unlike workflow.region which doesn't carry forward when Standard1 doesn't re-run.
+  - V6.20 Rule 0 updates the region-resolution order: `user.userRegion` → `workflow.region` → `user.data.region` → default. Adds explicit guidance to ALWAYS pass `region` to queryContent so the integration doesn't fall back to its listEvents scan (cross-user risk).
+  - Pair with v1.0.17 listEvents 10s freshness window — defense in depth. Real fix is bot reading user.userRegion first.
+
+- **2026-05-20 — V6.19 (marine framing corrected: NOT UK-only, published 2026-05-20):**
   - Liz pushback on V6.18: "[Marine forensics] isn't just handled in europe tho its handled other regions also isnt it". She's right — V6.18 claimed "handled by our UK forensic team" but JH has forensic experts in multiple regions who handle marine. The /europe/ URL just means the UK team is the content-authoring lead for that page.
   - V6.19 Rule 5 STEP 0 templates corrected — no UK-team-only claim. All regions get essentially the same reply: "Yes - JH offers marine forensics. Detailed practice info at /europe/services/marine-fire-forensics. For inquiries, email instructus.uk@."
   - EU users get a slightly more direct "Here's the page" lead-in since it's their region's site, but substance is identical.
