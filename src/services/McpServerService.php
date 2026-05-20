@@ -568,13 +568,26 @@ class McpServerService extends Component
         // content[0].formattedText directly.
         $entries = $result['entries'] ?? null;
         if (is_array($entries) && !empty($entries)) {
+            // Normalize URLs IN PLACE on the entries array first. The bot's
+            // LLMz JSON.parse() reads entries[i].url directly (e.g., the
+            // name-match path in the integration's query_ourTeam handler
+            // returns a single matched entry whose `url` the bot then quotes
+            // in the reply). Without in-place normalization, staging hosts
+            // leak even though formattedText is correct.
+            foreach ($result['entries'] as $i => $entry) {
+                if (is_array($entry) && isset($entry['url'])) {
+                    $result['entries'][$i]['url'] = UrlNormalizer::normalizeForProduction($entry['url']);
+                }
+            }
+            $entries = $result['entries'];
+
             $lines = [];
             foreach ($entries as $entry) {
                 if (!is_array($entry)) {
                     continue;
                 }
                 $title = $entry['title'] ?? null;
-                $url   = UrlNormalizer::normalizeForProduction($entry['url'] ?? null);
+                $url   = $entry['url'] ?? null;
                 if (!is_string($title) || trim($title) === '' || strtolower(trim($title)) === 'untitled') {
                     continue;
                 }

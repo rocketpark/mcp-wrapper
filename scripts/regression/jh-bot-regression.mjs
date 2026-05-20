@@ -212,9 +212,11 @@ const TESTS = [
     expectAny: ['Sean', 'Lebel', 'info@jensenhughes.com'],
     deny: ['${', '$&#123;'] },
   { id: 'G8-NA-unknown-person', region: 'NA', tag: 'gap-2026-05-20', q: 'Tell me about Joaquim Vandermeerschen.',
-    // Fabricated name — must NOT hallucinate a bio
+    // Fabricated name — must NOT hallucinate a bio. Any "no match" phrasing is fine
+    // (Rule 10 fallback also acceptable — links the regional services landing).
     expect: [],
-    expectAny: ['couldn\'t find', 'no results', 'info@jensenhughes.com', 'not sure', 'don\'t have'],
+    expectAny: ['couldn\'t find', 'no results', 'info@jensenhughes.com', 'not sure', 'don\'t have',
+                'not seeing', 'no public', 'no published profile', 'no profile', '/services'],
     deny: ['${', '$&#123;', 'Director of', 'Managing Director', 'VP of'] },
   { id: 'G9-Pacific-sydney-cbd', region: 'Pacific', tag: 'gap-2026-05-20', q: 'What is the phone number for the Sydney CBD office?',
     // Tests partial slug + region — Rule 3 says partials work ("oakland"→"oakland-san-leandro")
