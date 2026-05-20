@@ -4,6 +4,11 @@ Fallback contact: info@jensenhughes.com | (410) 737-8677 | https://www.jensenhug
 
 ## Change log
 
+- **2026-05-20 — Integration v1.0.16 (Matt Booth findability fix):**
+  - `query_ourTeam` now passes the bot's `search` term through to MCP instead of fetching unconditional + filtering in JS. MCP's no-search query_ourTeam caps at ~100 entries (CMS has 101+ team members). Members alphabetically past the cap (Matt Booth, others) never reached the JS name-match filter, so the bot incorrectly told users "I can't find a directory entry for [Person]" even when the person had a live profile on jensenhughes.com/experts/[slug].
+  - Confirmed wild bug 2026-05-20: bot returned person-not-found for Matt Booth despite `/experts/matt-booth` returning HTTP 200 and direct MCP search returning his record. MCP fetch with limit=200 returned 100 entries, Matt Booth at position -1 (not in slice).
+  - Browse-mode (no search term) keeps the unconditional fetch to apply the Regional Leadership filter for "show me experts in X" queries.
+
 - **2026-05-20 — Integration v1.0.15 (cross-user region-leak fix):**
   - `listEvents` fallback in `src/index.ts:315` now filters events by `createdAt within last 60 seconds` instead of returning the most-recent-ever regionContext event in the workspace. Closes the wild-confirmed race: Jonathan on Global region got `/asia/services` because an earlier test session left a stale Asia regionContext event in the workspace event log; bot's fallback picked it up despite it being unrelated to Jonathan's user.
   - 60s window is conservative — the Twig footer re-emits regionContext on every `webchat:messageSent`, so the current user's event is always within seconds of the bot's query. Stale events older than 60s are ignored.

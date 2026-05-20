@@ -381,10 +381,18 @@ export default new bp.Integration({
           const searchTerm = (queryArgs.search || '').toLowerCase()
           logger.forBot().info(`Team member query - search: "${searchTerm}"`)
 
-          // Get all team members to filter
+          // When searching for a specific person by name, pass the search term
+          // to MCP so the server can return matching members directly. The MCP
+          // server's no-search query caps at ~100 entries (verified 2026-05-20
+          // on Jonathan's Matt Booth bug), so JS-side filtering of an
+          // unconditional fetch misses members beyond the first 100. Passing
+          // the search term lets MCP do the heavy lifting + return only
+          // matching members. For browse mode (no search term), keep the
+          // unconditional fetch to apply the Regional Leadership filter.
           const result = await client.callTool(toolName, {
-            limit: 200, // Get all to filter properly
+            limit: 200,
             offset: 0,
+            ...(searchTerm ? { search: searchTerm } : {}),
           })
 
           if (result?.content?.[0]?.text) {
