@@ -6,6 +6,7 @@ use Craft;
 use craft\base\Component;
 use rocketpark\mcpwrapper\support\GraphQLSanitizer;
 use rocketpark\mcpwrapper\support\RequestTimeoutException;
+use rocketpark\mcpwrapper\support\UrlNormalizer;
 use yii\web\Response;
 
 /**
@@ -573,7 +574,7 @@ class McpServerService extends Component
                     continue;
                 }
                 $title = $entry['title'] ?? null;
-                $url   = $entry['url']   ?? null;
+                $url   = UrlNormalizer::normalizeForProduction($entry['url'] ?? null);
                 if (!is_string($title) || trim($title) === '' || strtolower(trim($title)) === 'untitled') {
                     continue;
                 }

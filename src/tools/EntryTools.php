@@ -7,6 +7,7 @@ use craft\elements\Entry;
 use rocketpark\mcpwrapper\attributes\Tool;
 use rocketpark\mcpwrapper\support\Response;
 use rocketpark\mcpwrapper\support\SafeExecution;
+use rocketpark\mcpwrapper\support\UrlNormalizer;
 
 /**
  * Entry Tools
@@ -521,8 +522,8 @@ class EntryTools
 
             return Response::success([
                 'available'    => true,
-                'url'          => $url,
-                'fallbackUrl'  => $fallbackUrl,
+                'url'          => UrlNormalizer::normalizeForProduction($url),
+                'fallbackUrl'  => UrlNormalizer::normalizeForProduction($fallbackUrl),
                 'matchedSlug'  => $entry->slug,
                 'matchedTitle' => $entry->title,
                 'region'       => $region,
@@ -687,7 +688,7 @@ class EntryTools
                     $suggestions = array_map(fn($m) => [
                         'slug' => $m->slug,
                         'title' => $m->title,
-                        'url' => $m->url,
+                        'url' => UrlNormalizer::normalizeForProduction($m->url),
                     ], array_slice($matches, 0, 10));
                 }
             }
@@ -784,7 +785,7 @@ class EntryTools
                 'office' => [
                     'title' => $office->title,
                     'slug' => $office->slug,
-                    'url' => $office->url,
+                    'url' => UrlNormalizer::normalizeForProduction($office->url),
                     'phone' => $phone,
                     'phoneHref' => $phoneHref,
                     'contactForm' => $contactForm,
@@ -810,7 +811,7 @@ class EntryTools
             'title' => $entry->title,
             'slug' => $entry->slug,
             'uri' => $entry->uri,
-            'url' => $entry->url,
+            'url' => UrlNormalizer::normalizeForProduction($entry->url),
             'section' => $entry->section ? [
                 'id' => $entry->section->id,
                 'handle' => $entry->section->handle,
@@ -874,7 +875,7 @@ class EntryTools
                 return [
                     'id' => $element->id,
                     'title' => $element->title ?? $element->name ?? null,
-                    'url' => $element->url ?? null,
+                    'url' => UrlNormalizer::normalizeForProduction($element->url ?? null),
                     'type' => get_class($element),
                 ];
             }, $elements);
