@@ -14,7 +14,12 @@ Fallback contact: info@jensenhughes.com | (410) 737-8677 | https://www.jensenhug
   - 60s window is conservative — the Twig footer re-emits regionContext on every `webchat:messageSent`, so the current user's event is always within seconds of the bot's query. Stale events older than 60s are ignored.
   - Does not fully eliminate the race under genuine concurrent traffic (two users from different regions both active within 60s), but reduces the window dramatically. Real fix remains User Variables refactor (see audit doc Tier 2 item #5).
 
-- **2026-05-20 — V6.13 (URL fix for V6.12 person-lookup fallback, pending paste):**
+- **2026-05-20 — V6.14 (person-lookup richer reply, pending paste):**
+  - Rule 2.5 step 2 reply template was too thin ("[name] is on the Jensen Hughes team. Here's the profile page: [url]"). User can already see the name they asked about — that says nothing useful. Updated to include `role` (job title) and `officeLocation[0].title` from the entry the integration returned. Example: "Matt Booth is ACT Manager - Fire Safety Engineering based in our Canberra office. Here's the profile page: [url]"
+  - Fallback chain: role+office > office-only > generic stub. NEVER fabricate from general knowledge — use only what the tool returned.
+  - Triggered by Jonathan-style verification: Matt Booth IS an ACT Manager based in Canberra (per CMS data); previous response told the user nothing.
+
+- **2026-05-20 — V6.13 (URL fix for V6.12 person-lookup fallback, published 2026-05-20):**
   - V6.12's Rule 2.5 person-not-found template linked `/our-team` which **404s** on prod (verified via curl HEAD). The correct URL is `/our-experts` (200, page title "Featured Experts"). `/experts` also serves the same landing. Picked `/our-experts` for clarity.
   - V6.12 was a regression fix that fixed Jonathan's bugs but introduced a new broken URL. V6.13 corrects.
   - Re-tested today: Matt Booth person query now links the LIVE Featured Experts directory.
