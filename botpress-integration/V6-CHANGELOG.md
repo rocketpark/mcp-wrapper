@@ -14,7 +14,16 @@ Fallback contact: info@jensenhughes.com | (410) 737-8677 | https://www.jensenhug
   - 60s window is conservative — the Twig footer re-emits regionContext on every `webchat:messageSent`, so the current user's event is always within seconds of the bot's query. Stale events older than 60s are ignored.
   - Does not fully eliminate the race under genuine concurrent traffic (two users from different regions both active within 60s), but reduces the window dramatically. Real fix remains User Variables refactor (see audit doc Tier 2 item #5).
 
-- **2026-05-20 — V6.15 (marine + product liability framing fix, pending paste):**
+- **2026-05-20 — V6.16 (marine + product liability go per-region, pending paste):**
+  - V6.15's "globally; UK team" framing was a half-fix. Real answer: response should differ per user region. Live scrape confirms NA, Pacific, Asia, ME have NO marine-fire-forensics page (returns 404). Only EU has it.
+  - V6.16 Rule 5 STEP 0 now emits **3 different templates per region**:
+    - EU asks marine → direct EU URL (unchanged from V6.15)
+    - NA asks marine → "specialty within our forensic practice — page on our Europe site, NA general forensics at /services/investigations, UK team for marine specifically"
+    - Pacific/Asia/ME asks marine → "Europe-based specialty handled by UK team, EU URL, instructus.uk@ for marine, info@ for general forensics in your region"
+  - Same per-region pattern for product liability. Note added that other EU forensic sub-specialties (civil-structural-failure, escape-of-water, fire-explosion, materials-failure-analysis, expert-witness-litigation-support) follow the same pattern.
+  - Triggered by Liz/Jonathan ask to make bot **truly region-aware for ALL content categories**, not just services. Phase 1 inventory scrape running in parallel (research-agent) to capture all categories per region (insights, industries, careers, etc.) — will inform V6.17+ and a future tool-driven URL resolution refactor.
+
+- **2026-05-20 — V6.15 (marine + product liability framing fix, published 2026-05-20):**
   - V6.12-V6.14 linked `/europe/services/marine-fire-forensics` for any-region marine query, which made the URL feel exclusionary ("why is the bot pointing me to Europe?"). Real story: marine forensics + product liability are GLOBAL services owned by JH's UK team — the page just lives on the EU site because that's where the team's content authoring happens. Verified by reading the page content: "expertise for insurers, building owners and adjusters globally."
   - V6.15 Rule 5 STEP 0 templates now LEAD with the global framing:
     > "Yes — Jensen Hughes offers marine forensics globally; our specialist team is based in the UK. Here's the page: ..."
