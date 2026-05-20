@@ -207,13 +207,25 @@ export default new bp.Integration({
         const readEventRegion = (ev: any): string | null => {
           if (!ev || !ev.payload) return null
           const p = ev.payload
-          // Twig footer shape:  payload.data = { type:'regionContext', region }
+          // Webchat SDK sendEvent({data: X}) actually serializes as
+          // payload = { type:'custom', data: { data: X } } — the SDK adds
+          // an extra `data` wrapper around whatever the caller passed.
+          // The Twig footer calls sendEvent({data:{type:'regionContext',region,...}})
+          // so the real path is payload.data.data.type === 'regionContext'.
+          // Verified via reqid=161 trace 2026-05-19: bot returned NA on Asia
+          // because previous filter at payload.data.type never matched.
+          if (p.data?.data?.type === 'regionContext' && typeof p.data.data.region === 'string') {
+            return p.data.data.region
+          }
+          // Legacy / direct-payload shape (if event was posted server-side):
+          //   payload.data = { type:'regionContext', region }
           if (p.data?.type === 'regionContext' && typeof p.data.region === 'string') {
             return p.data.region
           }
-          // Defensive: bare region at payload root
+          // Defensive: bare region at various depths
           if (typeof p.region === 'string' && p.region.trim()) return p.region
           if (typeof p.data?.region === 'string' && p.data.region.trim()) return p.data.region
+          if (typeof p.data?.data?.region === 'string' && p.data.data.region.trim()) return p.data.data.region
           return null
         }
 
@@ -228,7 +240,7 @@ export default new bp.Integration({
               const evResp = await bpClient.listEvents({})
               const events = ((evResp as any)?.events || []) as any[]
               if (attempt === 0 && events.length) {
-                lastDebugDump = `events=${events.length}; sample=${JSON.stringify(events.slice(0, 2).map((e: any) => ({ id: e.id, type: e.type, payloadKeys: Object.keys(e.payload || {}), payloadDataType: e.payload?.data?.type, payloadDataRegion: e.payload?.data?.region })))}`
+                lastDebugDump = `events=${events.length}; sample=${JSON.stringify(events.slice(0, 2).map((e: any) => ({ id: e.id, type: e.type, payloadKeys: Object.keys(e.payload || {}), payloadType: e.payload?.type, payloadDataType: e.payload?.data?.type, payloadDataDataType: e.payload?.data?.data?.type, payloadDataDataRegion: e.payload?.data?.data?.region })))}`
               }
               const candidates = events
                 .map((e: any) => ({ e, region: readEventRegion(e) }))
@@ -423,23 +435,28 @@ export default new bp.Integration({
             const data = JSON.parse(result.content[0].text)
             const allEntries = data.entries || []
             
-            // Filter by search term in title, slug, summary, or ANY region title
+            // Filter by search term against title, slug, summary, AND address
+            // fields (locality, administrativeArea, country, countryCode). The
+            // address widens the country-level search ("India" should hit
+            // Mumbai). The previous region.title fallback was REMOVED — it
+            // matched "India" against the multi-country region label
+            // "Middle East + India", returning every Middle-East office as
+            // an India hit (Jeddah, Abu Dhabi, Riyadh, Doha all leaked).
+            // Region-scoped browsing belongs in the bot's explicit `region`
+            // input arg (Rule 0), not in the search filter.
             const filtered = allEntries.filter((entry: any) => {
-              // Check title, slug, summary
+              const addr = entry.address || {}
               const mainText = [
                 entry.title || '',
                 entry.slug || '',
-                entry.officeSummary || ''
+                entry.officeSummary || '',
+                addr.locality || '',
+                addr.administrativeArea || '',
+                addr.country || '',
+                addr.countryCode || '',
+                entry.country || '',
               ].join(' ').toLowerCase()
-              
-              if (mainText.includes(searchTerm)) return true
-              
-              // Check each region title individually
-              const regions = entry.region || []
-              return regions.some((r: any) => {
-                const regionTitle = (r.title || '').toLowerCase()
-                return regionTitle.includes(searchTerm)
-              })
+              return mainText.includes(searchTerm)
             })
             
             logger.forBot().info(`Filtered ${filtered.length} offices from ${allEntries.length} total`)
