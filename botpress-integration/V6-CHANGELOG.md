@@ -9,7 +9,12 @@ Fallback contact: info@jensenhughes.com | (410) 737-8677 | https://www.jensenhug
   - 60s window is conservative — the Twig footer re-emits regionContext on every `webchat:messageSent`, so the current user's event is always within seconds of the bot's query. Stale events older than 60s are ignored.
   - Does not fully eliminate the race under genuine concurrent traffic (two users from different regions both active within 60s), but reduces the window dramatically. Real fix remains User Variables refactor (see audit doc Tier 2 item #5).
 
-- **2026-05-20 — V6.12 (Jonathan bugs caught, pending paste):**
+- **2026-05-20 — V6.13 (URL fix for V6.12 person-lookup fallback, pending paste):**
+  - V6.12's Rule 2.5 person-not-found template linked `/our-team` which **404s** on prod (verified via curl HEAD). The correct URL is `/our-experts` (200, page title "Featured Experts"). `/experts` also serves the same landing. Picked `/our-experts` for clarity.
+  - V6.12 was a regression fix that fixed Jonathan's bugs but introduced a new broken URL. V6.13 corrects.
+  - Re-tested today: Matt Booth person query now links the LIVE Featured Experts directory.
+
+- **2026-05-20 — V6.12 (Jonathan bugs caught, published 2026-05-20 — has broken /our-team URL, fixed in V6.13):**
   - **Rule 5 STEP 0 (NEW)** — Marine Forensics + Product Liability sub-topic override BEFORE region routing. Sub-areas exist only on EU site but apply globally. NA/Asia/Pacific/ME user asking for "marine forensics" now gets the EU `/europe/services/marine-fire-forensics` URL + `instructus.uk@jensenhughes.com` email. Previously: bot fell through to NA Step 2 template (`/services/investigations`) — wrong URL, wrong email. Confirmed by Jonathan on Global region today.
   - **Rule 2.5 NEW — Person Lookup fallback** — when `query_ourTeam` returns 0 results for a specific named person (e.g. "Matt Booth"), bot now emits the **person-not-found template** linking the global team directory (`/our-team`) + `info@jensenhughes.com`. Previously bot fell through to Rule 10 services-page template (e.g. `/asia/services`) which is wrong for a person query. Confirmed by Jonathan today.
   - Identified separately: a cross-user region-leak race in the integration's `listEvents` fallback (caused Jonathan's Global-region query to route to Asia). Fix shipping in integration v1.0.15 separately.
