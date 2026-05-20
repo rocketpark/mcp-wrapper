@@ -160,7 +160,11 @@ async function main() {
   console.log(`Headers: ${headers.join(', ')}`)
 
   // Normalize rows for Botpress: enforce types per schema.
-  const cleaned = rows.map((r, idx) => ({
+  // Pipe-separated topic_pattern values get expanded into one row per pattern
+  // so the Botpress filter `event.preview contains topic_pattern` can hit any
+  // single synonym. Source CSV stays compact (one logical row per topic);
+  // expansion happens only at insert time.
+  const rawCleaned = rows.map((r, idx) => ({
     topic_pattern: String(r.topic_pattern || '').trim(),
     region: String(r.region || '').trim().toLowerCase(),
     answer_template: String(r.answer_template || '').trim(),
@@ -169,6 +173,13 @@ async function main() {
     notes: String(r.notes || '').trim(),
     _row: idx + 2,  // CSV line number for debugging (header is line 1)
   })).filter(r => r.topic_pattern && r.region && r.answer_template)
+
+  const cleaned = rawCleaned.flatMap(r => {
+    const patterns = r.topic_pattern.split('|').map(s => s.trim().toLowerCase()).filter(Boolean)
+    if (patterns.length === 0) return []
+    return patterns.map(p => ({ ...r, topic_pattern: p }))
+  })
+  console.log(`Expanded ${rawCleaned.length} CSV rows -> ${cleaned.length} per-pattern rows for Botpress.`)
 
   if (cleaned.length === 0) {
     console.error('ERROR: no valid rows after normalization')
