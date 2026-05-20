@@ -19,7 +19,14 @@ Fallback contact: info@jensenhughes.com | (410) 737-8677 | https://www.jensenhug
   - 60s window is conservative — the Twig footer re-emits regionContext on every `webchat:messageSent`, so the current user's event is always within seconds of the bot's query. Stale events older than 60s are ignored.
   - Does not fully eliminate the race under genuine concurrent traffic (two users from different regions both active within 60s), but reduces the window dramatically. Real fix remains User Variables refactor (see audit doc Tier 2 item #5).
 
-- **2026-05-20 — V6.18 (simpler human-tone replies, pending paste):**
+- **2026-05-20 — V6.19 (marine framing corrected: NOT UK-only, pending paste):**
+  - Liz pushback on V6.18: "[Marine forensics] isn't just handled in europe tho its handled other regions also isnt it". She's right — V6.18 claimed "handled by our UK forensic team" but JH has forensic experts in multiple regions who handle marine. The /europe/ URL just means the UK team is the content-authoring lead for that page.
+  - V6.19 Rule 5 STEP 0 templates corrected — no UK-team-only claim. All regions get essentially the same reply: "Yes - JH offers marine forensics. Detailed practice info at /europe/services/marine-fire-forensics. For inquiries, email instructus.uk@."
+  - EU users get a slightly more direct "Here's the page" lead-in since it's their region's site, but substance is identical.
+  - Same pattern applies to product liability + other EU-page-owning sub-specialties (civil structural failure, escape of water, fire and explosion, materials failure, expert witness litigation support).
+  - Removed the per-region template fan-out from V6.18; one accurate response for all regions is better than three semi-wrong ones.
+
+- **2026-05-20 — V6.18 (simpler human-tone replies, published 2026-05-20 — superseded by V6.19 same day):**
   - Rule 5 STEP 0 marine/product-liability templates **simplified** — Liz pushback: "shouldn't it answer better than this? mentioning Europe AND Asia in one reply is too much." V6.16 templates referenced 3 regions in one Asia reply (Europe-based + UK team + "from Asia"). V6.18 strips the cross-region soup:
     - Pacific/Asia/ME marine reply now: "Marine forensics is handled by our UK forensic team. Email instructus.uk@jensenhughes.com (subject: Marine Forensics Instruction) for inquiries." — one sentence, no `/europe/` URL dangle, no user-region mention.
     - NA marine reply: "handled by our UK forensic team — they take inquiries globally" + instructus.uk@ + secondary NA `/services/investigations`.
