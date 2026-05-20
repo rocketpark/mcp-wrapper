@@ -14,7 +14,16 @@ Fallback contact: info@jensenhughes.com | (410) 737-8677 | https://www.jensenhug
   - 60s window is conservative — the Twig footer re-emits regionContext on every `webchat:messageSent`, so the current user's event is always within seconds of the bot's query. Stale events older than 60s are ignored.
   - Does not fully eliminate the race under genuine concurrent traffic (two users from different regions both active within 60s), but reduces the window dramatically. Real fix remains User Variables refactor (see audit doc Tier 2 item #5).
 
-- **2026-05-20 — V6.16 (marine + product liability go per-region, pending paste):**
+- **2026-05-20 — V6.17 (per-region experts directory + broken-URL guards, pending paste):**
+  - Phase 1 full content inventory completed today via research-agent. Scraped 5 regions across services / insights / industries / careers / contact / about / podcasts / events / team. Inventory at `docs/JH-REGIONAL-CONTENT-INVENTORY.md`.
+  - Caught 9 broken URLs the bot was (or could be) linking. Patched Rule 2.5 person-not-found template to use REGION-AWARE experts-directory URL:
+    - NA / unknown → `/our-experts`
+    - EU → `/europe/our-experts`
+    - Pacific / Asia / ME → `/experts` (those regions' `/our-experts` 404s)
+  - Added "Other broken URLs to NEVER link" section: `/webinars` (500 site-wide), `/asia/events`, `/middle-east/events`, `/middle-east/contact/office-locations`, regional `/about/leadership-team` (Pacific/Asia/ME only NA+EU work), `/pacific/careers/students-graduates`.
+  - Also today: uploaded `botpress-regional-services.txt` (11 kB) to the previously-EMPTY "Regions" KB. Bot's RAG now has authoritative per-region service inventory to retrieve from.
+
+- **2026-05-20 — V6.16 (marine + product liability go per-region, published 2026-05-20):**
   - V6.15's "globally; UK team" framing was a half-fix. Real answer: response should differ per user region. Live scrape confirms NA, Pacific, Asia, ME have NO marine-fire-forensics page (returns 404). Only EU has it.
   - V6.16 Rule 5 STEP 0 now emits **3 different templates per region**:
     - EU asks marine → direct EU URL (unchanged from V6.15)
