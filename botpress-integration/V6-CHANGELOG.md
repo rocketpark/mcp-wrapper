@@ -14,6 +14,12 @@ Fallback contact: info@jensenhughes.com | (410) 737-8677 | https://www.jensenhug
   - 60s window is conservative — the Twig footer re-emits regionContext on every `webchat:messageSent`, so the current user's event is always within seconds of the bot's query. Stale events older than 60s are ignored.
   - Does not fully eliminate the race under genuine concurrent traffic (two users from different regions both active within 60s), but reduces the window dramatically. Real fix remains User Variables refactor (see audit doc Tier 2 item #5).
 
+- **2026-05-20 — V6.15 (marine + product liability framing fix, pending paste):**
+  - V6.12-V6.14 linked `/europe/services/marine-fire-forensics` for any-region marine query, which made the URL feel exclusionary ("why is the bot pointing me to Europe?"). Real story: marine forensics + product liability are GLOBAL services owned by JH's UK team — the page just lives on the EU site because that's where the team's content authoring happens. Verified by reading the page content: "expertise for insurers, building owners and adjusters globally."
+  - V6.15 Rule 5 STEP 0 templates now LEAD with the global framing:
+    > "Yes — Jensen Hughes offers marine forensics globally; our specialist team is based in the UK. Here's the page: ..."
+  - Same shape for product liability. URLs + emails unchanged (still EU URL + instructus.uk@ — that's where the content + team live).
+
 - **2026-05-20 — V6.14 (person-lookup richer reply, pending paste):**
   - Rule 2.5 step 2 reply template was too thin ("[name] is on the Jensen Hughes team. Here's the profile page: [url]"). User can already see the name they asked about — that says nothing useful. Updated to include `role` (job title) and `officeLocation[0].title` from the entry the integration returned. Example: "Matt Booth is ACT Manager - Fire Safety Engineering based in our Canberra office. Here's the profile page: [url]"
   - Fallback chain: role+office > office-only > generic stub. NEVER fabricate from general knowledge — use only what the tool returned.
