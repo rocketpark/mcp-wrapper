@@ -53,19 +53,29 @@ In Studio's bot flow editor:
 
 **Why `user` scope, not `workflow`:** `user.*` persists across messages AND conversations for the same anonymous webchat user. `workflow.*` only lasts the current conversation. Region is a stable per-user property — must be user-scoped.
 
-## Step 2 — Update Standard1 (or wherever region is read into workflow.region)
+## Step 2 — Update Standard1 (the "Set Workflow Region" / "Assign User Region" Execute Code card)
 
-The bot probably has a node that reads region at conversation start and writes to `workflow.region`. Update it:
+Standard1 has two cards:
+1. **Get User Data** (action: `webchat/getUserData`, stores output in `workflow.userData`)
+2. **Set Workflow Region** (Execute Code, reads from above + sets `workflow.region`)
 
-**Before:**
-```
-workflow.region = user.data.region ?? 'north_america'
+**CRITICAL — the path Botpress getUserData returns is DOUBLE-NESTED.** Verified live 2026-05-21 via console.log in Standard1: `workflow.userData` looks like `{ userData: { region: "pacific", siteHandle, urlPrefix, language } }`. There's an extra `userData` key wrapping the actual user.data fields. So the read path is `workflow.userData.userData.region`, NOT `workflow.userData.region` or `workflow.userData.data.region`.
+
+**Final code (paste exactly — verified working 2026-05-21):**
+```js
+const r = workflow.userData?.['userData']?.['region']
+       || user.userRegion
+       || null
+if (r) {
+  workflow.region = r
+}
 ```
 
-**After:**
-```
-workflow.region = user.userRegion ?? user.data.region ?? 'north_america'
-```
+Why `workflow.userData.userData.region` is checked FIRST (synchronous), `user.userRegion` SECOND (async fallback):
+- `workflow.userData.userData.region` is filled by Standard1's preceding "Get User Data" card. Synchronous within the node. Reflects whatever the Twig footer's `updateUser({data: {region}})` last committed for this user — racing only against updateUser commit, which is fast.
+- `user.userRegion` is set by the SetUserRegion node attached to Trigger1's regionContext event. Botpress user-scope writes have eventual consistency, so under tight test timing this may not be committed by Standard1's read. Kept as fallback for future events.
+
+Earlier versions of this doc said `workflow.userData.region` and `workflow.userData.data.region`. Both wrong — the wrapper key is named `userData`, not `data`. The path `workflow.userData.userData.region` was discovered 2026-05-21 by adding `console.info('STANDARD1_DEBUG', JSON.stringify({userData_full: workflow.userData}))` and reading the actual structure from Botpress Logs panel.
 
 (Order matters — `user.userRegion` from Step 1 is the new persistent source; `user.data.region` is the Twig updateUser legacy fallback; `'north_america'` is the final default.)
 

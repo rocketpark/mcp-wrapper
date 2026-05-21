@@ -4,6 +4,19 @@ Fallback contact: info@jensenhughes.com | (410) 737-8677 | https://www.jensenhug
 
 ## Change log
 
+- **2026-05-21 — V6.22 (Rule 5 STEP 2 reorder, Rule 10 accessibility/security/em rows, Rule 4 STEP 0 two-step algorithm) + Standard1 TRUE userData path discovered:**
+  - Live STANDARD1_DEBUG console.log + Botpress Logs panel inspection revealed `workflow.userData` returned by Botpress `webchat/getUserData` action is DOUBLE-NESTED:
+    ```
+    workflow.userData = { userData: { region, siteHandle, urlPrefix, language } }
+    ```
+    Real path is `workflow.userData.userData.region`. Earlier doc + Standard1 code used `workflow.userData.region` and `workflow.userData.data.region` — both wrong (no `region` or `data` at top of `workflow.userData`, the wrapper key is `userData`). Standard1 fix: read `workflow.userData?.['userData']?.['region']` FIRST (synchronous, no race), fallback to `user.userRegion` (async from Trigger1).
+  - V6.22 prompt changes:
+    - **Rule 5 STEP 2 reordered**: Europe template moved BEFORE NA template. LLM had a strong bias for whichever template appeared first; with NA listed first the bot kept picking NA forensics template even for EU users despite region resolved correctly. Added explicit pre-send check: "If draft contains /services/investigations AND region is europe, replace with Europe template."
+    - **Rule 10 added explicit Accessibility, Security Risk, Emergency Management rows**. V6.21 relied on Rule 4 STEP 0 catching these, but LLM occasionally skipped Rule 4 and fell through to Rule 10's KB result. Explicit REFUSE cells in Rule 10 prevent fallthrough.
+    - **Rule 4 STEP 0 strengthened with TWO-STEP DECISION ALGORITHM**. Enumerates exact region+topic pairs that must REFUSE. Removes LLM ambiguity about which lists apply where.
+  - Validated 3 tests post-Standard1-fix: EU-forensics, Pacific-forensics, Pacific-accessibility all PASS. 7 other previously-failing tests still fail but bot's AI Spend quota hit mid-regression so those results are degraded — cannot distinguish "real V6.22 bug" from "no LLM response" without quota bump + clean re-run.
+  - Regression script: playwright wait reverted 25s → 12s now that Standard1 reads userData synchronously (no async user.userRegion race). NA-marine-forensics test assertion fixed (was expecting /services/investigations but per Rule 5 STEP 0 marine is EU-page-served globally for NA users too). Pacific-security deny pattern expanded to catch both em-dash and spaced-dash "Yes — Jensen Hughes offers security risk" variants.
+
 - **2026-05-21 — Integration v1.0.18 + Trigger1/SetUserRegion TRUE path (root-cause fix for the persistent region leak):**
   - V6.20 + V6.21 + earlier Trigger1 widening were all chasing the wrong payload path. Live inspection of an actual `webchat:trigger` event from regression run (Botpress Events panel, event evt_01KS43XE55ZN6H71DGCVHVTEC8 at 2026-05-21T01:55:30Z) finally revealed the TRUE structure:
     ```

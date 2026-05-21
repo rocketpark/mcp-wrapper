@@ -75,7 +75,8 @@ const TESTS = [
   { id: 'EU-security',     region: 'EU',     tag: 'restriction', q: 'Do you offer security risk consulting?',
     expect: ['not currently available', 'Europe'], deny: [] },
   { id: 'Pacific-security', region: 'Pacific', tag: 'restriction', q: 'Do you offer security risk consulting?',
-    expect: ['Pacific'], deny: ['Yes—Jensen Hughes offers security risk'] },
+    expect: ['not currently available', 'Pacific'],
+    deny: ['Yes — Jensen Hughes offers security risk', 'Yes—Jensen Hughes offers security risk'] },
   { id: 'Pacific-em',       region: 'Pacific', tag: 'restriction', q: 'Do you offer emergency management?',
     expect: ['not currently available', 'Pacific'], deny: [] },
   // Office contact (Rule 3)
@@ -148,7 +149,12 @@ const TESTS = [
     expect: ['marine-fire-forensics', 'instructus.uk@jensenhughes.com'],
     deny: ['${', '$&#123;', 'what country', 'what city'] },
   { id: 'NA-marine-forensics', region: 'NA', tag: 'jonathan', q: 'Do you provide Marine Forensics services?',
-    expect: ['investigations'], deny: ['${', '$&#123;'] },
+    // Per V6.19+ Rule 5 STEP 0: marine forensics is EU-page-served globally
+    // (instructus.uk@ for inquiries) regardless of user's region. NA users get
+    // the EU URL too. Old assertion expected /services/investigations which
+    // would be a Rule 5 STEP 2 NA reply — wrong for marine sub-topic.
+    expect: ['marine-fire-forensics', 'instructus.uk@jensenhughes.com'],
+    deny: ['${', '$&#123;'] },
   // Digital Solutions per region
   { id: 'NA-digital', region: 'NA', tag: 'region-surface', q: 'What digital solutions do you offer?',
     // Accept any digital product mention OR the /services/digital landing — KB doesn't surface specific product names yet
@@ -279,7 +285,11 @@ async function setupSession(page, regionCfg) {
       data: { type: 'regionContext', region: cfg.region, siteHandle: cfg.siteHandle, urlPrefix: cfg.urlPrefix, language: 'en' }
     });
   }, regionCfg);
-  // race: workflow.region needs ≥10s after sendEvent (memory: project_jh_botpress_region)
+  // race: regionContext event needs commit time before first message. 2026-05-21
+  // raised then reverted: Standard1 now reads workflow.userData.userData.region
+  // SYNCHRONOUSLY (filled by Get User card in same node) so the async user.userRegion
+  // race is no longer load-bearing. 12s is plenty for updateUser → Get User to see
+  // the data. Real users naturally wait >12s between page-open and first message.
   await page.waitForTimeout(12000);
 }
 
