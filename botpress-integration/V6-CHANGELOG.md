@@ -4,6 +4,31 @@ Fallback contact: info@jensenhughes.com | (410) 737-8677 | https://www.jensenhug
 
 ## Change log
 
+- **2026-05-21 — Integration v1.0.18 + Trigger1/SetUserRegion TRUE path (root-cause fix for the persistent region leak):**
+  - V6.20 + V6.21 + earlier Trigger1 widening were all chasing the wrong payload path. Live inspection of an actual `webchat:trigger` event from regression run (Botpress Events panel, event evt_01KS43XE55ZN6H71DGCVHVTEC8 at 2026-05-21T01:55:30Z) finally revealed the TRUE structure:
+    ```
+    event.payload = {
+      origin: "website",
+      conversationId, userId,
+      payload: {                       <-- nested "payload" key, NOT "data"
+        data: {
+          type: "regionContext",
+          region: "north_america" | "europe" | ...,
+          siteHandle, urlPrefix, language
+        }
+      }
+    }
+    ```
+  - Correct paths:
+    - Trigger1 Event Filter: `{{event.payload?.payload?.data?.type === "regionContext"}}`
+    - SetUserRegion code: `event.payload?.payload?.data?.region`
+    - Integration readEventRegion (src/index.ts:277-310): `p.payload?.data?.type === 'regionContext'` checked FIRST, then legacy paths as fallback.
+  - Earlier comments in integration code (and runbook + the 2026-05-20 evening Trigger1 widening) incorrectly described path as `payload.data.data.type`. That path doesn't exist in real webchat events, so Trigger1 NEVER fired → user.userRegion stayed empty → integration listEvents fallback also returned null → bot defaulted to NA site for every regression test.
+  - Why Pacific manual test passed earlier: timing. Manual test gives page load enough lead time for updateUser to populate user.data.region, which Standard1 reads via Get User → workflow.userData → workflow.region. Bot resolved region via that path. Regression's tight 12s window races Get User and loses for ~9/62 tests, especially EU.
+  - Integration v1.0.18 bumps package.json + integration.definition.ts.
+  - Studio side requires re-paste of Trigger1 filter + SetUserRegion code (see docs/USER-VARIABLES-STUDIO-SETUP.md Step 1).
+  - V6.21 prompt updates (Rule 4 STEP 0, EU URL column, Rule 7 regionLabel, etc) remain valid — they reduce damage when region resolution fails, but with v1.0.18 the resolution itself works reliably.
+
 - **2026-05-20 late — V6.21 (regression-driven fix bundle: Rule 4 hoisting + EU URL column + Rule 7 regionLabel mandate + podcast row + Rule 12 enforcement checklist):**
   - Post-Trigger1-fix regression suite caught 4 classes of bugs that Trigger1 wiring alone didn't address. Root issue: V6.20 prompt has all the right rules, but priority ordering and slug ambiguity let the LLM pick wrong templates / URLs even when region resolution succeeded.
   - **Rule 4 STEP 0 — RUN BEFORE Rule 5 / Rule 10 routing (mirrors Rule 9 STEP 1 off-topic pattern).** Bot must check current region's NOT-available list BEFORE considering any tool call or service URL. Adds restricted-service topic-pattern matchers (e.g., "security risk", "accessibility", "forensic" → trigger refusal for restricted regions). Catches: EU-security, EU-accessibility, Pacific-security weak-pass (regression Pacific got "Yes" + `/pacific/services` when Rule 4 says refuse), Asia-LSFT, and similar.

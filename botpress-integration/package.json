@@ -1,6 +1,6 @@
 {
   "name": "botpress-craftcms-mcp-integration",
-  "version": "1.0.17",
+  "version": "1.0.18",
   "description": "Botpress integration for Craft CMS via Model Context Protocol (MCP)",
   "main": "dist/index.js",
   "type": "module",

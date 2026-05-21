@@ -2,7 +2,7 @@ import { IntegrationDefinition, z } from '@botpress/sdk'
 
 export default new IntegrationDefinition({
   name: 'craftcms-mcp',
-  version: '1.0.17',
+  version: '1.0.18',
   title: 'Craft CMS via MCP',
   description: 'Query Craft CMS content through the Model Context Protocol (MCP) server',
   icon: 'icon.svg',

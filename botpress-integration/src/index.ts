@@ -277,23 +277,44 @@ export default new bp.Integration({
         const readEventRegion = (ev: any): string | null => {
           if (!ev || !ev.payload) return null
           const p = ev.payload
-          // Webchat SDK sendEvent({data: X}) actually serializes as
-          // payload = { type:'custom', data: { data: X } } — the SDK adds
-          // an extra `data` wrapper around whatever the caller passed.
-          // The Twig footer calls sendEvent({data:{type:'regionContext',region,...}})
-          // so the real path is payload.data.data.type === 'regionContext'.
-          // Verified via reqid=161 trace 2026-05-19: bot returned NA on Asia
-          // because previous filter at payload.data.type never matched.
-          if (p.data?.data?.type === 'regionContext' && typeof p.data.data.region === 'string') {
-            return p.data.data.region
+          // Webchat SDK sendEvent({data: X}) is delivered to Botpress as a
+          // webchat:trigger event with this shape (verified live 2026-05-20
+          // via Botpress Events panel, event evt_01KS43XE55ZN6H71DGCVHVTEC8):
+          //
+          //   event.payload = {
+          //     origin: "website",
+          //     conversationId, userId,
+          //     payload: {                       <-- nested "payload" key, not "data"
+          //       data: {
+          //         type: "regionContext",
+          //         region: "north_america" | "europe" | ...,
+          //         siteHandle, urlPrefix, language
+          //       }
+          //     }
+          //   }
+          //
+          // So the TRUE path is payload.payload.data.type === 'regionContext'.
+          // Earlier comments here (and the V6.20 Studio Trigger1 filter) used
+          // payload.data.data.type — that path doesn't exist in real webchat
+          // events, so the filter NEVER matched and user.userRegion was never
+          // populated; integration's listEvents fallback ALSO returned null
+          // here, defaulting site to NA. Caused ~6 EU regression failures.
+          if (p.payload?.data?.type === 'regionContext' && typeof p.payload.data.region === 'string') {
+            return p.payload.data.region
           }
-          // Legacy / direct-payload shape (if event was posted server-side):
+          // Server-posted shape (no webchat SDK wrap):
           //   payload.data = { type:'regionContext', region }
           if (p.data?.type === 'regionContext' && typeof p.data.region === 'string') {
             return p.data.region
           }
+          // Legacy double-wrap shape kept for backwards compatibility:
+          //   payload.data.data = { type:'regionContext', region }
+          if (p.data?.data?.type === 'regionContext' && typeof p.data.data.region === 'string') {
+            return p.data.data.region
+          }
           // Defensive: bare region at various depths
           if (typeof p.region === 'string' && p.region.trim()) return p.region
+          if (typeof p.payload?.data?.region === 'string' && p.payload.data.region.trim()) return p.payload.data.region
           if (typeof p.data?.region === 'string' && p.data.region.trim()) return p.data.region
           if (typeof p.data?.data?.region === 'string' && p.data.data.region.trim()) return p.data.data.region
           return null

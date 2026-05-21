@@ -34,14 +34,16 @@ In Studio's bot flow editor:
    - Trigger type: **Custom Event**
    - Event name: `regionContext`
    - Listen on every conversation (not just start)
-   - **Event Filter (CRITICAL — must handle webchat SDK double-data wrap):**
+   - **Event Filter (CRITICAL — TRUE PATH verified live 2026-05-20 from Botpress Events panel):**
      ```
-     {{event.payload?.data?.type === "regionContext" || event.payload?.data?.data?.type === "regionContext"}}
+     {{event.payload?.payload?.data?.type === "regionContext"}}
      ```
-     The Twig footer calls `sendEvent({data:{type:'regionContext',...}})`. The webchat SDK wraps that with an extra `data` layer, so the bot actually sees `event.payload.data.data.type === 'regionContext'` (NOT `event.payload.data.type` — that path holds the SDK's outer event-type label, which is "custom"). The defensive filter above matches BOTH the SDK-wrapped shape AND the legacy/direct-payload shape. A filter that only checks the shallow path silently never fires for webchat events — see `botpress-integration/src/index.ts:277-300` for the same defensive pattern in integration code, and the 2026-05-20 fix-up where the trigger was tightened after a live region-leak retest. Validated 2026-05-20 evening: Pacific page → "Do you offer security risk consulting?" now correctly returns Rule 4 Pacific-not-available refusal (previously leaked to NA).
-4. After the Trigger card, add an **Execute Code** card named `SetUserRegion` with this code (mirrors the defensive both-shapes pattern):
+     The Twig footer calls `sendEvent({data:{type:'regionContext',...}})`. The webchat SDK wraps that as a `webchat:trigger` event with structure `event.payload = {origin, conversationId, userId, payload: {data: {type, region, siteHandle, urlPrefix, language}}}`. The actual `regionContext` payload lives at `event.payload.payload.data` — note the nested `payload` key, NOT a nested `data` key. Earlier doc versions (and the original Studio Trigger1 filter) used `event.payload.data.type` and `event.payload.data.data.type` — both wrong, no `data` key at top of `event.payload`. Filter that doesn't match the true path silently never fires for webchat events. See `botpress-integration/src/index.ts:277-310` for the integration's matching defensive `readEventRegion()` function (v1.0.18 added the `payload.payload.data` path as primary).
+4. After the Trigger card, add an **Execute Code** card named `SetUserRegion` with this code (mirrors integration code's defensive priority order):
    ```js
-   const r = event.payload?.data?.region || event.payload?.data?.data?.region
+   const r = event.payload?.payload?.data?.region
+          || event.payload?.data?.region
+          || event.payload?.data?.data?.region
    if (r) {
      user.userRegion = r
    }
