@@ -4,6 +4,17 @@ Fallback contact: info@jensenhughes.com | (410) 737-8677 | https://www.jensenhug
 
 ## Change log
 
+- **2026-05-20 evening — Studio Trigger1 filter widened (region leak ROOT CAUSE FIXED):**
+  - V6.20 prompt + v1.0.17 integration freshness window were necessary but not sufficient — Pacific staging retest at ~20:00 still leaked NA on "Do you offer security risk consulting?" reply.
+  - Root cause: Trigger1's Event Filter was `{{event.payload.data && event.payload.data.type === "regionContext"}}`. The webchat SDK wraps `sendEvent({data:X})` payloads with an extra `data` layer, so the real path is `event.payload.data.data.type === "regionContext"` (the shallow path `event.payload.data.type` holds the SDK's outer event-type label "custom"). Filter silently never fired for webchat events → user.userRegion stayed empty → integration's listEvents fallback fired → cross-user leak.
+  - Fix: filter widened to defensive both-shapes pattern (matches integration code at `src/index.ts:287` + SetUserRegion code's own both-shapes read):
+    ```
+    {{event.payload?.data?.type === "regionContext" || event.payload?.data?.data?.type === "regionContext"}}
+    ```
+  - SetUserRegion + variable + prompt all unchanged — only Trigger1 filter modified + republished.
+  - Validated live 2026-05-20 evening on Pacific staging: msg 1 "Do you offer security risk consulting?" → "Security Risk + Public Safety is not currently available in the Pacific. For more info, contact info@jensenhughes.com." (Rule 4 refusal — correct). Msg 2 same convo "do you do forensic investigation?" → "Forensic investigation is not currently available in Pacific. For forensic inquiries, contact info@jensenhughes.com." (Rule 5 STEP 1 — correct). Region persists msg 2+, no leak.
+  - Runbook fix at `docs/USER-VARIABLES-STUDIO-SETUP.md` Step 1 (defensive filter + Execute Code variant for SetUserRegion + correct `userRegion` variable name).
+
 - **2026-05-20 — Integration v1.0.17 (tighter listEvents freshness 60s → 10s):**
   - v1.0.15 set the listEvents fallback freshness window to 60 seconds. Live testing today 2026-05-20 caught a cross-user leak even within that window (EU test fired ~2 min after an Asia test, integration's listEvents picked up the stale Asia event because workflow.region was empty on the EU session and the Asia event was just barely outside 60s — but the test repro also showed a 30s contamination).
   - Tightening to 10s. The Twig footer re-emits regionContext on EVERY webchat:messageSent, so the current user's event is always within ~1-2 seconds of any bot query. 10s is plenty for the legitimate case, much tighter than 60s on cross-user contamination.
