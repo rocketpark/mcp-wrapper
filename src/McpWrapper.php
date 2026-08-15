@@ -8,8 +8,9 @@ use craft\events\RegisterUrlRulesEvent;
 use craft\services\Utilities;
 use craft\web\UrlManager;
 use rocketpark\mcpwrapper\utilities\McpManifestUtility;
-use rocketpark\mcpwrapper\utilities\McpAnalyticsUtility;
 use yii\base\Event;
+use craft\events\RegisterUserPermissionsEvent;
+use craft\services\UserPermissions;
 
 use rocketpark\mcpwrapper\services\ManifestBuilderService;
 use rocketpark\mcpwrapper\services\McpServerService;
@@ -27,6 +28,8 @@ use craft\events\ModelEvent;
 class McpWrapper extends Plugin
 {
     public string $schemaVersion = '1.0.0';
+    public bool $hasCpSection = true;
+    public bool $hasCpSettings = false;
 
     /**
      * @var McpWrapper|null
@@ -60,12 +63,47 @@ class McpWrapper extends Plugin
         ];
     }
 
+    /**
+     * @inheritdoc
+     */
+    public function getCpNavItem(): ?array
+    {
+        $item = parent::getCpNavItem();
+        $item['label'] = Craft::t('mcp-wrapper', 'MCP Wrapper');
+
+        $subnav = [];
+
+        // Analytics - check permission
+        if (Craft::$app->getUser()->getIsAdmin() || Craft::$app->getUser()->checkPermission('mcp-wrapper:viewAnalytics')) {
+            $subnav['analytics'] = [
+                'label' => Craft::t('mcp-wrapper', 'Analytics'),
+                'url' => 'mcp-wrapper/analytics',
+            ];
+        }
+
+        // Manifest Manager - check permission
+        if (Craft::$app->getUser()->getIsAdmin() || Craft::$app->getUser()->checkPermission('mcp-wrapper:manageManifest')) {
+            $subnav['manifest'] = [
+                'label' => Craft::t('mcp-wrapper', 'Manifest'),
+                'url' => 'mcp-wrapper/manifest',
+            ];
+        }
+
+        $item['subnav'] = $subnav;
+
+        return $item;
+    }
+
     public function init(): void
     {
         parent::init();
 
         // Set controller namespace for proper routing
-        $this->controllerNamespace = 'rocketpark\\mcpwrapper\\controllers';
+        if (Craft::$app->getRequest()->getIsConsoleRequest()) {
+            $this->controllerNamespace = 'rocketpark\\mcpwrapper\\console\\controllers';
+        } else {
+            $this->controllerNamespace = 'rocketpark\\mcpwrapper\\controllers';
+        }
 
         self::$plugin = $this;
         
@@ -86,29 +124,53 @@ class McpWrapper extends Plugin
             }
         );
 
-        // Register CP URL rules for utility
+        // Register CP URL rules
         Event::on(
             UrlManager::class,
             UrlManager::EVENT_REGISTER_CP_URL_RULES,
             function(RegisterUrlRulesEvent $event) {
+                // Utility routes
                 $event->rules['utilities/mcp-wrapper'] = 'mcp-wrapper/utility/index';
                 $event->rules['utilities/mcp-wrapper/rebuild/<schema:[a-zA-Z0-9_-]+>'] = 'mcp-wrapper/utility/rebuild';
-                // Allow standard action routes for utility controller
                 $event->rules['actions/mcp-wrapper/utility/<action:\w+>'] = 'mcp-wrapper/utility/<action>';
                 
-                // Analytics dashboard routes
+                // Plugin CP section routes
+                $event->rules['mcp-wrapper'] = 'mcp-wrapper/analytics/index';
                 $event->rules['mcp-wrapper/analytics'] = 'mcp-wrapper/analytics/index';
                 $event->rules['mcp-wrapper/analytics/<schemaHandle:[a-zA-Z0-9_-]+>'] = 'mcp-wrapper/analytics/index';
+                $event->rules['mcp-wrapper/manifest'] = 'mcp-wrapper/utility/index';
+                $event->rules['mcp-wrapper/manifest/rebuild/<schema:[a-zA-Z0-9_-]+>'] = 'mcp-wrapper/utility/rebuild';
             }
         );
 
-        // Register Utility in the CP
+        // Register Manifest Utility in the CP
         Event::on(
             Utilities::class,
             Utilities::EVENT_REGISTER_UTILITIES,
             function(RegisterComponentTypesEvent $e) {
                 $e->types[] = McpManifestUtility::class;
-                $e->types[] = McpAnalyticsUtility::class;
+            }
+        );
+
+        // Register plugin permissions
+        Event::on(
+            UserPermissions::class,
+            UserPermissions::EVENT_REGISTER_PERMISSIONS,
+            function(RegisterUserPermissionsEvent $event) {
+                $event->permissions[] = [
+                    'heading' => Craft::t('mcp-wrapper', 'MCP Wrapper'),
+                    'permissions' => [
+                        'mcp-wrapper:viewAnalytics' => [
+                            'label' => Craft::t('mcp-wrapper', 'View MCP Analytics'),
+                        ],
+                        'mcp-wrapper:exportAnalytics' => [
+                            'label' => Craft::t('mcp-wrapper', 'Export MCP Analytics'),
+                        ],
+                        'mcp-wrapper:manageManifest' => [
+                            'label' => Craft::t('mcp-wrapper', 'Manage MCP Manifest'),
+                        ],
+                    ],
+                ];
             }
         );
 
@@ -193,8 +255,6 @@ class McpWrapper extends Plugin
         // Register built-in tool classes
         $toolRegistry->registerToolClass(EntryTools::class);
         $toolRegistry->registerToolClass(SystemTools::class);
-        
-        // TODO: Add more tool classes here or allow plugins to register their own
     }
     
     /**

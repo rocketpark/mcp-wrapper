@@ -1,9 +1,9 @@
 # MCP Wrapper for Craft CMS
 
-[![Version](https://img.shields.io/badge/version-2.7.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.8.0-blue.svg)](CHANGELOG.md)
 [![Craft CMS](https://img.shields.io/badge/Craft%20CMS-5.0%2B-orange.svg)](https://craftcms.com)
 [![PHP](https://img.shields.io/badge/PHP-8.2%2B-purple.svg)](https://php.net)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE.md)
+[![License](https://img.shields.io/badge/license-proprietary-blue.svg)](LICENSE.md)
 
 A production-ready Craft CMS plugin that exposes your content to AI assistants through the [Model Context Protocol (MCP)](https://modelcontextprotocol.io).
 
@@ -12,14 +12,13 @@ A production-ready Craft CMS plugin that exposes your content to AI assistants t
 ## 📚 Documentation
 
 ### Core Documentation
-- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Production deployment guide
-- **[VERIFICATION.md](VERIFICATION.md)** - Post-deployment verification checklist
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and release notes
+- **[docs/BOTPRESS-KB-STRATEGY.md](docs/BOTPRESS-KB-STRATEGY.md)** - Knowledge Base architecture and sync strategy
 
 ### Implementation Guides
 - **[JENSEN-HUGHES-IMPLEMENTATION.md](JENSEN-HUGHES-IMPLEMENTATION.md)** - Complete implementation guide with real-world example
-- **[COMPREHENSIVE-BOT-QUESTIONS.md](COMPREHENSIVE-BOT-QUESTIONS.md)** - 200+ test questions for AI assistant training
-- **[botpress-integration/AUTONOMOUS-NODE-INSTRUCTIONS-V4-WITH-PRIVACY.md](botpress-integration/AUTONOMOUS-NODE-INSTRUCTIONS-V4-WITH-PRIVACY.md)** - Botpress AI instructions (production version)
+- **[tests/BOT-COMPREHENSIVE-TEST-QUESTIONS.md](tests/BOT-COMPREHENSIVE-TEST-QUESTIONS.md)** - 150+ test questions for AI assistant training
+- **[botpress-integration/](botpress-integration/)** - Botpress integration code and AI instructions
 
 ## Architecture
 
@@ -193,7 +192,7 @@ composer require rocket-park/mcp-wrapper
 php craft plugin/install mcp-wrapper
 ```
 
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions.
+See the Configuration section below for detailed setup.
 
 ## Configuration
 
@@ -401,6 +400,49 @@ Each schema can have different:
 - Field visibility
 - Permission levels
 
+## Console Commands
+
+### Knowledge Base Sync
+
+Automatically sync Craft CMS content to Botpress Knowledge Base:
+
+```bash
+# Sync all KBs (Services, Industries, Offices, Leadership)
+php craft mcp-wrapper/sync-kb
+
+# Sync specific content type
+php craft mcp-wrapper/sync-kb/services
+php craft mcp-wrapper/sync-kb/industries
+php craft mcp-wrapper/sync-kb/offices
+php craft mcp-wrapper/sync-kb/leadership
+
+# Preview without uploading
+php craft mcp-wrapper/sync-kb --dry-run
+
+# Force sync even if no changes
+php craft mcp-wrapper/sync-kb --force
+```
+
+**Required Environment Variables:**
+
+```bash
+BOTPRESS_PAT=your-personal-access-token
+BOTPRESS_BOT_ID=your-bot-id
+```
+
+**Recommended Cron Schedule:**
+
+```bash
+# Daily at 3am UTC
+0 3 * * * cd /path/to/project && php craft mcp-wrapper/sync-kb >> /var/log/kb-sync.log 2>&1
+```
+
+### Webhook Testing
+
+```bash
+php craft mcp-wrapper/webhook/test
+```
+
 ## Usage
 
 ### Endpoints
@@ -503,56 +545,57 @@ curl -X POST "https://your-site.com/mcp/MCPSchema" \
 
 ## Deployment
 
-For production deployments, comprehensive guides are available:
-
-- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Complete deployment guide with step-by-step instructions
-- **[VERIFICATION.md](VERIFICATION.md)** - Post-deployment verification checklist
-
 **Quick Deployment:**
 
 ```bash
-# Automated deployment script
-./scripts/deploy.sh
-
-# Or manual deployment:
+# Update plugin
 composer update rocket-park/mcp-wrapper
-php craft clear-caches/all
+
+# Sync project config (CRITICAL)
 php craft project-config/apply
+
+# Clear caches
+php craft clear-caches/all
+
+# Force manifest rebuild
+curl "https://your-site.com/mcp/manifest/MCPSchema?force=1"
 ```
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed pre-deployment checks, configuration examples, and troubleshooting.
+**Key Steps:**
+1. `composer update` - Get latest plugin version
+2. `project-config/apply` - Sync DB with YAML schema config
+3. `clear-caches/all` - Clear Craft caches
+4. Force manifest rebuild - Regenerate tool list
 
 ## Testing
 
-The plugin includes a comprehensive PHPUnit test suite covering core functionality:
+The plugin includes a comprehensive test suite covering core functionality:
 
 ```bash
-# Run all unit tests (33 tests, 72 assertions)
-vendor/bin/phpunit tests/Unit --colors=always
+# Run all tests (106 tests total)
+./tests/run-all-tests.sh
 
-# Or use the convenience script
-./tests/run-unit-tests.sh
+# Run PHPUnit unit tests only
+vendor/bin/phpunit tests/Unit --colors=always
 
 # Run specific test class
 ./tests/run-unit-tests.sh --filter ToolCacheServiceTest
-
-# Generate coverage report
-./tests/run-unit-tests.sh --coverage
-# Opens tests/coverage/index.html
 ```
 
 ### Test Coverage
 
 **Unit Tests (tests/Unit/):**
-- ToolCacheServiceTest.php - 8 tests (cache key generation, argument normalization)
-- RequestLoggerServiceTest.php - 10 tests (privacy, IP anonymization, arg hashing)
-- ToolAttributeTest.php - 8 tests (attribute discovery, enhanced annotations)
-- WebhookServiceTest.php - 7 tests (event/section/status filtering, payload structure)
+- ToolCacheServiceTest.php - Cache key generation, argument normalization
+- RequestLoggerServiceTest.php - Privacy, IP anonymization, arg hashing
+- ToolAttributeTest.php - Attribute discovery, enhanced annotations
+- WebhookServiceTest.php - Event/section/status filtering, payload structure
 
 **Integration Tests (tests/):**
 - test-argument-mapping.php - Argument extraction from GraphQL schema
-- test-graphql-sanitization.php - SQL injection prevention
-- test-ip-validator.php - IPv4/IPv6 CIDR validation
+- test-graphql-sanitization.php - SQL injection prevention (49 tests)
+- test-ip-validator.php - IPv4 validation (9 tests)
+- test-ip-validator-ipv6.php - IPv6 CIDR validation (32 tests)
+- test-request-timeout-exception.php - Timeout handling (10 tests)
 - test-tool-registry.php - Tool discovery and registration
 
 ### Running MCP Endpoint Tests
@@ -772,6 +815,6 @@ The plugin includes a CP utility at **Utilities → MCP Manifest Manager** for:
 - [x] Prompts registry (schema_explorer, content_health, query_builder)
 
 ### 🔜 Planned
-- [ ] Performance dashboard for analytics visualization
 - [ ] OAuth 2.1 support for enterprise deployments
-- [ ] Auto-generated tool improvements (output schemas for GraphQL tools)
+- [ ] Streamable HTTP transport (SSE deprecated in MCP spec)
+- [ ] Tool annotations: `title`, `outputSchema` for auto-generated tools

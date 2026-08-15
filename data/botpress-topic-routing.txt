@@ -1,0 +1,119 @@
+# Jensen Hughes Topic → Service-Page Routing Reference
+
+Last updated: 2026-05-19 (URLs verified against live jensenhughes.com sitemap + curl)
+Purpose: When a user asks about a specific hazard, acronym, or industry term, route them to the closest matching service area page.
+
+These mappings supplement query_ourTeam and query_services when those tools return empty/sparse results.
+
+---
+
+## Topic → Service Routing Table (NA URLs verified live 2026-05-19; substitute regional URL from regional-services doc for non-NA users)
+
+| Topic / Acronym | Maps to Service | URL |
+|---|---|---|
+| BESS (Battery Energy Storage Systems) | Lithium-Ion Risk Consulting | https://www.jensenhughes.com/services/lithium-ion-risk-consulting |
+| Battery Energy Storage | Lithium-Ion Risk Consulting | https://www.jensenhughes.com/services/lithium-ion-risk-consulting |
+| Lithium Ion / Lithium-ion batteries / Li-ion | Lithium-Ion Risk Consulting | https://www.jensenhughes.com/services/lithium-ion-risk-consulting |
+| Emerging hazards (generic) | Emerging Hazards | https://www.jensenhughes.com/services/emerging-hazards |
+| Combustible Dust | Combustible Dust Safety | https://www.jensenhughes.com/services/combustible-dust-safety |
+| Dust Hazard Analysis (DHA) | Combustible Dust Safety | https://www.jensenhughes.com/services/combustible-dust-safety |
+| Explosion Protection | Combustible Dust Safety | https://www.jensenhughes.com/services/combustible-dust-safety |
+| LSFT (Large-Scale Fire Testing) | Large-Scale Fire Testing | https://www.jensenhughes.com/services/large-scale-fire-testing-lsft |
+| Large-Scale Fire Testing | Large-Scale Fire Testing | https://www.jensenhughes.com/services/large-scale-fire-testing-lsft |
+| Material Fire Testing | Large-Scale Fire Testing | https://www.jensenhughes.com/services/large-scale-fire-testing-lsft |
+| Reaction-to-Fire Testing | Large-Scale Fire Testing | https://www.jensenhughes.com/services/large-scale-fire-testing-lsft |
+| UL 9540A | Large-Scale Fire Testing (+ Lithium-Ion Risk) | https://www.jensenhughes.com/services/large-scale-fire-testing-lsft |
+| Hydrogen | Hydrogen Services | https://www.jensenhughes.com/services/hydrogen-services |
+| LNG (Liquefied Natural Gas) | Process Safety | https://www.jensenhughes.com/services/process-safety |
+| Cryogenic / Cryogenics | Process Safety | https://www.jensenhughes.com/services/process-safety |
+| Hazardous Materials / HazMat | Hazardous Materials | https://www.jensenhughes.com/services/hazardous-materials |
+| PBD (Performance-Based Design) | Fire Engineering | https://www.jensenhughes.com/services/fire-engineering-systems-design |
+| AHJ (Authority Having Jurisdiction) | AHJ Representation + Plan Review | https://www.jensenhughes.com/services/ahj-representation-plan-review |
+| Smoke Control / Smoke Modeling | Fire-Smoke-Tunnel Modeling | https://www.jensenhughes.com/services/fire-smoke-tunnel-modeling |
+| Egress / Means of Egress / Pedestrian Evacuation | Pedestrian Evacuation Modeling | https://www.jensenhughes.com/services/pedestrian-evacuation-modeling |
+| Sprinkler Design | Fire Suppression Systems Design | https://www.jensenhughes.com/services/fire-suppression-systems-design |
+| Fire Alarm Design | Fire Suppression Systems Design | https://www.jensenhughes.com/services/fire-suppression-systems-design |
+| BIM / BIMfire | (Insights article — see bot Rule 6) | https://www.jensenhughes.com/insights/incorporating-bimfire-into-jensen-hughes-fire-safety-design |
+| Wildfire / WUI | Wildfire Risk Mitigation | https://www.jensenhughes.com/services/wildfire-risk-mitigation |
+| Mass Timber | Mass Timber Consulting | https://www.jensenhughes.com/services/mass-timber-consulting |
+| Cybersecurity / OT Security / Digital | Digital Solutions | https://www.jensenhughes.com/services/digital |
+| DataAdvisr / ProtectAdvisr | Digital Solutions | https://www.jensenhughes.com/services/digital |
+| Mass Notification | Mass Notification Systems | https://www.jensenhughes.com/services/mass-notification-systems |
+| Emergency Management / Response Planning | Emergency Management + Response | https://www.jensenhughes.com/services/emergency-management-response |
+| Threat Assessment / Violence Risk Management | Threat + Violence Risk Management | https://www.jensenhughes.com/services/threat-violence-risk-management |
+| Security Design | Security Design | https://www.jensenhughes.com/services/security-design |
+| Healthcare Life Safety | Healthcare Life Safety Assessments | https://www.jensenhughes.com/services/healthcare-life-safety-assessments |
+| Healthcare Emergency Preparedness | Healthcare Emergency Preparedness | https://www.jensenhughes.com/services/healthcare-emergency-preparedness |
+| Code Consulting | Code Consulting | https://www.jensenhughes.com/services/code-consulting |
+| Built Environment | Code Consulting (Built Environment) | https://www.jensenhughes.com/services/code-consulting-built-environment |
+| Commissioning | Commissioning | https://www.jensenhughes.com/services/commissioning |
+| Nuclear | Nuclear Services | https://www.jensenhughes.com/services/nuclear-services |
+| Risk Analysis | Risk Analysis | https://www.jensenhughes.com/services/risk-analysis |
+| In-House Labs / Lab Testing | In-House Laboratories Testing | https://www.jensenhughes.com/services/in-house-laboratories-testing |
+| Testing R&D | Testing Research + Development | https://www.jensenhughes.com/services/testing-research-development |
+| MEP / Structural Safety | MEP + Structural Safety | https://www.jensenhughes.com/services/mep-structural-safety |
+| Business Continuity | Business Continuity | https://www.jensenhughes.com/services/business-continuity |
+| Mutual Aid | Mutual Aid Plan Development | https://www.jensenhughes.com/services/mutual-aid-plan-development |
+| Surge Capacity | Surge Capacity | https://www.jensenhughes.com/services/surge-capacity |
+
+---
+
+## Per-Region Contact Pages (verified 2026-05-19)
+
+| Region | Contact URL |
+|---|---|
+| North America / Americas | https://www.jensenhughes.com/contact-us |
+| Europe | https://www.jensenhughes.com/europe/contact-us |
+| Pacific | https://www.jensenhughes.com/contact-us (no dedicated Pacific contact page — use global) |
+| Asia | https://www.jensenhughes.com/asia/contact-us |
+| Middle East + India | https://www.jensenhughes.com/middle-east/contact-us |
+
+## Per-Region Careers Pages (verified 2026-05-19)
+
+| Region | Careers URL |
+|---|---|
+| North America / Americas | https://www.jensenhughes.com/careers |
+| Europe | https://www.jensenhughes.com/europe/careers |
+| Pacific | https://www.jensenhughes.com/pacific/careers |
+| Asia | https://www.jensenhughes.com/asia/careers |
+| Middle East + India | https://www.jensenhughes.com/middle-east/careers |
+
+## Per-Region About Pages
+
+About / company information is global. Use the IDENTITY section in the prompt or `/about` family of pages. Closing-line contact URL should use the regional contact-us per table above.
+
+---
+
+## How to use this map
+
+When a user asks "Who are your experts in [topic]?" or "Do you offer [topic] services?" and tool calls return zero/ambiguous results:
+
+1. Look up the topic in the Topic → Service Routing Table above.
+2. If matched: respond per prompt Rule 10 matched pattern with the mapped service name + URL.
+3. If unmatched: fall back to the regional services landing page (Rule 10 fallback pattern).
+4. For regional users (not NA), substitute the regional URL prefix per Regional Services Reference document — but NEVER for the dedicated topic pages above (those are NA-only slugs). For regional users, link the regional services landing instead.
+
+---
+
+## Topic-Specific Notes (content gaps + clarifications)
+
+### Combustible Dust — DEDICATED PAGE EXISTS
+JH has `/services/combustible-dust-safety` — a dedicated service page. Route Combustible Dust / DHA / Dust Hazard Analysis / Explosion Protection queries here directly. (Process Safety is the parent practice but the specific page is the right destination.)
+
+### BESS / Battery Energy Storage / Lithium Ion
+The dedicated service page is `/services/lithium-ion-risk-consulting` (Lithium-Ion Risk Consulting). This covers BESS facilities, lithium-ion battery hazards, UL 9540A testing partnership with the Large-Scale Fire Testing team, and emerging energy storage risks. Available in NA. For Pacific, route to `/pacific/services/energy-sustainability` (Pacific exception per Rule 4).
+
+### LSFT — Large-Scale Fire Testing
+Real prod URL: `/services/large-scale-fire-testing-lsft` (NOT `/services/fire-testing` which returns 404). JH operates multiple fire testing labs; the "in-house laboratories" page (`/services/in-house-laboratories-testing`) lists locations. If a user asks "where do you do LSFT?" or "what labs do you have?", link the in-house labs page. The new SMS lab in Utah may not yet be reflected on the prod site — pending Sarah Pichardo update.
+
+### LNG / Cryogenics
+JH does NOT have a dedicated LNG service page. Route to Process Safety (`/services/process-safety`) as the closest match.
+
+### BIM / BIMfire
+Always link the BIMfire insights article. NOT the Fire Engineering services page. The article explains JH's BIM integration approach.
+
+### Digital Solutions
+JH's Digital Solutions umbrella covers DataAdvisr, ProtectAdvisr, and cybersecurity/OT consulting. Real URL: `/services/digital` (NOT `/services/digital-services`).
+
+### AHJ Representation + Plan Review
+Dedicated page at `/services/ahj-representation-plan-review`. Use for any AHJ liaison / plan review / code official engagement queries.

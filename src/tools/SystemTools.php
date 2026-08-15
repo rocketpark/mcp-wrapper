@@ -246,7 +246,7 @@ class SystemTools
             ],
             'required' => ['success'],
         ],
-        dangerous: false,
+        dangerous: true,
         costHint: 'medium',
         confidentialityHint: 'high',
     )]

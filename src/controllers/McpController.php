@@ -17,13 +17,28 @@ use yii\web\Response;
 class McpController extends Controller
 {
     protected array|int|bool $allowAnonymous = true;
-    public $enableCsrfValidation = false; // MCP clients don't use CSRF tokens
 
     /**
-     * Validate IP access and rate limiting before any action
+     * CSRF validation is disabled by default for API clients.
+     * However, for session-authenticated requests (e.g., admin users),
+     * we re-enable CSRF protection in beforeAction().
+     */
+    public $enableCsrfValidation = false;
+
+    /**
+     * Validate IP access, CSRF (for session requests), and rate limiting before any action
      */
     public function beforeAction($action): bool
     {
+        // Enable CSRF for session-authenticated requests to prevent CSRF attacks
+        // API token requests (Authorization header) skip CSRF validation
+        $hasAuthHeader = Craft::$app->request->headers->has('Authorization');
+        $isSessionAuth = Craft::$app->getUser()->getIdentity() !== null && !$hasAuthHeader;
+
+        if ($isSessionAuth) {
+            $this->enableCsrfValidation = true;
+        }
+
         if (!parent::beforeAction($action)) {
             return false;
         }
@@ -185,9 +200,11 @@ class McpController extends Controller
         $sessionId = bin2hex(random_bytes(16));
         Craft::$app->cache->set("mcp_session_{$sessionId}", $schemaHandle, 3600);
 
-        // SSE connection limits to prevent DoS
-        $maxDuration = 3600; // 1 hour max connection time
-        $keepaliveInterval = 15; // seconds between keepalives
+        // SSE connection limits to prevent DoS (configurable via mcpwrapper.php)
+        $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
+        $sseConfig = $config['sse'] ?? [];
+        $maxDuration = $sseConfig['maxDuration'] ?? 3600;
+        $keepaliveInterval = $sseConfig['keepaliveInterval'] ?? 15;
         $startTime = time();
 
         header('Content-Type: text/event-stream');
@@ -269,7 +286,7 @@ class McpController extends Controller
         // Server info
         $metrics[] = '# HELP mcp_server_info MCP server information';
         $metrics[] = '# TYPE mcp_server_info gauge';
-        $metrics[] = 'mcp_server_info{version="2.7.0",protocol="2025-11-25"} 1';
+        $metrics[] = 'mcp_server_info{version="2.8.0",protocol="2025-11-25"} 1';
 
         // Rate limit status (if available)
         $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
@@ -322,7 +339,7 @@ class McpController extends Controller
         $health = [
             'status' => 'healthy',
             'timestamp' => date('c'),
-            'version' => '2.7.0',
+            'version' => '2.8.0',
             'protocolVersion' => '2025-11-25',
         ];
 

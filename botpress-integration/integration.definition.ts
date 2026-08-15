@@ -2,7 +2,7 @@ import { IntegrationDefinition, z } from '@botpress/sdk'
 
 export default new IntegrationDefinition({
   name: 'craftcms-mcp',
-  version: '1.0.0',
+  version: '1.0.18',
   title: 'Craft CMS via MCP',
   description: 'Query Craft CMS content through the Model Context Protocol (MCP) server',
   icon: 'icon.svg',
@@ -54,11 +54,20 @@ export default new IntegrationDefinition({
           limit: z.number().default(10).describe('Maximum number of entries to return (1-100)'),
           offset: z.number().default(0).describe('Number of entries to skip'),
           orderBy: z.string().optional().describe('Order results (e.g., "dateCreated DESC", "title ASC")'),
+          // Region-aware queries: pass site handle to get URLs with correct regional prefix
+          site: z.union([z.string(), z.array(z.string())]).optional().describe('Craft site handle for region-aware URLs (jensenHughesEurope, jensenHughesPacific, jensenHughesAsia, jensenHughesMiddleEast, jensenHughesDigital)'),
+          siteId: z.number().optional().describe('Craft site ID (alternative to site handle)'),
+          // Region shortcut: bot can pass the user region directly instead of computing the site handle.
+          // If site is not provided and region is one of europe/pacific/asia/middle_east, the
+          // integration auto-derives the matching Craft site handle server-side. This removes the
+          // need for the bot to remember the site mapping and ensures regional URLs are always used.
+          region: z.string().optional().describe('IMPORTANT: pass the value of {{user.data.region}} on every call so regional URLs are correct. Allowed values: europe, pacific, asia, middle_east, north_america. If omitted, the integration falls back to discovering the visitor region from Botpress user data (may race on the first call after page load).'),
+          section: z.union([z.string(), z.array(z.string())]).optional().describe('Section handle for craft_search_entries (e.g., insights, services, industries, ourTeam)'),
         }),
       },
       output: {
         schema: z.object({
-          content: z.array(z.any()).describe('Raw MCP response content'),
+          content: z.array(z.any()).describe('Raw MCP response content. When tool returns a list of entries, content[0].formattedText is pre-built markdown link list ready for Message() pass-through.'),
         }),
       },
     },
@@ -123,8 +132,27 @@ export default new IntegrationDefinition({
 
   events: {},
   channels: {},
-  states: {},
+  // User tags MUST be declared here for Botpress to accept tag writes
+  // (window.botpress.updateUser({tags: ...}) — see _meta_footer.twig).
+  // The Twig footer writes these on every page load from a JH regional site.
   user: {
-    tags: {},
+    tags: {
+      region: {
+        title: 'User region',
+        description: 'Visitor region detected from currentSite.handle (europe, pacific, asia, middle_east, americas)',
+      },
+      siteHandle: {
+        title: 'Craft site handle',
+        description: 'currentSite.handle (e.g. jensenHughesEurope)',
+      },
+      language: {
+        title: 'Language code',
+        description: 'currentSite.language (e.g. en, fr)',
+      },
+      urlPrefix: {
+        title: 'Regional URL prefix',
+        description: 'Regional path prefix (e.g. /europe/, /pacific/)',
+      },
+    },
   },
 })

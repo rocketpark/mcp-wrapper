@@ -1,0 +1,170 @@
+# Jensen Hughes Digital Solutions
+
+Last updated: 2026-03-24
+Source: https://www.jensenhughes.com/services/digital
+
+Jensen Hughes offers a suite of industry-specific digital software solutions — the Advisr™ platform — developed by the same engineers who consult on the problems the software solves. These tools help organizations manage risk, compliance, and safety in complex, regulated industries.
+
+**Learn More:** https://www.jensenhughes.com/services/digital
+
+---
+
+## ProtectAdvisr™ — Emergency Management + Life Safety Software
+
+ProtectAdvisr is purpose-built for healthcare, industrial, and government organizations to manage emergency preparedness, life safety, and other interrelated critical areas with confidence. It adapts to each sector's terminology, data needs, and operational workflows.
+
+**Key Results:**
+- Clients have reduced administrative burden by up to 50%
+- In healthcare settings: reduced Life Safety Code findings by over 60%
+- Achieved 80–90% deficiency closeout rates
+- One system saw door inspection pass rates improve from 26% to over 70%
+- 1,600+ U.S. healthcare facilities trust ProtectAdvisr
+- 40% less time spent on compliance programs
+
+**Apps Included:**
+- Emergency Management
+- Life Safety Assessments
+- Healthcare Coalitions
+- ITM (Inspection, Testing + Maintenance) Tracking
+- Door Inspections
+- Fire Risk Assessments
+
+**Why Use It:**
+- Gain Insight: Real-time data and action tracking for informed decision-making
+- Strengthen Compliance: Connects multidisciplinary teams with actionable data
+- Leverage Expertise: Decades of experience managing risk across the continuum of care
+
+**Best For:** Healthcare facilities, industrial organizations, government agencies
+
+**Learn More:** https://www.jensenhughes.com/services/protectadvisr
+
+---
+
+## RiskAdvisr™ — Integrated Fire Protection Risk Tools for Nuclear Power
+
+RiskAdvisr brings fire protection, permitting, and risk analysis together in one connected platform, helping nuclear facilities streamline compliance and reduce operational complexity. Teams can track combustibles, ignition sources, and out-of-service equipment within a single, cohesive risk view.
+
+**Key Stats:**
+- Trusted by over 60% of U.S. nuclear facilities
+- 20+ years of nuclear power industry experience backing the platform
+
+**Platform Features:**
+- Universal design change + fault tree modeling
+- Fire probabilistic analysis and fire modeling
+- Fire permitting for combustibles, hot work, and impairment
+- Inspection, testing, and maintenance (ITM) tracking
+- Compensatory measures and control
+- Systems Tracking to manage permitting end-to-end
+- Probabilistic risk assessments (PRA)
+- Cable routing and building feature data
+
+**Why Use It:**
+- Improve Resiliency: Models emergency scenarios against protection strategies
+- Save Time: Streamlines operations, reduces time in binders/buried systems
+- More-Informed Decisions: Connected data and advanced analytics
+
+**Best For:** Nuclear power facilities, plant risk managers
+
+**Learn More:** https://www.jensenhughes.com/digital-solutions/riskadvisr-fire-protection-risk-analysis
+
+---
+
+## HazAdvisr™ — Real-Time Hazardous Materials Compliance + Inventory Management
+
+HazAdvisr helps organizations manage hazardous materials with confidence across sites through a real-time, centralized platform. Built for EH&S, lab, and operations teams, it supports chemical inventory classification, storage thresholds, and occupancy-based limits.
+
+**Compliance Standards Supported:** ICC, NFPA, FM Global, and other jurisdictional requirements
+
+**Key Capabilities:**
+- Upload chemicals, track properties and hazard classifications
+- Identify potential hazards and proactively address issues
+- Create building layouts and add chemical inventories to determine Maximum Allowable Quantities (MAQs)
+- Evaluate whether facilities exceed MAQs in control areas, lab suites, high-hazard spaces
+- Drag-and-drop planning module for rapid iteration
+- Export regulatory compliance reports
+- Multi-site environment management
+
+**Why Use It:**
+- Improve Compliance: Navigate complex regulatory and insurance requirements
+- Minimize Risk: Full visibility into chemical hazards with Jensen Hughes expert support
+- Design Efficiently: Quickly check compliance before finalizing building designs
+
+**Best For:** Science + technology, pharmaceutical, research labs, manufacturing, multi-site EH&S teams
+
+**Learn More:** https://www.jensenhughes.com/digital-solutions/hazadvisr-hazardous-materials-management-solution
+
+---
+
+## DataAdvisr™ — AI-Driven Maintenance + Condition Report Processing for Nuclear Facilities
+
+DataAdvisr uses AI to automate condition report (CR) processing and maintenance request management in nuclear facilities. It applies natural language processing (NLP) and supervised machine learning to screen, classify, and route CRs.
+
+**Key Results:**
+- Cuts condition report review time by up to 80%
+- Supports over 75% of U.S. nuclear facilities with software solutions
+
+**AI Techniques Used:**
+- Natural language processing (NLP)
+- Artificial neural networks
+- Supervised learning
+- Sensitivity assessment suite for prediction confidence
+
+**Why Use It:**
+- Reduce Cost: Permanently reduces manual review and classification burden
+- Drive Efficiencies: Optimized processes and faster decision-making
+- Improve Compliance: Backed by nuclear regulatory and technical experts
+
+**Client Quote:** "Jensen Hughes is a company we've worked with for many years on probabilistic risk assessment models and has great capabilities in artificial intelligence and machine learning." — Gene Kelly, Senior Manager, Constellation Energy
+
+**Best For:** Nuclear power facilities managing large volumes of condition reports
+
+**Learn More:** https://www.jensenhughes.com/digital-solutions/dataadvisr-ai-process-improvement
+
+---
+
+## SMARTPLAN™ — Enterprise Emergency Planning + Management Software
+
+SMARTPLAN replaces inefficient paper-based plan management with a digital platform for consistent, best-practice emergency responses. It adapts to your organization's structure, protocols, and evolving compliance requirements.
+
+**Key Stats:**
+- 10,000+ emergency plans currently in use
+- 25+ years of emergency planning experience behind the platform
+
+**Plan Types Supported:**
+- Facility Response Plans (FRP)
+- Spill Prevention Control and Countermeasure (SPCC)
+- Fire Pre Plans
+- Emergency Response Plans (ERP)
+- Business Continuity Plans (BCP)
+- Crisis Management Plans (CMP)
+- Incident Management Plans
+- Emergency Action Plans (EAP)
+
+**Key Features:**
+- Turnkey plan development by Jensen Hughes experts
+- Common shared information across all locations
+- Automated contact management (HR system integration)
+- Web + mobile app access
+- Version control — eliminates outdated content and contact info
+
+**Why Use Emergency Plans:**
+- Effective and efficient emergency response
+- Identify vulnerabilities faster
+- Resume operations quickly after an emergency
+- Avoid regulatory fines
+- Run emergency response exercises more effectively
+- Enhance employee confidence and legal protection
+
+**Client Quote:** "We have been working with SMARTPLAN since 2005 and consider it an essential component in our compliance toolbox." — Andy McClish, Manager, Regulatory Compliance, TLP Management Services, LLC
+
+**Best For:** Oil & gas, petrochemical, industrial facilities, multi-site organizations
+
+**Learn More:** https://www.jensenhughes.com/digital-solutions/smartplan-emergency-response-plan-solution
+
+---
+
+## Get In Touch About Digital Solutions
+
+To learn more or request a demo of any Advisr solution:
+- Website: https://www.jensenhughes.com/services/digital
+- Contact: https://www.jensenhughes.com/services/contact

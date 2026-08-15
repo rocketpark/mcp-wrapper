@@ -1,0 +1,78 @@
+# Jensen Hughes Acronym + Synonym Reference
+
+Last updated: 2026-05-19
+Purpose: KB doc the bot can search to resolve industry-specific acronyms users type, and to map them to the correct parent service category.
+
+---
+
+## Common acronyms (substitute before searching the rest of the KB)
+
+| Acronym | Expansion | Routes to / parent category |
+|---------|-----------|-----------------------------|
+| BESS | Battery Energy Storage System | Emerging Hazards (battery safety) — also covered under Lithium-Ion Risk Consulting |
+| LSFT | Large-Scale Fire Testing | Testing Research + Development; Fire Resistance Testing (Pacific) |
+| LNG | Liquefied Natural Gas | Process Safety; Petrochemical, Oil + Gas (industry) |
+| BIM | Building Information Modeling | BIMfire integration article (see Rule 6) |
+| PBD | Performance Based Design | Life Safety + Performance Based Design (Asia, ME); Code Consulting + Performance-Based Design (EU); Performance Solutions (Pacific) |
+| AHJ | Authority Having Jurisdiction | AHJ Representation + Plan Review (Asia); AHJ Liaison + Approvals (ME) |
+| FRA | Fire Risk Assessment | Fire Risk Assessments (EU); Fire Safety Assessment + Audits (Pacific) |
+| ATEX | ATmosphères EXplosibles (EU directive) | Process Safety; Hazardous Materials; DSEAR/ATEX support (Forensics capability) |
+| DSEAR | Dangerous Substances and Explosive Atmospheres Regulations (UK) | Process Safety; DSEAR/ATEX support (Forensics) |
+| HVAC | Heating, Ventilation, Air Conditioning | Smoke + Ventilation Design (EU) |
+| NFPA | National Fire Protection Association | Code Consulting (referenced standards, not a JH service) |
+| OSHA | Occupational Safety and Health Administration (US) | Process Safety; Emergency Management |
+| HVA | Hazard Vulnerability Analysis | Healthcare-focused — see Insights: HVA in Healthcare |
+| EV | Electric Vehicle | Emerging Hazards (lithium-ion); EV charging fire safety |
+| RTM | Real-Time Monitoring | Digital Solutions; DataAdvisr; ProtectAdvisr |
+| MNS | Mass Notification Systems | Mass Notification Systems (ME) |
+| OEM | Original Equipment Manufacturer | Product Liability Investigations (EU forensics sub) |
+| SCBA | Self-Contained Breathing Apparatus | Emergency Response training (where available) |
+| ICS | Incident Command System | Emergency Management + Response (NA, ME) |
+| EOC | Emergency Operations Center | Emergency Management + Response (NA, ME) |
+| PEM | Performance-based Engineering / Modeling | Advanced Modelling (EU); Modelling (Pacific) |
+| CFD | Computational Fluid Dynamics | Advanced Modelling (EU); Fire + Smoke + Tunnel Modeling (Asia, ME); Modelling (Pacific) |
+| SMS | Safety Management System (also Jensen Hughes' Salt Lake City lab — see note) | Process Safety; Fire Testing |
+| ESS | Energy Storage System (same family as BESS) | Emerging Hazards |
+| HRR | Heat Release Rate | Fire Testing; Reaction to Fire Testing (Pacific) |
+| FAA | Federal Aviation Administration | Aviation industry |
+| NRC | Nuclear Regulatory Commission | Nuclear Licensing + Regulatory Support (EU) |
+| ALARP | As Low As Reasonably Practicable | Process Safety; Fire Risk Assessments |
+| SIL | Safety Integrity Level | Process Safety |
+| HAZOP | Hazard and Operability study | Process Safety |
+| HAZID | Hazard Identification | Process Safety |
+| FMEA | Failure Modes and Effects Analysis | Process Safety; Product Liability Investigations (EU) |
+| RAM | Reliability, Availability, Maintainability | Process Safety |
+| QRA | Quantitative Risk Assessment | Process Safety; Risk Analysis (Asia) |
+
+---
+
+## Parent-child mappings (when user asks about a sub-topic, route to the parent service)
+
+| Sub-topic / keyword | Parent service | Notes |
+|---------------------|----------------|-------|
+| Lithium-Ion / Li-Ion / Lithium battery | Lithium-Ion Risk Consulting (NA, EU) — under Emerging Hazards umbrella elsewhere | Standalone slug exists: `/services/lithium-ion-risk-consulting` |
+| BESS / Battery Energy Storage / energy storage | Emerging Hazards | EU slug: `emerging-hazards`. Pacific equivalent: Energy + Sustainability. |
+| Combustible Dust | Emerging Hazards (NA, EU); Combustible Dust Safety (Asia dedicated page) | Asia has dedicated slug `combustible-dust-safety` |
+| Hydrogen | Hydrogen Services | Available NA, EU, Asia, ME |
+| Wildfire / WUI | Wildfire Risk Mitigation (NA) | Region-specific |
+| Nuclear | Nuclear Licensing + Regulatory Support; Nuclear Site Evaluation; Advanced Reactor / SMR / AMR Consulting | EU primarily |
+| Tunnels / underground | Infrastructure + Tunnels (Pacific); Fire + Smoke + Tunnel Modeling (Asia, ME) |
+| Marine / maritime / shipping | Marine Fire Forensics (EU); Marine industry generally | EU has dedicated forensics sub-page |
+| Healthcare / hospital | Healthcare industry (NA); also Hazard Vulnerability Analysis HVA insight | Industry, not service |
+| Aviation / airport | Aviation industry (NA); Government + Military overlap |
+| Petrochem / oil and gas | Petrochemical, Oil + Gas (NA industry); Process Safety (service) |
+| Data center / server farm | Mission Critical (NA industry) |
+| Stadium / arena | Hospitality + Entertainment (NA industry) |
+| Universal Design / Accessibility | Accessibility + Universal Design (NA, Pacific, ME — NOT EU, NOT Asia) |
+| Forensics / fire investigation | Forensic Investigation (NA, EU only) | See Rule 5 |
+
+---
+
+## Fallback rule for bot
+
+If a user types an acronym not in this list AND the rest of the KB doesn't match it:
+1. Ask once for the expansion ("Could you tell me what BESS stands for in your context?").
+2. If they answer, search again with the expansion.
+3. If they don't, link the regional /services landing page and offer info@jensenhughes.com.
+
+Never reply "I don't recognize that acronym" without offering a fallback URL.

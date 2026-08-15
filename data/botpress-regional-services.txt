@@ -1,0 +1,216 @@
+# Jensen Hughes Regional Service Availability + URL Reference
+
+Last updated: 2026-05-19 (corrected against prod-site audit of jensenhughes.com)
+Source: Live jensenhughes.com per-region sitemaps + service pages
+
+Each region has its own URL prefix AND its own service taxonomy/slugs. Service slugs differ between regions — do NOT assume the global slug works under a regional prefix.
+
+---
+
+## URL Prefix per Region
+
+| Region            | URL Prefix      | Services Landing                                    |
+|-------------------|-----------------|-----------------------------------------------------|
+| North America / Americas | (none)   | https://www.jensenhughes.com/services               |
+| Europe            | /europe/        | https://www.jensenhughes.com/europe/services        |
+| Pacific           | /pacific/       | https://www.jensenhughes.com/pacific/services       |
+| Asia              | /asia/          | https://www.jensenhughes.com/asia/services          |
+| Middle East + India | /middle-east/ | https://www.jensenhughes.com/middle-east/services   |
+
+NOTE: Middle East has its own URL prefix `/middle-east/`. Do NOT use global URLs for Middle East users.
+
+---
+
+## Slug Routing Rule
+
+1. If you know the user's region AND the exact regional slug for the service they asked about, use the deep URL.
+2. If you DO NOT know the exact regional slug, link ONLY to the region's services landing page (e.g., /europe/services). Do not guess a slug.
+3. NEVER assume a global slug works for a regional URL — many slugs differ (Europe uses "fire-engineering-consultancy" or "fire-engineering-code-consulting", Pacific uses "fire-engineering", Global uses "fire-engineering-systems-design").
+
+---
+
+## Service Availability per Region (verified 2026-05-19)
+
+### North America / Americas (Global)
+All services available. Use no URL prefix.
+- /services/fire-engineering-systems-design
+- /services/investigations (Forensics / fire investigations — PRIMARY forensics landing)
+- /services/accessibility
+- /services/security-risk-consulting
+- /services/security-risk-public-safety
+- /services/emergency-management-response
+- /services/process-safety
+- /services/wildfire-risk-mitigation
+- /services/lithium-ion-risk-consulting
+(and more — see prod site /services index)
+
+### Europe
+Available services include:
+- Fire Engineering Consultancy (fire-engineering-consultancy)
+- Fire Engineering + Code Consulting (fire-engineering-code-consulting)
+- Code Consulting + Performance-Based Design (code-consulting-performance-based-design)
+- Advanced Modelling (advanced-modelling)
+- Emerging Hazards (emerging-hazards)
+- Energy + Utilities (energy-utilities)
+- **Forensic Investigation (forensic-investigation) — PRIMARY EU forensics page**
+- Civil + Structural Failure (civil-structural-failure)
+- Escape of Water (escape-of-water)
+- Expert Witness + Litigation Support (expert-witness-litigation-support)
+- External Wall Construction + Cladding (external-wall-construction-and-cladding)
+- Fire Audits (fire-audits)
+- Fire Explosion (fire-explosion)
+- Fire Protection Design + Safe Shutdown (fire-protection-design-safe-shutdown)
+- Fire Risk Assessments (fire-risk-assessments)
+- Fire Suppression Systems Design (fire-suppression-systems-design)
+- Hazardous Materials (hazardous-materials)
+- Hydrogen Services (hydrogen-services)
+- Lithium-Ion Risk Consulting (lithium-ion-risk-consulting)
+- Marine Fire Forensics (marine-fire-forensics)
+- Mass Timber Consulting (mass-timber-consulting)
+- Materials Failure Analysis (materials-failure-analysis)
+- Mechanical Electrical Engineering (mechanical-electrical-engineering)
+- Nuclear Licensing + Regulatory Support (nuclear-licensing-regulatory-support)
+- Nuclear Site Evaluation (nuclear-site-evaluation)
+- Process Safety (process-safety)
+- Product Liability Investigations (product-liability-investigations)
+- QA + ISO Certifications (qa-iso-certifications)
+- Smoke + Ventilation Design (smoke-ventilation-design-instructions)
+- Structural Fire Safety (structural-fire-safety)
+- Advanced Reactor / SMR / AMR Consulting (advanced-reactor-smr-amr-consulting)
+- Contamination + Spills (contamination-spills)
+- Decommissioning + Waste Management (decommissioning-waste-management)
+- Long-Term Operation / Life Extension (long-term-operation-life-extension)
+
+NOT available in Europe:
+- Accessibility + Universal Design
+- Security Risk + Public Safety
+- Emergency Management + Response
+
+### Pacific (Australia + New Zealand)
+Available services include:
+- Fire Engineering (fire-engineering)
+- Fire Protection Engineering (fire-protection-engineering)
+- Structural Fire Engineering (structural-fire-engineering)
+- Performance Solutions (performance-solutions)
+- Fire Safety Strategies (fire-safety-strategies)
+- Fire Safety Assessment + Audits (fire-safety-assessment-audits)
+- Fire Resistance Testing (fire-resistance-testing)
+- Bushfire Testing (bushfire-testing)
+- Reaction to Fire Testing (reaction-to-fire-testing)
+- Fire Testing (fire-testing)
+- Building Code Consulting (building-code-consulting)
+- Building Code + Regulations (building-code-regulations)
+- Building Certification (building-certification)
+- Crown Certification (crown-certification)
+- Acceptable Solutions (acceptable-solutions)
+- Construction Inspections + Advice (construction-inspections-advice)
+- Design Assessments + Upgrades (design-assessments-upgrades)
+- Peer Reviews (peer-reviews)
+- Technical Fire Assessment (technical-fire-assessment)
+- Passive Fire Compliance (passive-fire-compliance)
+- Passive Fire Design (passive-fire-design)
+- Modelling (modelling)
+- Infrastructure + Tunnels (infrastructure-tunnels)
+- Sustainable Design Services (sustainable-design-services)
+- Energy + Sustainability (energy-sustainability)
+- Green Building Certification (green-building-certification)
+- Accessibility Core Services (accessibility-core-services)
+- Accessibility + Universal Design (accessibility-universal-design)
+- Accessible + Adaptable Housing (accessible-adaptable-housing)
+- Bespoke Accessibility Services (bespoke-accessibility-services)
+- Expert Witness (expert-witness)
+- Registered Research Service Provider (registered-research-service-provider)
+- Regulatory Compliance (regulatory-compliance)
+- QA + ISO Certifications (qa-iso-certifications)
+- Jensen Hughes FIREMARK Product Certification (jensen-hughes-firemark-product-certification)
+
+NOT available in Pacific:
+- Forensic Investigation (no dedicated service page in region)
+- Security Risk + Public Safety
+- Emergency Management + Response
+- Energy + Utilities (Pacific offers Energy + Sustainability instead — different brand)
+- Emerging Hazards
+- Process Safety
+
+### Asia
+Available services include:
+- Fire Engineering + Systems Design (fire-engineering-systems-design)
+- Code Consulting + Built Environment (code-consulting-built-environment)
+- Code Consulting (code-consulting)
+- Emerging Hazards (emerging-hazards)
+- Energy + Utilities (energy_utilities)
+- AHJ Representation + Plan Review (ahj-representation-plan-review)
+- Combustible Dust Safety (combustible-dust-safety)
+- Commissioning (commissioning)
+- Fire + Smoke + Tunnel Modeling (fire-smoke-tunnel-modeling)
+- Fire Suppression Systems Design (fire-suppression-systems-design)
+- Hazardous Materials (hazardous-materials)
+- Hydrogen Services (hydrogen-services)
+- Life Safety + Performance Based Design (life-safety-pbd)
+- Lithium-Ion Risk Consulting (lithium-ion-risk-consulting)
+- Pedestrian + Evacuation Modeling (pedestrian-evacuation-modeling)
+- Pre-Construction Administration + Oversight (pre-construction-administration-and-oversight)
+- Process Safety (process-safety)
+- Risk Analysis (risk-analysis)
+- Testing Research + Development (testing-research-development)
+- QA + ISO Certifications (qa-iso-certifications)
+
+NOT available in Asia:
+- Forensic Investigation
+- Accessibility + Universal Design
+- Security Risk + Public Safety
+- Emergency Management + Response
+- Large-Scale Fire Testing
+
+### Middle East + India (UAE, Saudi Arabia, Qatar, India)
+Available services include:
+- Fire Engineering + Systems Design (fire-engineering-systems-design)
+- Code Consulting + Built Environment (code-consulting-built-environment)
+- Code Consulting (code-consulting)
+- Accessibility (accessibility)
+- AHJ Liaison + Approvals (ahj-liaison-approvals)
+- Commissioning (commissioning)
+- Emergency Management + Response (emergency-management-response)
+- Emergency Preparedness (emergency-preparedness)
+- Emerging Hazards (emerging-hazards)
+- Energy + Utilities (energy_utilities)
+- Fire Emergency Services Consulting (fire-emergency-services-consulting)
+- Fire + Smoke + Tunnel Modeling (fire-smoke-tunnel-modeling)
+- Fire Suppression Systems Design (fire-suppression-systems-design)
+- Hazardous Materials (hazardous-materials)
+- Hydrogen Services (hydrogen-services)
+- Life Safety + Performance Based Design (life-safety-pbd)
+- Mass Notification Systems (mass-notification-systems)
+- Pre-Construction Administration + Oversight (pre-construction-administration-and-oversight)
+- Private Client + Family Office Services (private-client-family-office-services)
+- Process Safety (process-safety)
+- Response Planning (response-planning)
+- Security Design (security-design)
+- Security Risk Management (security-risk-management)
+- Security Risk + Public Safety (security-risk-public-safety)
+- Structural Fire Safety (structural-fire-safety)
+- Threat + Violence Risk Management (threat-violence-risk-management)
+- QA + ISO Certifications (qa-iso-certifications)
+
+NOT available in Middle East + India:
+- Forensic Investigation (no dedicated /middle-east/services/forensic-* page on prod)
+
+Middle East + India offices: Abu Dhabi, Dubai, Doha (Qatar), Riyadh (Saudi Arabia), Mumbai (India)
+
+---
+
+## Forensics Pages (canonical reference, verified 2026-05-19)
+
+| Region | Available | Primary Forensic URL | Forensics Email |
+|--------|-----------|----------------------|-----------------|
+| North America / Americas | YES | https://www.jensenhughes.com/services/investigations | info@jensenhughes.com |
+| Europe | YES | https://www.jensenhughes.com/europe/services/forensic-investigation | instructus.uk@jensenhughes.com (subject: "Forensics Instruction") |
+| Europe — Marine sub | YES | https://www.jensenhughes.com/europe/services/marine-fire-forensics | instructus.uk@jensenhughes.com |
+| Europe — Product Liability sub | YES | https://www.jensenhughes.com/europe/services/product-liability-investigations | instructus.uk@jensenhughes.com |
+| Pacific | NO | — | info@jensenhughes.com |
+| Asia | NO | — | info@jensenhughes.com |
+| Middle East + India | NO | — | info@jensenhughes.com |
+
+NEVER link `/scotland` for forensics queries. Scotland is a country page, NOT the forensics hub.
+NEVER link `/services/fire-engineering-systems-design` as a forensics fallback — that's fire engineering.
+For unavailable regions: phrase "Forensic investigation is not currently available in [regionLabel]. For forensic inquiries, contact info@jensenhughes.com."

@@ -82,30 +82,65 @@ class RateLimiter
             ];
         }
 
-        // Increment counter
-        $data['count']++;
-        $remaining = max(0, $limit - $data['count']);
+        // Use mutex to prevent race conditions during increment
+        $mutex = Craft::$app->getMutex();
+        $lockName = "mcp_ratelimit_{$cacheKey}";
         $resetAt = $data['windowStart'] + $window;
 
-        // Check if over limit
-        if ($data['count'] > $limit) {
-            Craft::warning("Rate limit exceeded for IP: {$ip} ({$data['count']}/{$limit})", 'mcp-wrapper');
-
+        // Try to acquire lock (1 second timeout)
+        if (!$mutex->acquire($lockName, 1)) {
+            // If we can't get the lock, allow the request but log it
+            Craft::warning("Rate limiter mutex timeout for IP: {$ip}", 'mcp-wrapper');
             return [
-                'allowed' => false,
-                'remaining' => 0,
+                'allowed' => true,
+                'remaining' => max(0, $limit - $data['count']),
                 'resetAt' => $resetAt,
             ];
         }
 
-        // Update cache
-        $cache->set($cacheKey, $data, $window);
+        try {
+            // Re-fetch data inside lock to ensure consistency
+            $data = $cache->get($cacheKey);
+            if ($data === false) {
+                // Cache expired while waiting for lock
+                $data = [
+                    'count' => 1,
+                    'windowStart' => $now,
+                ];
+                $cache->set($cacheKey, $data, $window);
+                return [
+                    'allowed' => true,
+                    'remaining' => $limit - 1,
+                    'resetAt' => $now + $window,
+                ];
+            }
 
-        return [
-            'allowed' => true,
-            'remaining' => $remaining,
-            'resetAt' => $resetAt,
-        ];
+            // Increment counter
+            $data['count']++;
+            $remaining = max(0, $limit - $data['count']);
+            $resetAt = $data['windowStart'] + $window;
+
+            // Check if over limit
+            if ($data['count'] > $limit) {
+                Craft::warning("Rate limit exceeded for IP: {$ip} ({$data['count']}/{$limit})", 'mcp-wrapper');
+                return [
+                    'allowed' => false,
+                    'remaining' => 0,
+                    'resetAt' => $resetAt,
+                ];
+            }
+
+            // Update cache
+            $cache->set($cacheKey, $data, $window);
+
+            return [
+                'allowed' => true,
+                'remaining' => $remaining,
+                'resetAt' => $resetAt,
+            ];
+        } finally {
+            $mutex->release($lockName);
+        }
     }
 
     /**

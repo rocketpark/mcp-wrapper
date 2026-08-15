@@ -3,6 +3,33 @@ import * as bp from '../.botpress'
 import fetch from 'node-fetch'
 
 /**
+ * Default mcpServerUrl from integration.definition.ts. If a bot's installed
+ * integration config gets reset on a bp deploy bump (Botpress historically
+ * has not been 100% reliable about preserving per-bot config across schema
+ * updates), the bot will silently start hitting servicecurator.com instead
+ * of the per-tenant Craft host. warnOnConfigDrift fires a one-shot log
+ * warning the first time a JH-style schemaHandle is paired with the
+ * default host — a strong "this is wrong" signal that surfaces in
+ * Botpress runtime logs.
+ */
+const SERVICECURATOR_DEFAULT = 'https://servicecurator.com'
+const JH_SCHEMA_HANDLES = new Set(['MCPSchema', 'ai', 'jensenhughes'])
+let configDriftWarned = false
+
+function warnOnConfigDrift(ctx: any, logger: any): void {
+  if (configDriftWarned) return
+  const url = ctx?.configuration?.mcpServerUrl
+  const handle = ctx?.configuration?.schemaHandle
+  if (url === SERVICECURATOR_DEFAULT && typeof handle === 'string' && JH_SCHEMA_HANDLES.has(handle)) {
+    configDriftWarned = true
+    logger.forBot().warn(
+      `Config drift detected: mcpServerUrl is the default '${SERVICECURATOR_DEFAULT}' but schemaHandle '${handle}' is JH-specific. ` +
+      `Per-bot config likely reset on the last integration update. Set mcpServerUrl to the staging or prod Craft host before further use.`
+    )
+  }
+}
+
+/**
  * MCP Client for communicating with Craft CMS MCP server
  */
 class MCPClient {
@@ -13,11 +40,17 @@ class MCPClient {
   ) {}
 
   /**
-   * Make a JSON-RPC 2.0 request to the MCP server
+   * Make a JSON-RPC 2.0 request to the MCP server.
+   *
+   * Retries on transient 5xx + network errors. A transient Forge blip or
+   * Craft opcache rebuild used to kill the entire bot reply — bot would
+   * emit "I couldn't reach our knowledge base" with no fallback. Two
+   * retries with exponential backoff (250ms, then 500ms) absorb the
+   * common cases. 4xx errors (auth, validation) are NOT retried — they
+   * won't fix themselves.
    */
   private async makeRequest(method: string, params: any = {}): Promise<any> {
     const endpoint = `${this.baseUrl}/mcp/${this.schemaHandle}`
-    
     const request = {
       jsonrpc: '2.0',
       id: Date.now(),
@@ -28,40 +61,75 @@ class MCPClient {
     this.logger.forBot().info(`🔵 MCP Request to ${endpoint}`)
     this.logger.forBot().info(`🔵 Request body: ${JSON.stringify(request)}`)
 
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request),
-      })
+    const maxAttempts = 3
+    const backoffMs = [0, 250, 500]
+    let lastError: Error | null = null
 
-      this.logger.forBot().info(`🔵 Response status: ${response.status} ${response.statusText}`)
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        this.logger.forBot().error(`🔴 HTTP Error Response: ${errorText}`)
-        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`)
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (attempt > 0) {
+        await new Promise(r => setTimeout(r, backoffMs[attempt]))
+        this.logger.forBot().info(`🔁 MCP retry attempt ${attempt + 1}/${maxAttempts} (waited ${backoffMs[attempt]}ms)`)
       }
 
-      const responseText = await response.text()
-      this.logger.forBot().info(`🔵 Raw response: ${responseText}`)
-      
-      const data = JSON.parse(responseText)
-      
-      if ((data as any).error) {
-        this.logger.forBot().error(`🔴 MCP Error: ${JSON.stringify((data as any).error)}`)
-        throw new Error(`MCP Error: ${(data as any).error.message} (code: ${(data as any).error.code})`)
-      }
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(request),
+        })
 
-      this.logger.forBot().info(`🟢 MCP Success! Result: ${JSON.stringify((data as any).result)}`)
-      return (data as any).result
-    } catch (error) {
-      this.logger.forBot().error(`🔴 MCP request failed: ${error}`)
-      this.logger.forBot().error(`🔴 Error stack: ${(error as Error).stack}`)
-      throw error
+        this.logger.forBot().info(`🔵 Response status: ${response.status} ${response.statusText}`)
+
+        // 5xx = transient. Retry.
+        if (response.status >= 500 && response.status < 600) {
+          const errorText = await response.text()
+          lastError = new Error(`HTTP ${response.status} (transient): ${errorText}`)
+          this.logger.forBot().warn(`🟡 ${lastError.message} — will retry`)
+          continue
+        }
+
+        // 4xx = client error. Don't retry, fail fast.
+        if (!response.ok) {
+          const errorText = await response.text()
+          this.logger.forBot().error(`🔴 HTTP Error Response (no retry): ${errorText}`)
+          throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`)
+        }
+
+        const responseText = await response.text()
+        this.logger.forBot().info(`🔵 Raw response: ${responseText}`)
+
+        const data = JSON.parse(responseText)
+
+        if ((data as any).error) {
+          this.logger.forBot().error(`🔴 MCP Error: ${JSON.stringify((data as any).error)}`)
+          throw new Error(`MCP Error: ${(data as any).error.message} (code: ${(data as any).error.code})`)
+        }
+
+        this.logger.forBot().info(`🟢 MCP Success! Result: ${JSON.stringify((data as any).result)}`)
+        return (data as any).result
+      } catch (error) {
+        // Network errors (DNS failure, connection refused, timeout) are retryable.
+        // JSON.parse errors + thrown MCP errors are NOT retryable — they're shape
+        // problems, not connectivity problems. We distinguish by checking if a
+        // response was received.
+        lastError = error as Error
+        const msg = lastError.message || ''
+        const isNetworkError = msg.includes('fetch failed') || msg.includes('ECONN') || msg.includes('ETIMEDOUT') || msg.includes('ENOTFOUND')
+        if (isNetworkError && attempt < maxAttempts - 1) {
+          this.logger.forBot().warn(`🟡 Network error: ${msg} — will retry`)
+          continue
+        }
+        // Non-retryable error OR last attempt — give up.
+        this.logger.forBot().error(`🔴 MCP request failed (attempt ${attempt + 1}): ${error}`)
+        if (attempt === maxAttempts - 1) {
+          this.logger.forBot().error(`🔴 Error stack: ${(error as Error).stack}`)
+        }
+        throw error
+      }
     }
+
+    // All attempts exhausted with retryable errors.
+    throw lastError ?? new Error('MCP request failed after all retries')
   }
 
   /**
@@ -98,6 +166,7 @@ export default new bp.Integration({
      * List all available Craft CMS content types
      */
     listTools: async ({ ctx, logger }) => {
+      warnOnConfigDrift(ctx, logger)
       const { mcpServerUrl, schemaHandle } = ctx.configuration
       logger.forBot().info(`Configuration: URL=${mcpServerUrl}, Schema=${schemaHandle}`)
       
@@ -145,13 +214,166 @@ export default new bp.Integration({
     /**
      * Query Craft CMS content
      */
-    queryContent: async ({ ctx, input, logger }) => {
+    queryContent: async ({ ctx, input, client: bpClient, logger }) => {
+      warnOnConfigDrift(ctx, logger)
       const { mcpServerUrl, schemaHandle } = ctx.configuration
       if (!mcpServerUrl || !schemaHandle) {
         throw new Error('MCP Server URL and Schema Handle are required')
       }
-      
+
       const { toolName, ...queryArgs } = input
+
+      // Auto-derive the Craft site handle from the user region.
+      //
+      // Two strategies, most-explicit -> most-implicit:
+      //   1. Bot passed `region` directly. Map via REGION_TO_SITE. This is the
+      //      reliable path: the bot reads {{user.data.region}} (set by Twig at
+      //      page load) and passes it. The schema description tells the LLM to
+      //      always do this.
+      //   2. Bot forgot to pass region. Look up the most recently-updated
+      //      Botpress user that has `data.region` set and use that. Webchat
+      //      updateUser is async, so first-call race retried with backoff.
+      //
+      // An integration-level state cache was considered but rejected: it
+      // would bleed across users from different regions on the same bot.
+      // Per-user caching needs the calling user's ID, which IntegrationContext
+      // doesn't expose for actions, so we rely on bot-side passing instead.
+      const REGION_TO_SITE: Record<string, string> = {
+        europe: 'jensenHughesEurope',
+        pacific: 'jensenHughesPacific',
+        asia: 'jensenHughesAsia',
+        middle_east: 'jensenHughesMiddleEast',
+      }
+      const normalizeRegion = (r: unknown): string | null => {
+        if (typeof r !== 'string') return null
+        return r.toLowerCase().trim().replace(/\s+/g, '_')
+      }
+      const siteFromRegion = (r: string | null): string | null => {
+        return r && REGION_TO_SITE[r] ? REGION_TO_SITE[r] : null
+      }
+
+      if (!queryArgs.site) {
+        // Strategy 1: explicit region in input
+        let resolved = siteFromRegion(normalizeRegion(queryArgs.region))
+        let derivedFrom = resolved ? `input.region=${queryArgs.region}` : null
+
+        // Strategy 2: scan recent bot events for the most recent regionContext
+        // event sent from the webchat Twig footer. Events are bot-scoped (not
+        // integration-scoped), so the integration action CAN read events that
+        // originated from the webchat integration. listUsers on the same path
+        // returned zero users because user records ARE integration-scoped.
+        //
+        // We scan up to 5 pages (~250 events). For each, look for a payload
+        // shape that looks like a regionContext custom event. The Twig footer
+        // sends `sendEvent({data: {type: 'regionContext', region, ...}})` which
+        // surfaces as payload.data.type === 'regionContext'. Other shapes are
+        // tolerated for robustness.
+        //
+        // Race / multi-user note: we sort by createdAt desc and take the first
+        // matching event. For a single active visitor this is reliable. Under
+        // concurrent traffic from different regions, the most recent event may
+        // not belong to the calling user — accepted tradeoff until we move
+        // off AutonomousNode (which doesn't expose per-arg Manual mode).
+        const readEventRegion = (ev: any): string | null => {
+          if (!ev || !ev.payload) return null
+          const p = ev.payload
+          // Webchat SDK sendEvent({data: X}) is delivered to Botpress as a
+          // webchat:trigger event with this shape (verified live 2026-05-20
+          // via Botpress Events panel, event evt_01KS43XE55ZN6H71DGCVHVTEC8):
+          //
+          //   event.payload = {
+          //     origin: "website",
+          //     conversationId, userId,
+          //     payload: {                       <-- nested "payload" key, not "data"
+          //       data: {
+          //         type: "regionContext",
+          //         region: "north_america" | "europe" | ...,
+          //         siteHandle, urlPrefix, language
+          //       }
+          //     }
+          //   }
+          //
+          // So the TRUE path is payload.payload.data.type === 'regionContext'.
+          // Earlier comments here (and the V6.20 Studio Trigger1 filter) used
+          // payload.data.data.type — that path doesn't exist in real webchat
+          // events, so the filter NEVER matched and user.userRegion was never
+          // populated; integration's listEvents fallback ALSO returned null
+          // here, defaulting site to NA. Caused ~6 EU regression failures.
+          if (p.payload?.data?.type === 'regionContext' && typeof p.payload.data.region === 'string') {
+            return p.payload.data.region
+          }
+          // Server-posted shape (no webchat SDK wrap):
+          //   payload.data = { type:'regionContext', region }
+          if (p.data?.type === 'regionContext' && typeof p.data.region === 'string') {
+            return p.data.region
+          }
+          // Legacy double-wrap shape kept for backwards compatibility:
+          //   payload.data.data = { type:'regionContext', region }
+          if (p.data?.data?.type === 'regionContext' && typeof p.data.data.region === 'string') {
+            return p.data.data.region
+          }
+          // Defensive: bare region at various depths
+          if (typeof p.region === 'string' && p.region.trim()) return p.region
+          if (typeof p.payload?.data?.region === 'string' && p.payload.data.region.trim()) return p.payload.data.region
+          if (typeof p.data?.region === 'string' && p.data.region.trim()) return p.data.region
+          if (typeof p.data?.data?.region === 'string' && p.data.data.region.trim()) return p.data.data.region
+          return null
+        }
+
+        if (!resolved) {
+          const maxAttempts = 3
+          let lastDebugDump: string | null = null
+          for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            if (attempt > 0) {
+              await new Promise(r => setTimeout(r, 600))
+            }
+            try {
+              const evResp = await bpClient.listEvents({})
+              const events = ((evResp as any)?.events || []) as any[]
+              if (attempt === 0 && events.length) {
+                lastDebugDump = `events=${events.length}; sample=${JSON.stringify(events.slice(0, 2).map((e: any) => ({ id: e.id, type: e.type, payloadKeys: Object.keys(e.payload || {}), payloadType: e.payload?.type, payloadDataType: e.payload?.data?.type, payloadDataDataType: e.payload?.data?.data?.type, payloadDataDataRegion: e.payload?.data?.data?.region })))}`
+              }
+              // Filter to events from the last 10 seconds only. The Twig footer
+              // re-emits regionContext on every webchat:messageSent, so the
+              // CURRENT user's event will always be within ~1-2 seconds of the
+              // bot's query. Stale events from earlier sessions get filtered.
+              // V1.0.15 used 60s; testing today 2026-05-20 showed back-to-back
+              // tests within 60s contaminated each other (EU test picked up a
+              // 2-minute-old Asia event). Tightening to 10s reduces the leak
+              // window dramatically. Real fix is User Variables (see
+              // docs/USER-VARIABLES-STUDIO-SETUP.md) — this is the cheap
+              // hardening pre-Studio-wiring.
+              const FRESHNESS_MS = 10 * 1000
+              const nowMs = Date.now()
+              const candidates = events
+                .map((e: any) => ({ e, region: readEventRegion(e), createdAtMs: e?.createdAt ? new Date(e.createdAt).getTime() : 0 }))
+                .filter((x: any) => x.region && (nowMs - x.createdAtMs) < FRESHNESS_MS)
+                .sort((a: any, b: any) => b.createdAtMs - a.createdAtMs)
+              const winner = candidates[0]
+              if (winner) {
+                const r = normalizeRegion(winner.region)
+                const s = siteFromRegion(r)
+                if (s) {
+                  resolved = s
+                  derivedFrom = `event(${winner.e.id}).payload.region=${winner.region}${attempt > 0 ? ` (after ${attempt} retries)` : ''}`
+                  break
+                }
+              }
+            } catch (e) {
+              logger.forBot().warn(`Region listEvents fallback attempt ${attempt + 1} failed: ${(e as Error).message}`)
+            }
+          }
+          if (!resolved) {
+            logger.forBot().info(`No regionContext event found in recent events; using default site. ${lastDebugDump || 'no events'}`)
+          }
+        }
+
+        if (resolved) {
+          queryArgs.site = resolved
+          logger.forBot().info(`Auto-derived site=${resolved} (source: ${derivedFrom})`)
+        }
+      }
+
       const client = new MCPClient(mcpServerUrl, schemaHandle, logger)
 
       try {
@@ -176,37 +398,72 @@ export default new bp.Integration({
           }
         }
         
-        // CRITICAL: For team members, ALWAYS filter to Regional Leadership only
-        // This ensures only the 59 Regional Leaders are shown, not all 101 team members
+        // For team members: allow named person lookups to find anyone,
+        // but default browse/list queries to Regional Leadership only
         if (toolName === 'query_ourTeam') {
           const searchTerm = (queryArgs.search || '').toLowerCase()
-          logger.forBot().info(`Team member query - filtering to Regional Leadership only`)
+          logger.forBot().info(`Team member query - search: "${searchTerm}"`)
 
-          // Get all team members to filter
+          // When searching for a specific person by name, pass the search term
+          // to MCP so the server can return matching members directly. The MCP
+          // server's no-search query caps at ~100 entries (verified 2026-05-20
+          // on Jonathan's Matt Booth bug), so JS-side filtering of an
+          // unconditional fetch misses members beyond the first 100. Passing
+          // the search term lets MCP do the heavy lifting + return only
+          // matching members. For browse mode (no search term), keep the
+          // unconditional fetch to apply the Regional Leadership filter.
           const result = await client.callTool(toolName, {
-            limit: 200, // Get all to filter properly
+            limit: 200,
             offset: 0,
+            ...(searchTerm ? { search: searchTerm } : {}),
           })
 
           if (result?.content?.[0]?.text) {
             const data = JSON.parse(result.content[0].text)
             const allMembers = data.entries || []
 
-            // Filter to ONLY Regional Leadership members
-            const regionalLeaders = allMembers.filter((member: any) => {
-              const types = member.teamMemberType || []
-              return types.some((t: any) => {
-                const title = (t.title || '').toLowerCase()
-                return title.includes('regional leadership')
-              })
-            })
-
-            logger.forBot().info(`Found ${regionalLeaders.length} Regional Leaders from ${allMembers.length} total team members`)
-
-            // If search term provided, filter Regional Leaders by search
-            let filtered = regionalLeaders
+            // If searching for a specific person by name, search ALL members (not just Regional Leadership)
+            // This allows looking up experts like "Sean Lebel" who may not be Regional Leadership
             if (searchTerm) {
-              filtered = regionalLeaders.filter((member: any) => {
+              // First try exact name match across all members
+              const nameMatches = allMembers.filter((member: any) => {
+                const nameText = [
+                  member.title || '',
+                  member.fullName || '',
+                ].join(' ').toLowerCase()
+                return nameText.includes(searchTerm)
+              })
+
+              if (nameMatches.length > 0) {
+                logger.forBot().info(`Found ${nameMatches.length} team members matching name "${searchTerm}" (all members)`)
+                const limit = queryArgs.limit || 10
+                const offset = queryArgs.offset || 0
+                const paginatedResults = nameMatches.slice(offset, offset + limit)
+                return {
+                  content: [{
+                    type: 'text',
+                    text: JSON.stringify({
+                      entries: paginatedResults,
+                      _meta: {
+                        totalMatches: nameMatches.length,
+                        returned: paginatedResults.length,
+                        searchType: 'name_match'
+                      }
+                    })
+                  }],
+                }
+              }
+
+              // No name match found - fall through to Regional Leadership search by expertise/role
+              const regionalLeaders = allMembers.filter((member: any) => {
+                const types = member.teamMemberType || []
+                return types.some((t: any) => {
+                  const title = (t.title || '').toLowerCase()
+                  return title.includes('regional leadership')
+                })
+              })
+
+              const filtered = regionalLeaders.filter((member: any) => {
                 const searchableText = [
                   member.title || '',
                   member.role || '',
@@ -218,12 +475,41 @@ export default new bp.Integration({
                 return searchableText.includes(searchTerm)
               })
               logger.forBot().info(`After search filter: ${filtered.length} Regional Leaders match "${searchTerm}"`)
+
+              const limit = queryArgs.limit || 10
+              const offset = queryArgs.offset || 0
+              const paginatedResults = filtered.slice(offset, offset + limit)
+
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify({
+                    entries: paginatedResults,
+                    _meta: {
+                      totalRegionalLeaders: regionalLeaders.length,
+                      matchingSearch: filtered.length,
+                      returned: paginatedResults.length,
+                      searchType: 'regional_leadership_expertise'
+                    }
+                  })
+                }],
+              }
             }
 
-            // Apply pagination
+            // No search term: browse mode - show Regional Leadership only
+            const regionalLeaders = allMembers.filter((member: any) => {
+              const types = member.teamMemberType || []
+              return types.some((t: any) => {
+                const title = (t.title || '').toLowerCase()
+                return title.includes('regional leadership')
+              })
+            })
+
+            logger.forBot().info(`Browse mode: ${regionalLeaders.length} Regional Leaders from ${allMembers.length} total`)
+
             const limit = queryArgs.limit || 10
             const offset = queryArgs.offset || 0
-            const paginatedResults = filtered.slice(offset, offset + limit)
+            const paginatedResults = regionalLeaders.slice(offset, offset + limit)
 
             return {
               content: [{
@@ -232,8 +518,8 @@ export default new bp.Integration({
                   entries: paginatedResults,
                   _meta: {
                     totalRegionalLeaders: regionalLeaders.length,
-                    matchingSearch: filtered.length,
-                    returned: paginatedResults.length
+                    returned: paginatedResults.length,
+                    searchType: 'browse'
                   }
                 })
               }],
@@ -256,36 +542,68 @@ export default new bp.Integration({
             const data = JSON.parse(result.content[0].text)
             const allEntries = data.entries || []
             
-            // Filter by search term in title, slug, summary, or ANY region title
+            // Filter by search term against title, slug, summary, AND address
+            // fields (locality, administrativeArea, country, countryCode). The
+            // address widens the country-level search ("India" should hit
+            // Mumbai). The previous region.title fallback was REMOVED — it
+            // matched "India" against the multi-country region label
+            // "Middle East + India", returning every Middle-East office as
+            // an India hit (Jeddah, Abu Dhabi, Riyadh, Doha all leaked).
+            // Region-scoped browsing belongs in the bot's explicit `region`
+            // input arg (Rule 0), not in the search filter.
             const filtered = allEntries.filter((entry: any) => {
-              // Check title, slug, summary
+              const addr = entry.address || {}
               const mainText = [
                 entry.title || '',
                 entry.slug || '',
-                entry.officeSummary || ''
+                entry.officeSummary || '',
+                addr.locality || '',
+                addr.administrativeArea || '',
+                addr.country || '',
+                addr.countryCode || '',
+                entry.country || '',
               ].join(' ').toLowerCase()
-              
-              if (mainText.includes(searchTerm)) return true
-              
-              // Check each region title individually
-              const regions = entry.region || []
-              return regions.some((r: any) => {
-                const regionTitle = (r.title || '').toLowerCase()
-                return regionTitle.includes(searchTerm)
-              })
+              return mainText.includes(searchTerm)
             })
             
             logger.forBot().info(`Filtered ${filtered.length} offices from ${allEntries.length} total`)
-            
+
             // Apply limit and offset to filtered results
             const limit = queryArgs.limit || 10
             const offset = queryArgs.offset || 0
             const paginatedResults = filtered.slice(offset, offset + limit)
-            
+
+            // Enrich each office with phone + address via craft_get_office_contact_info.
+            // This way the bot gets phone even if it picked query_officeLocations
+            // instead of craft_get_office_contact_info — eliminates the LLM
+            // tool-selection ambiguity that causes "phone not listed" answers.
+            const enriched = await Promise.all(paginatedResults.map(async (entry: any) => {
+              if (!entry?.slug) return entry
+              try {
+                const contactResult = await client.callTool('craft_get_office_contact_info', { slug: entry.slug })
+                const contactText = contactResult?.content?.[0]?.text
+                if (!contactText) return entry
+                const contact = JSON.parse(contactText)
+                if (contact?.found && contact.office) {
+                  return {
+                    ...entry,
+                    phone: contact.office.phone,
+                    phoneHref: contact.office.phoneHref,
+                    address: contact.office.address,
+                    googleMaps: contact.office.googleMaps,
+                    contactForm: contact.office.contactForm,
+                  }
+                }
+              } catch (e) {
+                logger.forBot().warn(`Enrichment failed for ${entry.slug}: ${(e as Error).message}`)
+              }
+              return entry
+            }))
+
             return {
               content: [{
                 type: 'text',
-                text: JSON.stringify({ entries: paginatedResults })
+                text: JSON.stringify({ entries: enriched })
               }],
             }
           }
@@ -308,11 +626,54 @@ export default new bp.Integration({
         if (queryArgs.dateCreated) toolArguments.dateCreated = queryArgs.dateCreated
         if (queryArgs.dateUpdated) toolArguments.dateUpdated = queryArgs.dateUpdated
         if (queryArgs.orderBy) toolArguments.orderBy = queryArgs.orderBy
+        // Region-aware queries: pass site handle so returned entry URLs use the
+        // correct regional prefix (e.g., /europe/insights/... vs /insights/...).
+        if (queryArgs.site) toolArguments.site = queryArgs.site
+        if (queryArgs.siteId) toolArguments.siteId = queryArgs.siteId
+        if (queryArgs.section) toolArguments.section = queryArgs.section
 
         const result = await client.callTool(toolName, toolArguments)
-        
+
         logger.forBot().info(`Query result: ${JSON.stringify(result).substring(0, 200)}...`)
-        
+
+        // Enrich query_officeLocations results with phone/address so the bot can
+        // answer "phone for X office" regardless of which toolName the LLM picked.
+        if (toolName === 'query_officeLocations' && result?.content?.[0]?.text) {
+          try {
+            const data = JSON.parse(result.content[0].text)
+            const entries = data?.entries
+            if (Array.isArray(entries) && entries.length > 0) {
+              const enriched = await Promise.all(entries.map(async (entry: any) => {
+                if (!entry?.slug) return entry
+                try {
+                  const contactResult = await client.callTool('craft_get_office_contact_info', { slug: entry.slug })
+                  const contactText = contactResult?.content?.[0]?.text
+                  if (!contactText) return entry
+                  const contact = JSON.parse(contactText)
+                  if (contact?.found && contact.office) {
+                    return {
+                      ...entry,
+                      phone: contact.office.phone,
+                      phoneHref: contact.office.phoneHref,
+                      address: contact.office.address,
+                      googleMaps: contact.office.googleMaps,
+                      contactForm: contact.office.contactForm,
+                    }
+                  }
+                } catch (e) {
+                  logger.forBot().warn(`Enrichment failed for ${entry.slug}: ${(e as Error).message}`)
+                }
+                return entry
+              }))
+              return {
+                content: [{ type: 'text', text: JSON.stringify({ ...data, entries: enriched }) }],
+              }
+            }
+          } catch (e) {
+            logger.forBot().warn(`Enrichment skipped (parse failed): ${(e as Error).message}`)
+          }
+        }
+
         // MCP tools/call returns: { content: [{ type: 'text', text: '...' }], isError: false }
         // The 'text' field contains JSON-encoded GraphQL results
         return {
@@ -482,11 +843,36 @@ export default new bp.Integration({
             } else {
               // Skip sections known to be empty or misconfigured
               const emptyOrProblematicSections = [
-                'services', 'servicesBrowse', 'servicesBrowseEurope',
                 'podcasts', 'podcastsBrowse', 'podcastEpisodes'
               ]
               if (emptyOrProblematicSections.includes(section)) {
                 logger.forBot().info(`Skipping ${section} (known to be empty/misconfigured)`)
+                continue
+              }
+
+              // For services sections, search param only does exact title match,
+              // so fetch all and filter client-side (only ~20 services)
+              if (['services', 'servicesBrowse', 'servicesBrowseEurope'].includes(section)) {
+                const result = await client.callTool(`query_${section}`, {
+                  limit: 50,
+                })
+                if (result.content?.[0]?.text) {
+                  const data = JSON.parse(result.content[0].text)
+                  const entries = data.entries || data.results || []
+                  // Filter client-side by keyword match in title, summary, or capabilities
+                  const filtered = entries.filter((e: any) => {
+                    const text = [
+                      e.title || '',
+                      e.summary || '',
+                      e.slug || '',
+                      ...(e.capabilities || []).map((c: any) => c.title || c),
+                    ].join(' ').toLowerCase()
+                    return keywordList.some(kw => text.includes(kw.toLowerCase()))
+                  })
+                  if (filtered.length > 0) {
+                    relevantContent.push(...filtered)
+                  }
+                }
                 continue
               }
               
@@ -519,7 +905,7 @@ export default new bp.Integration({
 
         const sources = relevantContent.slice(0, 5).map(e => ({
           title: e.title,
-          url: e.url || `https://servicecurator.com/${e._section || 'content'}/${e.slug}`,
+          url: e.url || (e.uri ? `https://www.jensenhughes.com/${e.uri}` : `https://www.jensenhughes.com/${e.slug}`),
         }))
 
         return { answer, sources }

@@ -1,0 +1,85 @@
+# Jensen Hughes Quality Assurance + ISO Certifications
+
+Last updated: 2026-03-24
+Source: https://www.jensenhughes.com/services/qa-iso-certifications
+
+Jensen Hughes holds national and international certifications that validate our commitment to quality and expertise. These certifications guarantee that our services meet the highest standards for safety, compliance, and performance.
+
+---
+
+## ISO 9001:2015 — Quality Management Systems (QMS)
+
+Jensen Hughes holds ISO 9001:2015 certification at multiple global locations:
+
+- **Jensen Hughes (Concord, CA, USA)** — Certified for Classified Nuclear Applications
+- **Jensen Hughes Consulting Canada (Ottawa, ON)** — Certified
+- **Jensen Hughes Saudi (Riyadh + Al Khobar)** — Certified at both locations
+- **Jensen Hughes Consulting L.L.L. (Qatar)** — Certified
+- **Jensen Hughes United Kingdom Forensics / International Fire Investigators and Consultants Limited (Glasgow, UK)** — Certified
+- **Jensen Hughes Finland Oy (Finland)** — Certified
+- **Jensen Hughes Pty Limited (Australia)** — Certified
+- **Jensen Hughes Co., Ltd. (Seoul, South Korea)** — Certified
+
+---
+
+## ISO 19443:2018 — QMS Important to Nuclear Safety (ITNS)
+
+- **Jensen Hughes (Concord, CA, USA)** — Certified to ISO 19443:2018 for nuclear safety-critical applications
+
+---
+
+## U.S.NRC, ASME, CSA — Nuclear Energy Quality Assurance Requirements
+
+**United States (Concord, CA office):**
+Quality assurance program meets requirements of:
+- 10 CFR 50 Appendix B
+- 10 CFR 830
+- ASME NQA-1
+
+**Canada (Ottawa, ON office):**
+Quality assurance program meets requirements of:
+- CSA N299.1
+- Applicable portions of CSA N286
+- CSA N286.7
+
+---
+
+## ISO 45001:2018 — Occupational Health + Safety Management System (OHS)
+
+- **Jensen Hughes Saudi (Riyadh + Al Khobar)** — Certified
+- **Jensen Hughes Consulting L.L.L. (Qatar)** — Certified
+
+---
+
+## ISO 17065:2012 (R2018) — Jensen Hughes FireMark Product Certification
+
+Jensen Hughes FireMark is an ISO 17065 accredited certification scheme and conformity assessment body (CAB) recognized in Australia and New Zealand.
+
+The Jensen Hughes FireMark scheme is an independent third-party certification scheme for fire protection products, principally — but not exclusively — related to the construction industry.
+
+---
+
+## ISO 14001:2015 — Environmental Management System (EMS)
+
+- **Jensen Hughes Saudi (Riyadh + Al Khobar)** — Certified
+- **Jensen Hughes Consulting L.L.L. (Qatar)** — Certified
+
+---
+
+## ISO/IEC 27001:2022 — Information Security Management System (ISMS)
+
+- **Jensen Hughes Security Risk Consulting** — Certified to ISO/IEC 27001:2022 globally
+
+---
+
+## ISO 17025:2017 — Testing + Calibration Laboratories
+
+- **Jensen Hughes Fire Testing Pty Ltd (Australia)** — NATA accredited and certified to ISO 17025:2017 at the Australian Fire Testing Laboratory
+
+---
+
+## About Our Commitment to Quality
+
+Jensen Hughes holds ISO certifications that align with globally recognized standards, providing independent verification of the outstanding quality and expertise we bring to each project. Our certifications span quality management, nuclear safety, occupational health, environmental management, information security, and laboratory testing.
+
+**Learn More:** https://www.jensenhughes.com/services/qa-iso-certifications

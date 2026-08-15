@@ -11,7 +11,7 @@ use yii\base\Component;
  * Logs structured MCP request/response data for analytics and debugging.
  * Enables analysis of tool usage patterns, performance metrics, and error tracking.
  * 
- * @author Rocket Park <hello@rocketpa.rk>
+ * @author Rocket Park <support@rocketpark.com>
  * @since 1.1.0
  */
 class RequestLoggerService extends Component
@@ -134,8 +134,7 @@ class RequestLoggerService extends Component
         }
         
         $cutoff = strtotime("-{$days} days");
-        $lines = file($logPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        
+
         $stats = [
             'total_requests' => 0,
             'successful_requests' => 0,
@@ -149,78 +148,90 @@ class RequestLoggerService extends Component
             'slowest_requests' => [],
             'recent_errors' => [],
         ];
-        
-        foreach ($lines as $line) {
+
+        // Use SplFileObject for memory-efficient line-by-line reading
+        // instead of file() which loads the entire log into memory
+        $file = new \SplFileObject($logPath, 'r');
+        $file->setFlags(\SplFileObject::DROP_NEW_LINE | \SplFileObject::SKIP_EMPTY);
+
+        foreach ($file as $line) {
+            if (empty($line)) {
+                continue;
+            }
+
             // Extract JSON from log line (format: "timestamp [category] JSON")
             if (preg_match('/\{.*\}/', $line, $matches)) {
                 $entry = json_decode($matches[0], true);
-                
+
                 if (!$entry) continue;
-                
+
                 // Skip old entries
-                $entryTime = strtotime($entry['timestamp']);
+                $entryTime = strtotime($entry['timestamp'] ?? '');
                 if ($entryTime < $cutoff) continue;
-                
+
                 // Filter by schema if specified
                 if ($schemaHandle && ($entry['schema'] ?? '') !== $schemaHandle) {
                     continue;
                 }
-                
+
                 $stats['total_requests']++;
-                
-                if ($entry['success']) {
+
+                if ($entry['success'] ?? false) {
                     $stats['successful_requests']++;
                 } else {
                     $stats['failed_requests']++;
                     $code = $entry['error_code'] ?? 'unknown';
                     $stats['by_error_code'][$code] = ($stats['by_error_code'][$code] ?? 0) + 1;
-                    
+
                     // Track recent errors
                     $stats['recent_errors'][] = [
-                        'tool' => $entry['tool'] ?? $entry['method'],
+                        'tool' => $entry['tool'] ?? $entry['method'] ?? 'unknown',
                         'error_code' => $entry['error_code'] ?? 'unknown',
                         'error_message' => $entry['error_message'] ?? 'Unknown error',
-                        'timestamp' => $entry['timestamp'],
+                        'timestamp' => $entry['timestamp'] ?? '',
                     ];
                 }
-                
-                $stats['total_duration_ms'] += $entry['duration_ms'];
-                
+
+                $stats['total_duration_ms'] += ($entry['duration_ms'] ?? 0);
+
                 // Track cache usage (look for cache-related info in log or infer from very fast responses)
-                if ($entry['duration_ms'] < 10) {
+                if (($entry['duration_ms'] ?? 0) < 10) {
                     $stats['cache_hits']++;
                 }
                 $stats['cache_checks']++;
-                
+
                 // By method
-                $method = $entry['method'];
+                $method = $entry['method'] ?? 'unknown';
                 if (!isset($stats['by_method'][$method])) {
                     $stats['by_method'][$method] = ['count' => 0, 'total_ms' => 0];
                 }
                 $stats['by_method'][$method]['count']++;
-                $stats['by_method'][$method]['total_ms'] += $entry['duration_ms'];
-                
+                $stats['by_method'][$method]['total_ms'] += ($entry['duration_ms'] ?? 0);
+
                 // By tool
-                if ($entry['tool']) {
+                if (!empty($entry['tool'])) {
                     $tool = $entry['tool'];
                     if (!isset($stats['by_tool'][$tool])) {
                         $stats['by_tool'][$tool] = ['count' => 0, 'total_ms' => 0, 'errors' => 0];
                     }
                     $stats['by_tool'][$tool]['count']++;
-                    $stats['by_tool'][$tool]['total_ms'] += $entry['duration_ms'];
-                    if (!$entry['success']) {
+                    $stats['by_tool'][$tool]['total_ms'] += ($entry['duration_ms'] ?? 0);
+                    if (!($entry['success'] ?? false)) {
                         $stats['by_tool'][$tool]['errors']++;
                     }
                 }
-                
+
                 // Track slowest requests
                 $stats['slowest_requests'][] = [
-                    'tool' => $entry['tool'] ?? $entry['method'],
-                    'duration_ms' => $entry['duration_ms'],
-                    'timestamp' => $entry['timestamp'],
+                    'tool' => $entry['tool'] ?? $entry['method'] ?? 'unknown',
+                    'duration_ms' => $entry['duration_ms'] ?? 0,
+                    'timestamp' => $entry['timestamp'] ?? '',
                 ];
             }
         }
+
+        // Release file handle
+        $file = null;
         
         // Calculate averages and rates
         if ($stats['total_requests'] > 0) {

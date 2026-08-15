@@ -26,7 +26,7 @@
             "rocketpark\\mcpwrapper\\": "src/"
         }
     },
-    "minimum-stability": "dev",
+    "minimum-stability": "stable",
     "prefer-stable": true,
     "extra": {
         "handle": "mcp-wrapper",

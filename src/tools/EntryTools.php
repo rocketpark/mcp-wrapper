@@ -7,6 +7,7 @@ use craft\elements\Entry;
 use rocketpark\mcpwrapper\attributes\Tool;
 use rocketpark\mcpwrapper\support\Response;
 use rocketpark\mcpwrapper\support\SafeExecution;
+use rocketpark\mcpwrapper\support\UrlNormalizer;
 
 /**
  * Entry Tools
@@ -260,9 +261,31 @@ class EntryTools
                 );
             }
             
-            // Apply custom field filters
-            foreach ($customFields as $fieldHandle => $fieldValue) {
-                $query->{$fieldHandle}($fieldValue);
+            // Apply custom field filters with validation
+            if (!empty($customFields)) {
+                // Get valid field handles for the section (if specified)
+                $validFieldHandles = $this->getValidFieldHandles($params['section'] ?? null);
+
+                foreach ($customFields as $fieldHandle => $fieldValue) {
+                    // Validate field handle format (alphanumeric + underscore, doesn't start with number)
+                    if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $fieldHandle)) {
+                        Craft::warning("Invalid custom field handle format: {$fieldHandle}", 'mcp-wrapper');
+                        continue;
+                    }
+
+                    // If we have a valid fields list (section was specified), validate against it
+                    if (!empty($validFieldHandles) && !in_array($fieldHandle, $validFieldHandles, true)) {
+                        Craft::warning("Unknown custom field: {$fieldHandle}", 'mcp-wrapper');
+                        continue;
+                    }
+
+                    // Verify the method exists on the query object (extra safety)
+                    if (method_exists($query, $fieldHandle) || property_exists($query, $fieldHandle)) {
+                        $query->{$fieldHandle}($fieldValue);
+                    } else {
+                        Craft::warning("Field method not found on query: {$fieldHandle}", 'mcp-wrapper');
+                    }
+                }
             }
             
             // Get total count before limiting
@@ -284,6 +307,227 @@ class EntryTools
                 fn($entry) => $this->serializeEntry($entry),
                 $entries
             ))), $metadata);
+        });
+    }
+
+    /**
+     * Map region handles passed by the webchat (user.data.region) to the
+     * canonical Craft site handle for that regional site.
+     */
+    private const REGION_SITE_HANDLE = [
+        'global'      => 'default',
+        'americas'    => 'default',
+        'europe'      => 'jensenHughesEurope',
+        'pacific'     => 'jensenHughesPacific',
+        'asia'        => 'jensenHughesAsia',
+        'middle_east' => 'jensenHughesMiddleEast',
+    ];
+
+    /**
+     * URL prefix on jensenhughes.com per region. Used to build the fallback
+     * landing URL when no specific entry matches.
+     */
+    private const REGION_URL_PREFIX = [
+        'global'      => '',
+        'americas'    => '',
+        'europe'      => '/europe',
+        'pacific'     => '/pacific',
+        'asia'        => '/asia',
+        'middle_east' => '/middle-east',
+    ];
+
+    /**
+     * Resolve canonical regional URL + availability for a service or industry intent
+     *
+     * Used by Botpress AI Helper to verify a URL exists in the user's region before
+     * emitting it in a response. Replaces the previous static URL prefix table baked
+     * into the bot's instructions (which produced 404s for region-specific slugs).
+     */
+    #[Tool(
+        name: 'craft_resolve_regional_url',
+        description: 'Resolve canonical regional URL + availability for a service or industry intent. Call BEFORE emitting any /services/* or /industries/* URL in a bot response. Args use wrapper-compatible names: search=intent, title=region, slug=contentType. Returns {available, url, fallbackUrl, matchedSlug, matchedTitle} so the bot can avoid 404 deep links and skip enumerating capabilities for services that do not exist in the region.',
+        inputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'search' => [
+                    'type' => 'string',
+                    'description' => 'Service keyword/intent (e.g., "fire engineering", "forensic investigation", "accessibility"). Aliased as intent.',
+                ],
+                'title' => [
+                    'type' => 'string',
+                    'enum' => ['global', 'americas', 'europe', 'pacific', 'asia', 'middle_east'],
+                    'description' => "User's region code from user.data.region. Aliased as region. Wrapper-compatible field name.",
+                ],
+                'slug' => [
+                    'type' => 'string',
+                    'enum' => ['services', 'industries'],
+                    'description' => 'Section to search. Aliased as contentType. Wrapper-compatible field name.',
+                ],
+            ],
+            'required' => ['search', 'title', 'slug'],
+        ],
+        outputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'available' => ['type' => 'boolean', 'description' => 'Whether a matching entry was found in this region'],
+                'url' => ['type' => ['string', 'null'], 'description' => 'Canonical URL if available'],
+                'fallbackUrl' => ['type' => 'string', 'description' => 'Region services/industries landing page (always valid)'],
+                'matchedSlug' => ['type' => ['string', 'null'], 'description' => 'Slug that matched the intent'],
+                'matchedTitle' => ['type' => ['string', 'null'], 'description' => 'Title of the matched entry'],
+                'region' => ['type' => 'string', 'description' => 'Echo of region for traceability'],
+            ],
+            'required' => ['available', 'fallbackUrl', 'region'],
+        ],
+        dangerous: false,
+        costHint: 'low',
+        confidentialityHint: 'low',
+    )]
+    public function resolveRegionalUrl(array $args): array
+    {
+        return SafeExecution::run(function() use ($args) {
+            // Accept both wrapper-compatible names (search/title/slug) and
+            // semantic names (intent/region/contentType) for direct MCP callers
+            // (sync scripts, curl, future integrations). Wrapper-compat names win
+            // if both supplied because Botpress queryContent only emits those.
+            $intent      = $args['search']      ?? $args['intent']      ?? '';
+            $region      = $args['title']       ?? $args['region']      ?? '';
+            $contentType = $args['slug']        ?? $args['contentType'] ?? '';
+
+            if ($intent === '' || $region === '' || $contentType === '') {
+                return Response::error("Missing required args. Need search (intent), title (region), and slug (contentType).", 400);
+            }
+
+            $region = strtolower(trim($region));
+            $contentType = strtolower(trim($contentType));
+
+            if (!isset(self::REGION_SITE_HANDLE[$region])) {
+                return Response::error("Unknown region '{$region}'. Expected one of: " . implode(', ', array_keys(self::REGION_SITE_HANDLE)), 400);
+            }
+            if (!in_array($contentType, ['services', 'industries'], true)) {
+                return Response::error("Unknown contentType '{$contentType}'. Expected 'services' or 'industries'.", 400);
+            }
+
+            $siteHandle  = self::REGION_SITE_HANDLE[$region];
+            $prefix      = self::REGION_URL_PREFIX[$region];
+            $fallbackUrl = 'https://www.jensenhughes.com' . $prefix . '/' . $contentType;
+
+            $site = Craft::$app->sites->getSiteByHandle($siteHandle);
+            if (!$site) {
+                Craft::warning("resolveRegionalUrl: site handle '{$siteHandle}' not found for region '{$region}'", 'mcp-wrapper');
+                return Response::success([
+                    'available'    => false,
+                    'url'          => null,
+                    'fallbackUrl'  => $fallbackUrl,
+                    'matchedSlug'  => null,
+                    'matchedTitle' => null,
+                    'region'       => $region,
+                ]);
+            }
+
+            // Title-matching passes run first to avoid FTS body-content false positives
+            // (e.g. "Greater China" region page ranking above "Fire Engineering + Systems Design"
+            // because it mentions fire engineering in its body). FTS is used only as last resort.
+            $keyword    = strtolower($intent);
+            $candidates = Entry::find()
+                ->section($contentType)
+                ->siteId($site->id)
+                ->status(['live'])
+                ->all();
+            $entry = null;
+
+            // Pass 1: full phrase in title
+            foreach ($candidates as $candidate) {
+                if (stripos($candidate->title, $keyword) !== false) {
+                    $entry = $candidate;
+                    break;
+                }
+            }
+
+            // Pass 2: scored word-by-word match against entry SLUGS with minimum-score gate.
+            // Matching slugs (not titles) avoids false positives from long titles that happen to
+            // share fire-safety vocabulary. E.g. "Fire + Life Safety Building Commissioning" title
+            // matches "fire safety engineering" with score 2, but its slug "commissioning" scores 0.
+            // A minimum score of min(2, wordCount) prevents weak single-word matches when the query
+            // has multiple meaningful words: "fire testing" (2 words, minScore=2) will NOT match
+            // "fire-engineering-systems-design" (only "fire" in slug → score 1 < 2 → no match →
+            // correct available:false for Asia where fire-testing entry does not exist).
+            if (!$entry) {
+                $stopwords = ['consulting', 'services', 'service', 'solutions', 'strategy',
+                              'support', 'management'];
+                $words = array_values(array_filter(
+                    explode(' ', $keyword),
+                    fn($w) => strlen($w) > 3 && !in_array($w, $stopwords)
+                ));
+                if (!empty($words)) {
+                    $minScore  = min(2, count($words));
+                    $bestScore = 0;
+                    $bestEntry = null;
+                    foreach ($candidates as $candidate) {
+                        $slugParts = explode('-', $candidate->slug);
+                        $score = 0;
+                        foreach ($words as $word) {
+                            if (in_array($word, $slugParts)) {
+                                $score++;
+                            }
+                        }
+                        if ($score > $bestScore) {
+                            $bestScore = $score;
+                            $bestEntry = $candidate;
+                        }
+                    }
+                    if ($bestEntry && $bestScore >= $minScore) {
+                        $entry = $bestEntry;
+                    }
+                }
+            }
+
+            // Pass 3: FTS fallback — searches body content too, less precise
+            if (!$entry) {
+                $entry = Entry::find()
+                    ->section($contentType)
+                    ->siteId($site->id)
+                    ->search($intent)
+                    ->status(['live'])
+                    ->orderBy(['score' => SORT_DESC])
+                    ->one();
+            }
+
+            if (!$entry) {
+                return Response::success([
+                    'available'    => false,
+                    'url'          => null,
+                    'fallbackUrl'  => $fallbackUrl,
+                    'matchedSlug'  => null,
+                    'matchedTitle' => null,
+                    'region'       => $region,
+                ]);
+            }
+
+            // Ensure the region prefix is present in the returned URL.
+            // Craft's $entry->url uses the site's base URL, which may omit the
+            // region path prefix when the server's REGION_SITE_URL env var is
+            // configured without it (common on staging). Normalize defensively.
+            $url = $entry->url;
+            if ($prefix !== '' && !empty($url)) {
+                $parsed = parse_url($url);
+                $path   = $parsed['path'] ?? '/';
+                if (!str_starts_with($path, $prefix . '/') && $path !== $prefix) {
+                    $scheme   = $parsed['scheme'] ?? 'https';
+                    $host     = $parsed['host'] ?? '';
+                    $query    = isset($parsed['query'])    ? '?' . $parsed['query']    : '';
+                    $fragment = isset($parsed['fragment']) ? '#' . $parsed['fragment'] : '';
+                    $url      = $scheme . '://' . $host . $prefix . $path . $query . $fragment;
+                }
+            }
+
+            return Response::success([
+                'available'    => true,
+                'url'          => UrlNormalizer::normalizeForProduction($url),
+                'fallbackUrl'  => UrlNormalizer::normalizeForProduction($fallbackUrl),
+                'matchedSlug'  => $entry->slug,
+                'matchedTitle' => $entry->title,
+                'region'       => $region,
+            ]);
         });
     }
 
@@ -351,6 +595,209 @@ class EntryTools
     }
 
     /**
+     * Get flattened office contact info (phone, address, maps URL) for a specific office slug.
+     *
+     * Walks the nested contactLinks + address entries that hold the actual phone numbers
+     * and addresses, and returns a single flat object the bot can use directly without
+     * having to chain multiple tool calls.
+     */
+    #[Tool(
+        name: 'craft_get_office_contact_info',
+        description: 'Get flattened office contact info (phone, address, Google Maps, region) for a specific office slug. Use this for any "phone number / contact / address for the X office" question. Slug examples: oakland-san-leandro, roseville, mumbai, london, sydney.',
+        inputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'slug' => [
+                    'type' => 'string',
+                    'description' => 'Office slug (e.g., oakland-san-leandro, roseville, mumbai)',
+                ],
+                'siteId' => [
+                    'type' => 'integer',
+                    'description' => 'Site ID (optional, defaults to primary site)',
+                ],
+            ],
+            'required' => ['slug'],
+        ],
+        outputSchema: [
+            'type' => 'object',
+            'properties' => [
+                'found' => ['type' => 'boolean'],
+                'office' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'title' => ['type' => 'string'],
+                        'slug' => ['type' => 'string'],
+                        'url' => ['type' => 'string'],
+                        'phone' => ['type' => ['string', 'null']],
+                        'phoneHref' => ['type' => ['string', 'null']],
+                        'contactForm' => ['type' => ['string', 'null']],
+                        'address' => ['type' => ['string', 'null']],
+                        'googleMaps' => ['type' => ['string', 'null']],
+                        'region' => ['type' => ['string', 'null']],
+                    ],
+                ],
+                'message' => ['type' => 'string'],
+            ],
+            'required' => ['found'],
+        ],
+        dangerous: false,
+        costHint: 'low',
+        confidentialityHint: 'public',
+    )]
+    public function getOfficeContactInfo(string $slug, ?int $siteId = null): array
+    {
+        return SafeExecution::run(function() use ($slug, $siteId) {
+            $query = Entry::find()
+                ->section('officeLocations')
+                ->slug($slug);
+
+            if ($siteId) {
+                $query->siteId($siteId);
+            }
+
+            $office = $query->one();
+
+            // Fuzzy fallback: if exact slug miss, try matching by slug prefix or title contains
+            $suggestions = [];
+            if (!$office) {
+                $term = trim($slug);
+                $fuzzy = Entry::find()
+                    ->section('officeLocations')
+                    ->status(null)
+                    ->orderBy('title ASC');
+                if ($siteId) {
+                    $fuzzy->siteId($siteId);
+                }
+                $candidates = $fuzzy->all();
+                $needle = strtolower($term);
+                $matches = [];
+                foreach ($candidates as $c) {
+                    $cSlug = strtolower((string)$c->slug);
+                    $cTitle = strtolower((string)$c->title);
+                    if ($cSlug === $needle) {
+                        $office = $c;
+                        break;
+                    }
+                    if (str_starts_with($cSlug, $needle . '-') || str_contains($cSlug, $needle) || str_contains($cTitle, $needle)) {
+                        $matches[] = $c;
+                    }
+                }
+                if (!$office && count($matches) === 1) {
+                    $office = $matches[0];
+                } elseif (!$office && count($matches) > 1) {
+                    $suggestions = array_map(fn($m) => [
+                        'slug' => $m->slug,
+                        'title' => $m->title,
+                        'url' => UrlNormalizer::normalizeForProduction($m->url),
+                    ], array_slice($matches, 0, 10));
+                }
+            }
+
+            if (!$office) {
+                $resp = [
+                    'found' => false,
+                    'message' => "Office not found with slug '{$slug}'",
+                ];
+                if (!empty($suggestions)) {
+                    $resp['suggestions'] = $suggestions;
+                    // Show TITLES to user (not internal slugs). LLM uses titles to re-prompt;
+                    // it can match user's pick back to a slug from the suggestions[] array.
+                    $resp['message'] .= '. Did you mean: ' . implode(', ', array_column($suggestions, 'title'));
+                }
+                return $resp;
+            }
+
+            // Walk contactLinks → extract phone + contact form from contactDetails HTML.
+            // contactDetails can be a Redactor/CKEditor FieldData object, so cast to string
+            // and decode HTML entities before pattern matching.
+            $phone = null;
+            $phoneHref = null;
+            $contactForm = null;
+            if (isset($office->contactLinks)) {
+                $links = is_object($office->contactLinks) && method_exists($office->contactLinks, 'all')
+                    ? $office->contactLinks->all()
+                    : [];
+                foreach ($links as $link) {
+                    $raw = $link->contactDetails ?? null;
+                    if ($raw === null) {
+                        continue;
+                    }
+                    $detail = is_string($raw) ? $raw : (string)$raw;
+                    $detail = html_entity_decode($detail, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                    if ($detail === '') {
+                        continue;
+                    }
+                    if (!$phone && preg_match('/href=["\']tel:([^"\']+)["\'][^>]*>([^<]+)</i', $detail, $m)) {
+                        $phoneHref = 'tel:' . $m[1];
+                        $phone = trim($m[2]);
+                    } elseif (!$phone && preg_match('/href=["\'](tel:[^"\']+)["\']/i', $detail, $m)) {
+                        $phoneHref = $m[1];
+                        $phone = preg_replace('/^tel:/', '', $m[1]);
+                    }
+                    if (!$contactForm && preg_match('/href=["\'](https?:[^"\']+)["\']/i', $detail, $m)) {
+                        $contactForm = $m[1];
+                    }
+                }
+            }
+
+            // Walk address (entry relation) → try common readable field names
+            $addressText = null;
+            if (isset($office->address)) {
+                $addresses = is_object($office->address) && method_exists($office->address, 'all')
+                    ? $office->address->all()
+                    : [];
+                foreach ($addresses as $a) {
+                    foreach (['streetAddress', 'addressLine1', 'address1', 'fullAddress', 'addressText'] as $f) {
+                        if (isset($a->$f) && is_string($a->$f) && trim($a->$f) !== '') {
+                            $addressText = trim($a->$f);
+                            break 2;
+                        }
+                    }
+                    if ($a->title && trim($a->title) !== '') {
+                        $addressText = trim($a->title);
+                        break;
+                    }
+                }
+            }
+
+            // Region: take the most specific (last) category in the chain
+            $region = null;
+            if (isset($office->region)) {
+                $cats = is_object($office->region) && method_exists($office->region, 'all')
+                    ? $office->region->all()
+                    : [];
+                if (!empty($cats)) {
+                    $region = end($cats)->title;
+                }
+            }
+
+            // Google Maps: build from googleMapId if present
+            $googleMaps = null;
+            $mapId = $office->googleMapId ?? null;
+            if ($mapId && is_string($mapId) && trim($mapId) !== '') {
+                $googleMaps = 'https://maps.google.com/?cid=' . urlencode(trim($mapId));
+            } elseif (!empty($office->googleMyBusiness) && is_string($office->googleMyBusiness)) {
+                $googleMaps = trim($office->googleMyBusiness);
+            }
+
+            return [
+                'found' => true,
+                'office' => [
+                    'title' => $office->title,
+                    'slug' => $office->slug,
+                    'url' => UrlNormalizer::normalizeForProduction($office->url),
+                    'phone' => $phone,
+                    'phoneHref' => $phoneHref,
+                    'contactForm' => $contactForm,
+                    'address' => $addressText,
+                    'googleMaps' => $googleMaps,
+                    'region' => $region,
+                ],
+            ];
+        });
+    }
+
+    /**
      * Serialize entry to array with all fields
      */
     private function serializeEntry(?Entry $entry): ?array
@@ -364,7 +811,7 @@ class EntryTools
             'title' => $entry->title,
             'slug' => $entry->slug,
             'uri' => $entry->uri,
-            'url' => $entry->url,
+            'url' => UrlNormalizer::normalizeForProduction($entry->url),
             'section' => $entry->section ? [
                 'id' => $entry->section->id,
                 'handle' => $entry->section->handle,
@@ -428,7 +875,7 @@ class EntryTools
                 return [
                     'id' => $element->id,
                     'title' => $element->title ?? $element->name ?? null,
-                    'url' => $element->url ?? null,
+                    'url' => UrlNormalizer::normalizeForProduction($element->url ?? null),
                     'type' => get_class($element),
                 ];
             }, $elements);
@@ -453,135 +900,31 @@ class EntryTools
     }
 
     /**
-     * Get office contact information (phone, address, etc.) in one call
+     * Get valid field handles for a section
+     *
+     * @param string|null $sectionHandle The section handle, or null for all fields
+     * @return array Array of valid field handles
      */
-    #[Tool(
-        name: 'craft_get_office_contact_info',
-        description: 'Get complete contact information for an office location including phone number, address, and contact form URL. This does the nested lookups automatically.',
-        inputSchema: [
-            'type' => 'object',
-            'properties' => [
-                'slug' => [
-                    'type' => 'string',
-                    'description' => 'Office location slug (e.g., "roseville", "syracuse", "oakland")',
-                ],
-            ],
-            'required' => ['slug'],
-        ],
-        outputSchema: [
-            'type' => 'object',
-            'properties' => [
-                'success' => ['type' => 'boolean'],
-                'data' => [
-                    'type' => 'object',
-                    'properties' => [
-                        'slug' => ['type' => 'string'],
-                        'title' => ['type' => 'string'],
-                        'phone' => ['type' => 'string'],
-                        'address' => ['type' => 'string'],
-                        'contactFormUrl' => ['type' => 'string'],
-                    ],
-                ],
-            ],
-            'required' => ['success'],
-        ],
-        dangerous: false,
-        costHint: 'low',
-        confidentialityHint: 'high',
-    )]
-    public function getOfficeContactInfo(string $slug): array
+    private function getValidFieldHandles(?string $sectionHandle): array
     {
-        return SafeExecution::run(function() use ($slug) {
-            // Step 1: Get the office entry
-            $office = Entry::find()
-                ->section('officeLocations')
-                ->slug($slug)
-                ->one();
-            
-            if (!$office) {
-                return Response::notFound("Office location '{$slug}' not found");
-            }
+        $validFields = [];
 
-            // Get site-specific settings from config
-            $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
-            $siteSettings = $config['siteSettings'] ?? [];
-            $baseUrl = $siteSettings['baseUrl'] ?? Craft::$app->sites->primarySite->baseUrl;
-            $contactFormPath = $siteSettings['officeContactFormPath'] ?? '/contact/office-locations/form';
-            
-            // Ensure baseUrl doesn't have trailing slash
-            $baseUrl = rtrim($baseUrl, '/');
-            
-            $contactInfo = [
-                'slug' => $slug,
-                'title' => $office->title,
-                'uri' => $office->uri,
-                'phone' => null,
-                'address' => null,
-                'addressLine1' => null,
-                'addressLine2' => null,
-                'city' => null,
-                'state' => null,
-                'zip' => null,
-                'country' => null,
-                'latitude' => null,
-                'longitude' => null,
-                'googleMapsUrl' => null,
-                // Use configured contact form path with slug
-                'contactFormUrl' => "{$baseUrl}{$contactFormPath}/{$slug}",
-                // Prefer Craft's native URL, fall back to constructed URL
-                'officeDetailsUrl' => $office->url ?? "{$baseUrl}/{$office->uri}",
-                'officeSummary' => $office->officeSummary ?? null,
-            ];
-
-            // Step 2: Get address details (if available)
-            $addressEntries = $office->address->all() ?? [];
-            if (count($addressEntries) > 0) {
-                $addressEntry = $addressEntries[0] ?? null;
-                
-                if ($addressEntry) {
-                    $contactInfo['addressLine1'] = $addressEntry->addressLine1 ?? null;
-                    $contactInfo['addressLine2'] = $addressEntry->addressLine2 ?? null;
-                    $contactInfo['city'] = $addressEntry->city ?? null;
-                    $contactInfo['state'] = $addressEntry->state ?? null;
-                    $contactInfo['zip'] = $addressEntry->zip ?? null;
-                    $contactInfo['country'] = $addressEntry->country ?? null;
-                    $contactInfo['latitude'] = $addressEntry->latitude ?? null;
-                    $contactInfo['longitude'] = $addressEntry->longitude ?? null;
-
-                    // Build formatted address
-                    $addressParts = array_filter([
-                        $addressEntry->addressLine1 ?? null,
-                        $addressEntry->addressLine2 ?? null,
-                        trim(($addressEntry->city ?? '') . ', ' . ($addressEntry->state ?? '') . ' ' . ($addressEntry->zip ?? '')),
-                        $addressEntry->country ?? null,
-                    ]);
-                    $contactInfo['address'] = implode("\n", $addressParts);
-
-                    // Build Google Maps URL from lat/long
-                    if ($addressEntry->latitude && $addressEntry->longitude) {
-                        $contactInfo['googleMapsUrl'] = "https://www.google.com/maps?q={$addressEntry->latitude},{$addressEntry->longitude}";
+        if ($sectionHandle !== null) {
+            // Get fields from the specific section's entry types
+            $section = Craft::$app->getEntries()->getSectionByHandle($sectionHandle);
+            if ($section) {
+                foreach ($section->getEntryTypes() as $entryType) {
+                    $fieldLayout = $entryType->getFieldLayout();
+                    if ($fieldLayout) {
+                        foreach ($fieldLayout->getCustomFields() as $field) {
+                            $validFields[] = $field->handle;
+                        }
                     }
                 }
             }
+        }
 
-            // Step 3: Get phone number from contactLinks (if available)
-            $contactLinksEntries = $office->contactLinks->all() ?? [];
-            if (count($contactLinksEntries) > 0) {
-                $contactLinksEntry = $contactLinksEntries[0] ?? null;
-                
-                if ($contactLinksEntry && isset($contactLinksEntry->contactDetails)) {
-                    // Extract phone from HTML: <a href="tel:+19259383550">+1 925 938 3550</a>
-                    $html = $contactLinksEntry->contactDetails;
-                    if (preg_match('/>([^<]+)<\/a>/', $html, $matches)) {
-                        $contactInfo['phone'] = trim($matches[1]);
-                    } elseif (preg_match('/tel:([^"]+)/', $html, $matches)) {
-                        // Fallback: extract from href
-                        $contactInfo['phone'] = trim($matches[1]);
-                    }
-                }
-            }
-
-            return Response::found('contactInfo', $contactInfo);
-        });
+        // Return unique field handles
+        return array_unique($validFields);
     }
 }

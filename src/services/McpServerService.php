@@ -1,16 +1,17 @@
 <?php
+
 namespace rocketpark\mcpwrapper\services;
 
 use Craft;
 use craft\base\Component;
-use GuzzleHttp\Client;
 use rocketpark\mcpwrapper\support\GraphQLSanitizer;
 use rocketpark\mcpwrapper\support\RequestTimeoutException;
+use rocketpark\mcpwrapper\support\UrlNormalizer;
 use yii\web\Response;
 
 /**
  * MCP Server Service
- * 
+ *
  * Implements the Model Context Protocol JSON-RPC 2.0 interface
  * for exposing Craft CMS content as MCP Tools
  */
@@ -41,7 +42,7 @@ class McpServerService extends Component
 
         $startTime = microtime(true);
         $toolName = null;
-        
+
         // Extract tool name if this is a tools/call
         if ($method === 'tools/call') {
             $toolName = $params['name'] ?? null;
@@ -59,7 +60,7 @@ class McpServerService extends Component
 
             $duration = microtime(true) - $startTime;
             $response = $this->successResponse($id, $result);
-            
+
             Craft::info("MCP Response: success for {$method} ({$this->formatDuration($duration)})", 'mcp-wrapper');
 
             // Log structured request data
@@ -69,23 +70,23 @@ class McpServerService extends Component
         } catch (RequestTimeoutException $e) {
             $duration = microtime(true) - $startTime;
             $response = $this->errorResponse($id, $e);
-            
+
             Craft::warning("MCP Timeout ({$method}): {$e->getMessage()} ({$this->formatDuration($duration)})", 'mcp-wrapper');
-            
+
             // Log failed request
             $this->logRequest($method, $toolName, $params, $response, $duration, $schemaHandle);
-            
+
             return $response;
         } catch (\Exception $e) {
             $duration = microtime(true) - $startTime;
             $response = $this->errorResponse($id, $e);
-            
+
             Craft::error("MCP Error ({$method}): {$e->getMessage()} ({$this->formatDuration($duration)})", 'mcp-wrapper');
             Craft::error($e->getTraceAsString(), 'mcp-wrapper');
-            
+
             // Log failed request
             $this->logRequest($method, $toolName, $params, $response, $duration, $schemaHandle);
-            
+
             return $response;
         }
     }
@@ -104,13 +105,13 @@ class McpServerService extends Component
         try {
             $logger = Craft::$app->getModule('mcp-wrapper')->get('requestLogger');
             $ip = Craft::$app->request->userIP ?? 'unknown';
-            
+
             // Extract arguments for tools/call
             $arguments = [];
             if ($method === 'tools/call' && isset($params['arguments'])) {
                 $arguments = $params['arguments'];
             }
-            
+
             $logger->logRequest($method, $toolName, $arguments, $response, $duration, $schemaHandle, $ip);
         } catch (\Exception $e) {
             // Don't let logging failures affect the request
@@ -269,17 +270,23 @@ class McpServerService extends Component
     {
         $token = $this->getSchemaToken($params);
         $sections = $this->getSectionsForSchema($token);
-        
+
         // Build GraphQL query tools from sections
         $tools = array_map(
             fn($section) => $this->buildToolDefinition($section),
             $sections
         );
 
+        // Build GraphQL query tools from category groups
+        $categoryGroups = $this->getCategoryGroupsForSchema($token);
+        foreach ($categoryGroups as $categoryGroup) {
+            $tools[] = $this->buildCategoryGroupToolDefinition($categoryGroup);
+        }
+
         // Add manual tools from ToolRegistry
         $toolRegistry = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('toolRegistry');
         $manualTools = $toolRegistry->discoverManualTools();
-        
+
         // Merge both arrays
         $tools = array_merge($tools, $manualTools);
 
@@ -340,7 +347,7 @@ class McpServerService extends Component
                     'type' => 'string',
                     'description' => 'Filter by entry title',
                 ],
-                
+
                 // Entry type and status
                 'type' => [
                     'type' => 'array',
@@ -365,7 +372,7 @@ class McpServerService extends Component
                     'type' => 'boolean',
                     'description' => 'Filter by trashed status',
                 ],
-                
+
                 // Date filters
                 'dateCreated' => [
                     'type' => 'string',
@@ -391,7 +398,7 @@ class McpServerService extends Component
                     'type' => 'string',
                     'description' => 'Filter entries posted after this date',
                 ],
-                
+
                 // Relationships
                 'relatedTo' => [
                     'type' => 'array',
@@ -426,7 +433,7 @@ class McpServerService extends Component
                     'type' => 'integer',
                     'description' => 'Filter entries positioned before specified entry ID',
                 ],
-                
+
                 // Authors
                 'authorId' => [
                     'type' => 'array',
@@ -438,7 +445,7 @@ class McpServerService extends Component
                     'items' => ['type' => 'string'],
                     'description' => 'Filter by author user group handles',
                 ],
-                
+
                 // Search and ordering
                 'search' => [
                     'type' => 'string',
@@ -460,7 +467,7 @@ class McpServerService extends Component
                     'type' => 'boolean',
                     'description' => 'Return unique entries only',
                 ],
-                
+
                 // Pagination
                 'limit' => [
                     'type' => 'integer',
@@ -475,7 +482,7 @@ class McpServerService extends Component
                     'default' => 0,
                     'minimum' => 0,
                 ],
-                
+
                 // Multi-site
                 'site' => [
                     'type' => 'array',
@@ -500,7 +507,7 @@ class McpServerService extends Component
     {
         $toolName = $params['name'] ?? null;
         $arguments = $params['arguments'] ?? [];
-        
+
         if (!$toolName) {
             throw new \Exception('Tool name required', -32602);
         }
@@ -512,14 +519,9 @@ class McpServerService extends Component
         if (str_starts_with($toolName, 'craft_')) {
             $toolRegistry = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('toolRegistry');
             $result = $toolRegistry->executeTool($toolName, $arguments);
-            
+
             return [
-                'content' => [
-                    [
-                        'type' => 'text',
-                        'text' => json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
-                    ],
-                ],
+                'content' => [$this->wrapResultAsContent($result)],
                 'isError' => false,
             ];
         }
@@ -531,7 +533,7 @@ class McpServerService extends Component
         // Check if this is a category group or section
         $categoryGroup = Craft::$app->getCategories()->getGroupByHandle($handle);
         $section = Craft::$app->getEntries()->getSectionByHandle($handle);
-        
+
         if ($categoryGroup) {
             $result = $this->executeCategoryQuery($token, $handle, $arguments, $params);
         } elseif ($section) {
@@ -541,14 +543,83 @@ class McpServerService extends Component
         }
 
         return [
-            'content' => [
-                [
-                    'type' => 'text',
-                    'text' => json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
-                ],
-            ],
+            'content' => [$this->wrapResultAsContent($result)],
             'isError' => false,
         ];
+    }
+
+    /**
+     * Wrap a tool's return value into an MCP content item.
+     *
+     * Always includes the standard {type: "text", text: <json>} pair so
+     * spec-conformant clients keep working. Additionally exposes any
+     * top-level scalar fields from $result directly on the content item
+     * so LLM-driven clients (e.g., Botpress LLMz) can read
+     * result.content[0].url without having to JSON.parse(...text).
+     * Only scalars/null are promoted; nested arrays stay only inside text.
+     */
+    private function wrapResultAsContent(array $result): array
+    {
+        // formattedText: pre-built markdown for LLMz pass-through. Avoids
+        // bot code-gen iteration bugs (e.g., literal "${e.title}" output).
+        // Built BEFORE json_encode so parsed.formattedText is reachable from
+        // LLMz code that does JSON.parse(content[0].text) — and also kept
+        // as a top-level scalar on the content item for clients that read
+        // content[0].formattedText directly.
+        $entries = $result['entries'] ?? null;
+        if (is_array($entries) && !empty($entries)) {
+            // Normalize URLs IN PLACE on the entries array first. The bot's
+            // LLMz JSON.parse() reads entries[i].url directly (e.g., the
+            // name-match path in the integration's query_ourTeam handler
+            // returns a single matched entry whose `url` the bot then quotes
+            // in the reply). Without in-place normalization, staging hosts
+            // leak even though formattedText is correct.
+            foreach ($result['entries'] as $i => $entry) {
+                if (is_array($entry) && isset($entry['url'])) {
+                    $result['entries'][$i]['url'] = UrlNormalizer::normalizeForProduction($entry['url']);
+                }
+            }
+            $entries = $result['entries'];
+
+            $lines = [];
+            foreach ($entries as $entry) {
+                if (!is_array($entry)) {
+                    continue;
+                }
+                $title = $entry['title'] ?? null;
+                $url   = $entry['url'] ?? null;
+                if (!is_string($title) || trim($title) === '' || strtolower(trim($title)) === 'untitled') {
+                    continue;
+                }
+                if (!is_string($url) || trim($url) === '') {
+                    continue;
+                }
+                $escapedTitle = str_replace([']', '['], ['\]', '\['], $title);
+                $lines[] = '- [' . $escapedTitle . '](' . $url . ')';
+            }
+            // For a single result, emit a single link string (no bullet) so the LLM
+            // can splice it inline into a conversational reply (Rule 1 Case A).
+            // For multiple results, keep the bulleted list for "list all" prompts (Rule 1 Case B).
+            $result['formattedText'] = count($lines) === 1
+                ? ltrim($lines[0], '- ')
+                : implode("\n", $lines);
+            $result['formattedCount'] = count($lines);
+        }
+
+        $item = [
+            'type' => 'text',
+            'text' => json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
+        ];
+        foreach ($result as $k => $v) {
+            if ($k === 'type' || $k === 'text') {
+                continue;
+            }
+            if (is_scalar($v) || $v === null) {
+                $item[$k] = $v;
+            }
+        }
+
+        return $item;
     }
 
     /**
@@ -568,18 +639,48 @@ class McpServerService extends Component
     private function getSchemaToken(array $params): string
     {
         $schemaHandle = $params['schemaHandle'] ?? null;
-        
+
         if (!$schemaHandle) {
             throw new \Exception('schemaHandle parameter required', -32602);
         }
 
         $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
-        
+
         if (!isset($config['schemas'][$schemaHandle])) {
             throw new \Exception("Unknown schema: {$schemaHandle}", -32602);
         }
-        
+
         return $config['schemas'][$schemaHandle];
+    }
+
+    /**
+     * Resolve a GqlSchema from a config value (token string or schema name)
+     * Tries access token first for backwards compatibility, falls back to schema name lookup
+     */
+    private function resolveGqlSchema(string $tokenOrSchemaName): \craft\models\GqlSchema
+    {
+        $gqlService = Craft::$app->getGql();
+
+        // Try as access token first (backwards compatibility)
+        if (!empty($tokenOrSchemaName)) {
+            try {
+                $gqlToken = $gqlService->getTokenByAccessToken($tokenOrSchemaName);
+                return $gqlToken->getSchema();
+            } catch (\yii\base\InvalidArgumentException | \InvalidArgumentException $e) {
+                // Not a valid token, try as schema name
+                Craft::info("Config value is not a valid access token, trying as schema name: {$tokenOrSchemaName}", 'mcp-wrapper');
+            }
+        }
+
+        // Try as schema name
+        foreach ($gqlService->getSchemas() as $schema) {
+            if ($schema->name === $tokenOrSchemaName) {
+                Craft::info("Resolved GraphQL schema by name: {$tokenOrSchemaName}", 'mcp-wrapper');
+                return $schema;
+            }
+        }
+
+        throw new \Exception("Could not resolve GraphQL schema from '{$tokenOrSchemaName}' - not a valid access token or schema name");
     }
 
     /**
@@ -591,11 +692,11 @@ class McpServerService extends Component
             // Introspect GraphQL schema to get available entry types
             $schema = $this->introspectGraphQLSchema($token);
             $availableTypes = array_column($schema['types'], 'name');
-            
+
             // Get all sections and filter by which have entry types in the schema
             $allSections = Craft::$app->getEntries()->getAllSections();
             $accessibleSections = [];
-            
+
             foreach ($allSections as $section) {
                 // Check if any entry type for this section is in the GraphQL schema
                 foreach ($section->getEntryTypes() as $entryType) {
@@ -606,7 +707,7 @@ class McpServerService extends Component
                     }
                 }
             }
-            
+
             Craft::info("Found " . count($accessibleSections) . " accessible sections out of " . count($allSections) . " total", 'mcp-wrapper');
             return $accessibleSections;
         } catch (\Exception $e) {
@@ -617,56 +718,107 @@ class McpServerService extends Component
     }
 
     /**
-     * Get trusted base URI for internal API requests
-     *
-     * Uses the primary site's base URL instead of HTTP Host header
-     * to prevent SSRF attacks via Host header manipulation.
-     *
-     * @return string The trusted base URI
-     */
-    private function getTrustedBaseUri(): string
-    {
-        // Use the primary site's configured base URL (from config, not request headers)
-        $primarySite = Craft::$app->getSites()->getPrimarySite();
-        return rtrim($primarySite->getBaseUrl(), '/');
-    }
-
-    /**
-     * Introspect GraphQL schema to get available types
+     * Introspect GraphQL schema to get available types and query fields
      */
     private function introspectGraphQLSchema(string $token): array
     {
         try {
-            $client = new Client([
-                'base_uri' => $this->getTrustedBaseUri(),
-                'timeout' => 10,
-                'verify' => !str_ends_with($this->getTrustedBaseUri(), '.test'),
-            ]);
+            $schema = $this->resolveGqlSchema($token);
+            $gqlService = Craft::$app->getGql();
 
             $query = '{ __schema { types { name } } }';
 
-            Craft::info("Introspecting GraphQL schema", 'mcp-wrapper');
-            
-            $response = $client->post('/api', [
-                'headers' => [
-                    'Authorization' => "Bearer {$token}",
-                    'Content-Type' => 'application/json',
-                ],
-                'json' => ['query' => $query],
-            ]);
+            Craft::info("Introspecting GraphQL schema via internal API", 'mcp-wrapper');
 
-            $data = json_decode($response->getBody()->getContents(), true);
-            
+            $data = $gqlService->executeQuery($schema, $query);
+
             if (!isset($data['data']['__schema'])) {
                 throw new \Exception('GraphQL introspection returned invalid data');
             }
-            
+
             Craft::info("GraphQL introspection successful, found " . count($data['data']['__schema']['types']) . " types", 'mcp-wrapper');
             return $data['data']['__schema'];
         } catch (\Exception $e) {
             Craft::error("GraphQL introspection failed: {$e->getMessage()}", 'mcp-wrapper');
             throw $e;
         }
+    }
+
+    /**
+     * Get category groups accessible via this schema using GraphQL introspection
+     */
+    private function getCategoryGroupsForSchema(string $token): array
+    {
+        try {
+            $schema = $this->introspectGraphQLSchema($token);
+            $availableTypes = array_column($schema['types'], 'name');
+
+            // Match category groups by checking if {handle}_Category type exists in schema
+            $allCategoryGroups = Craft::$app->getCategories()->getAllGroups();
+            $accessibleGroups = [];
+
+            foreach ($allCategoryGroups as $group) {
+                $typeName = $group->handle . '_Category';
+                if (in_array($typeName, $availableTypes, true)) {
+                    $accessibleGroups[] = $group;
+                } else {
+                    Craft::info("Category group '{$group->handle}' type '{$typeName}' not found in schema", 'mcp-wrapper');
+                }
+            }
+
+            Craft::info("Found " . count($accessibleGroups) . " accessible category groups out of " . count($allCategoryGroups) . " total", 'mcp-wrapper');
+            return $accessibleGroups;
+        } catch (\Exception $e) {
+            Craft::error("Failed to get category groups for schema: {$e->getMessage()}", 'mcp-wrapper');
+            return [];
+        }
+    }
+
+    /**
+     * Build MCP tool definition for a Craft category group
+     */
+    private function buildCategoryGroupToolDefinition($categoryGroup): array
+    {
+        return [
+            'name' => "query_{$categoryGroup->handle}",
+            'title' => "Query {$categoryGroup->name}",
+            'description' => "Query {$categoryGroup->name} categories from Craft CMS. Returns categories with their fields and hierarchy.",
+            'inputSchema' => $this->getCategoryGroupInputSchema(),
+            'annotations' => [
+                'readOnlyHint' => true,
+                'openWorldHint' => false,
+            ],
+        ];
+    }
+
+    /**
+     * Get standard input schema for category group query tools
+     */
+    private function getCategoryGroupInputSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'limit' => [
+                    'type' => 'integer',
+                    'description' => 'Maximum number of categories to return (default: 100)',
+                    'minimum' => 1,
+                    'maximum' => 500,
+                    'default' => 100,
+                ],
+                'level' => [
+                    'type' => 'integer',
+                    'description' => 'Filter by structure level (1 = top level)',
+                    'minimum' => 1,
+                ],
+                'orderBy' => [
+                    'type' => 'string',
+                    'description' => 'Sort order (e.g., "title ASC", "lft ASC" for structure order)',
+                    'default' => 'lft ASC',
+                ],
+            ],
+            'required' => [],
+        ];
     }
 
     /**
@@ -691,9 +843,9 @@ class McpServerService extends Component
         try {
             $query = $this->buildGraphQLQuery($sectionHandle, $args, $params);
             Craft::info("GraphQL Query for {$sectionHandle}: {$query}", 'mcp-wrapper');
-            
+
             $data = $this->sendGraphQLRequest($token, $query);
-            
+
             if (isset($data['errors'])) {
                 $errorJson = json_encode($data['errors']);
                 Craft::error("GraphQL errors: {$errorJson}", 'mcp-wrapper');
@@ -706,10 +858,10 @@ class McpServerService extends Component
             $entries = $result[$sectionField] ?? $result['entries'] ?? [];
             $entryCount = count($entries);
             Craft::info("GraphQL query returned {$entryCount} entries from field '{$sectionField}'", 'mcp-wrapper');
-            
+
             // Filter out sensitive fields from entries
             $entries = $this->filterSensitiveFields($entries);
-            
+
             // Normalize result to always use 'entries' key for consistency
             return ['entries' => $entries];
         } catch (\Exception $e) {
@@ -719,34 +871,76 @@ class McpServerService extends Component
     }
 
     /**
-     * Execute a category query
+     * Execute a category query using Craft's PHP API directly
+     * Bypasses GraphQL scope issues by querying categories natively
      */
     private function executeCategoryQuery(string $token, string $categoryGroupHandle, array $args, array $params = []): array
     {
         try {
-            $query = $this->buildCategoryGraphQLQuery($categoryGroupHandle, $args, $params);
-            Craft::info("Category GraphQL Query for {$categoryGroupHandle}: {$query}", 'mcp-wrapper');
-            
-            $data = $this->sendGraphQLRequest($token, $query);
-            
-            if (isset($data['errors'])) {
-                $errorJson = json_encode($data['errors']);
-                Craft::error("GraphQL errors: {$errorJson}", 'mcp-wrapper');
-                throw new \Exception('GraphQL error: ' . $errorJson, -32603);
+            $categoryGroup = Craft::$app->getCategories()->getGroupByHandle($categoryGroupHandle);
+            if (!$categoryGroup) {
+                throw new \Exception("Category group not found: {$categoryGroupHandle}", -32602);
             }
 
-            $result = $data['data'] ?? [];
-            // Result uses category group-specific field name (e.g., leadershipTeamsCategories)
-            $categoryField = $categoryGroupHandle . 'Categories';
-            $categories = $result[$categoryField] ?? $result['categories'] ?? [];
-            $categoryCount = count($categories);
-            Craft::info("GraphQL query returned {$categoryCount} categories from field '{$categoryField}'", 'mcp-wrapper');
-            
-            // Filter out sensitive fields
-            $categories = $this->filterSensitiveFields($categories);
-            
-            // Normalize result to use 'categories' key
-            return ['categories' => $categories];
+            $limit = min(500, max(1, (int) ($args['limit'] ?? 100)));
+
+            $query = \craft\elements\Category::find()
+                ->group($categoryGroupHandle)
+                ->limit($limit)
+                ->status('enabled');
+
+            if (isset($args['level'])) {
+                $query->level((int) $args['level']);
+            }
+
+            if (!empty($args['orderBy'])) {
+                $query->orderBy($args['orderBy']);
+            } else {
+                $query->orderBy('lft ASC');
+            }
+
+            $categories = $query->all();
+            $results = [];
+
+            foreach ($categories as $category) {
+                $item = [
+                    'id' => $category->id,
+                    'title' => $category->title,
+                    'slug' => $category->slug,
+                    'uri' => $category->uri,
+                    'level' => $category->level,
+                ];
+
+                // Include custom fields
+                foreach ($categoryGroup->getFieldLayout()->getCustomFields() as $field) {
+                    $handle = $field->handle;
+                    $value = $category->getFieldValue($handle);
+
+                    // Skip sensitive fields
+                    $sensitiveFields = ['internalNotes', 'internalComments', 'adminNotes'];
+                    if (in_array($handle, $sensitiveFields, true)) {
+                        continue;
+                    }
+
+                    // Handle relational fields
+                    if ($value instanceof \craft\elements\db\ElementQueryInterface) {
+                        $related = $value->all();
+                        $item[$handle] = array_map(fn($el) => [
+                            'id' => $el->id,
+                            'title' => $el->title,
+                        ], $related);
+                    } elseif (is_object($value) && method_exists($value, '__toString')) {
+                        $item[$handle] = (string) $value;
+                    } elseif (is_scalar($value) || is_null($value)) {
+                        $item[$handle] = $value;
+                    }
+                }
+
+                $results[] = $item;
+            }
+
+            Craft::info("Category query returned " . count($results) . " categories for '{$categoryGroupHandle}'", 'mcp-wrapper');
+            return ['categories' => $results];
         } catch (\Exception $e) {
             Craft::error("Failed to execute category query: {$e->getMessage()}", 'mcp-wrapper');
             throw $e;
@@ -767,28 +961,27 @@ class McpServerService extends Component
         $args = $this->validateQueryArgs($args);
 
         $limit = min(500, max(1, (int) ($args['limit'] ?? 100)));
-        
+
         $filters = [
-            "group: \"{$categoryGroupHandle}\"",
             "limit: {$limit}",
         ];
-        
+
         // Level filter (for structure)
         if (isset($args['level'])) {
             $filters[] = "level: " . intval($args['level']);
         }
-        
+
         // Ordering
         if (!empty($args['orderBy'])) {
             $filters[] = 'orderBy: "' . $this->escapeGraphQLString($args['orderBy']) . '"';
         }
-        
+
         // Get custom fields for this category group
         $fieldsList = $this->getFieldsListForCategoryQuery($categoryGroupHandle, $params);
 
         // Use category group-specific GraphQL field (e.g., leadershipTeamsCategories)
         $categoryField = $categoryGroupHandle . 'Categories';
-        
+
         return "query { {$categoryField}(" . implode(', ', $filters) . ") { id title slug uri {$fieldsList} } }";
     }
 
@@ -809,12 +1002,51 @@ class McpServerService extends Component
 
         $fields = [];
         foreach ($fieldLayout->getCustomFields() as $field) {
-            $fieldHandle = $field->handle;
-            
-            // Get proper GraphQL query fragment for this field type
-            $fieldFragment = $this->getGraphQLFieldFragment($field);
-            if ($fieldFragment) {
-                $fields[] = $fieldFragment;
+            $handle = $field->handle;
+            $fieldClass = get_class($field);
+
+            // Skip sensitive fields
+            $sensitiveFields = [
+                'formSubmissionNotificationEmail',
+                'formSubmissionNotificationEmail2',
+                'internalNotes',
+                'internalComments',
+                'adminNotes',
+            ];
+
+            if (in_array($handle, $sensitiveFields, true)) {
+                continue;
+            }
+
+            // Handle relational fields
+            if (
+                $field instanceof \craft\fields\Entries ||
+                $field instanceof \craft\fields\Categories ||
+                $field instanceof \craft\fields\Tags ||
+                $field instanceof \craft\fields\Users ||
+                $field instanceof \craft\fields\Assets
+            ) {
+                $fields[] = "{$handle} { id title }";
+            }
+            // Handle Linkit link fields
+            elseif (str_contains($fieldClass, 'linkit') || str_contains($fieldClass, 'LinkIt') || str_contains($fieldClass, 'Linkit')) {
+                $fields[] = "{$handle} { url text type target }";
+            }
+            // Skip complex field types
+            elseif (
+                $field instanceof \craft\fields\Matrix ||
+                $field instanceof \craft\fields\Table ||
+                $fieldClass === 'benf\\neo\\Field' ||
+                str_contains($fieldClass, '\\neo\\') ||
+                str_contains($fieldClass, 'CKEditor') ||
+                str_contains($fieldClass, 'Freeform') ||
+                str_contains($fieldClass, 'SuperTable') ||
+                str_contains($fieldClass, 'seomatic')
+            ) {
+                continue;
+            } else {
+                // Plain fields (text, number, date, lightswitch, dropdown, etc.)
+                $fields[] = $handle;
             }
         }
 
@@ -842,13 +1074,13 @@ class McpServerService extends Component
             "limit: {$limit}",
             "offset: {$offset}",
         ];
-        
+
         // Basic ID filters
         if (!empty($args['id']) && is_array($args['id'])) {
             $idsStr = implode(',', array_map('intval', $args['id']));
             $filters[] = "id: [{$idsStr}]";
         }
-        
+
         if (!empty($args['uid']) && is_array($args['uid'])) {
             $uidsStr = implode(',', array_map(fn($uid) => '"' . $this->escapeGraphQLString($uid) . '"', $args['uid']));
             $filters[] = "uid: [{$uidsStr}]";
@@ -867,51 +1099,52 @@ class McpServerService extends Component
         if (!empty($args['title'])) {
             $filters[] = 'title: "' . $this->escapeGraphQLString($args['title']) . '"';
         }
-        
+
         // Entry type filters
         if (!empty($args['type']) && is_array($args['type'])) {
             $typesStr = implode(',', array_map(fn($t) => '"' . $this->escapeGraphQLString($t) . '"', $args['type']));
             $filters[] = "type: [{$typesStr}]";
         }
-        
+
         if (!empty($args['typeId']) && is_array($args['typeId'])) {
             $typeIdsStr = implode(',', array_map('intval', $args['typeId']));
             $filters[] = "typeId: [{$typeIdsStr}]";
         }
-        
+
         // Status filters
-        if (!empty($args['status']) && is_array($args['status'])) {
-            $statusStr = implode(',', array_map(fn($s) => '"' . $this->escapeGraphQLString($s) . '"', $args['status']));
+        if (!empty($args['status'])) {
+            $statuses = (array) $args['status'];
+            $statusStr = implode(',', array_map(fn($s) => '"' . $this->escapeGraphQLString($s) . '"', $statuses));
             $filters[] = "status: [{$statusStr}]";
         }
-        
+
         if (isset($args['archived'])) {
             $filters[] = 'archived: ' . ($args['archived'] ? 'true' : 'false');
         }
-        
+
         if (isset($args['trashed'])) {
             $filters[] = 'trashed: ' . ($args['trashed'] ? 'true' : 'false');
         }
-        
+
         // Date filters
         foreach (['dateCreated', 'dateUpdated', 'postDate', 'expiryDate', 'before', 'after'] as $dateField) {
             if (!empty($args[$dateField])) {
                 $filters[] = "{$dateField}: \"" . $this->escapeGraphQLString($args[$dateField]) . '"';
             }
         }
-        
+
         // Relationship filters
         if (!empty($args['relatedTo']) && is_array($args['relatedTo'])) {
             $relatedIdsStr = implode(',', array_map('intval', $args['relatedTo']));
             $filters[] = "relatedTo: [{$relatedIdsStr}]";
         }
-        
+
         foreach (['ancestorOf', 'descendantOf', 'siblingOf', 'prevSiblingOf', 'nextSiblingOf', 'positionedAfter', 'positionedBefore'] as $relField) {
             if (!empty($args[$relField])) {
                 $filters[] = "{$relField}: " . intval($args[$relField]);
             }
         }
-        
+
         // Author filters
         if (!empty($args['authorId']) && is_array($args['authorId'])) {
             $authorIdsStr = implode(',', array_map('intval', $args['authorId']));
@@ -932,38 +1165,39 @@ class McpServerService extends Component
         if (!empty($args['orderBy'])) {
             $filters[] = 'orderBy: "' . $this->escapeGraphQLString($args['orderBy']) . '"';
         }
-        
+
         if (isset($args['inReverse'])) {
             $filters[] = 'inReverse: ' . ($args['inReverse'] ? 'true' : 'false');
         }
-        
+
         if (isset($args['fixedOrder'])) {
             $filters[] = 'fixedOrder: ' . ($args['fixedOrder'] ? 'true' : 'false');
         }
-        
+
         if (isset($args['unique'])) {
             $filters[] = 'unique: ' . ($args['unique'] ? 'true' : 'false');
         }
-        
+
         // Multi-site
-        if (!empty($args['site']) && is_array($args['site'])) {
-            $sitesStr = implode(',', array_map(fn($s) => '"' . $this->escapeGraphQLString($s) . '"', $args['site']));
+        if (!empty($args['site'])) {
+            $sites = (array) $args['site'];
+            $sitesStr = implode(',', array_map(fn($s) => '"' . $this->escapeGraphQLString($s) . '"', $sites));
             $filters[] = "site: [{$sitesStr}]";
         }
-        
-        if (!empty($args['siteId']) && is_array($args['siteId'])) {
-            $siteIdsStr = implode(',', array_map('intval', $args['siteId']));
+
+        if (!empty($args['siteId'])) {
+            $siteIds = (array) $args['siteId'];
+            $siteIdsStr = implode(',', array_map('intval', $siteIds));
             $filters[] = "siteId: [{$siteIdsStr}]";
         }
 
         // Get custom fields for this section
         $fieldsList = $this->getFieldsListForQuery($sectionHandle, $params);
 
-        // Use section-specific GraphQL field (e.g., servicesBrowseEntries) instead of generic entries
-        $sectionField = $sectionHandle . 'Entries';
-        
-        // Remove section filter since we're using section-specific field
-        $filters = array_filter($filters, fn($f) => !str_contains($f, 'section:'));
+        // Use generic `entries` field with section: filter (Craft 5 canonical pattern).
+        // Section-specific fields like `servicesEntries` have schema-cache fragility
+        // when site/status args are supplied — see McpServerService changelog 2026-05-11.
+        $sectionField = 'entries';
 
         // If we have inline fragments (entry type specific fields), use them
         if (!empty($fieldsList)) {
@@ -977,61 +1211,51 @@ class McpServerService extends Component
             // Fallback: Build basic inline fragments for sections without custom fields
             // This is needed because Craft GraphQL uses union types that require inline fragments
             // We need to check what types are actually in the GraphQL schema, not just Craft
-            
+
             $fallbackFragments = [];
-            
+
             try {
                 $token = $this->getSchemaToken($params);
                 $schema = $this->introspectGraphQLSchema($token);
                 $availableTypes = array_column($schema['types'], 'name');
-                
+
                 // Check if there's a union type for this section
                 $unionTypeName = $sectionHandle . 'SectionEntryUnion';
                 if (in_array($unionTypeName, $availableTypes)) {
                     // Query the union type to get possible types
-                    $client = new \GuzzleHttp\Client([
-                        'base_uri' => $this->getTrustedBaseUri(),
-                        'timeout' => 10,
-                    ]);
+                    $gqlSchema = $this->resolveGqlSchema($token);
+                    $gqlService = Craft::$app->getGql();
 
                     $introspectionQuery = sprintf(
                         '{ __type(name: "%s") { possibleTypes { name } } }',
                         $unionTypeName
                     );
-                    
-                    $response = $client->post('/api', [
-                        'headers' => [
-                            'Authorization' => 'Bearer ' . $token,
-                            'Content-Type' => 'application/json',
-                        ],
-                        'json' => ['query' => $introspectionQuery],
-                    ]);
-                    
-                    $data = json_decode($response->getBody()->getContents(), true);
+
+                    $data = $gqlService->executeQuery($gqlSchema, $introspectionQuery);
                     $possibleTypes = $data['data']['__type']['possibleTypes'] ?? [];
-                    
+
                     foreach ($possibleTypes as $type) {
                         $typeName = $type['name'];
-                        $fallbackFragments[] = "... on {$typeName} { id title slug uri dateCreated dateUpdated }";
+                        $fallbackFragments[] = "... on {$typeName} { id title slug uri url dateCreated dateUpdated }";
                     }
-                    
+
                     Craft::info("Built fallback fragments for {$sectionHandle} from union type: " . count($fallbackFragments) . " types", 'mcp-wrapper');
                 }
             } catch (\Exception $e) {
                 Craft::warning("Failed to build fallback fragments from GraphQL schema: {$e->getMessage()}", 'mcp-wrapper');
             }
-            
+
             // If we couldn't get types from GraphQL, try from Craft as last resort
             if (empty($fallbackFragments)) {
                 $section = Craft::$app->getEntries()->getSectionByHandle($sectionHandle);
                 if ($section) {
                     foreach ($section->getEntryTypes() as $entryType) {
                         $typeName = $entryType->handle . '_Entry';
-                        $fallbackFragments[] = "... on {$typeName} { id title slug uri dateCreated dateUpdated }";
+                        $fallbackFragments[] = "... on {$typeName} { id title slug uri url dateCreated dateUpdated }";
                     }
                 }
             }
-            
+
             if (!empty($fallbackFragments)) {
                 return sprintf(
                     'query { %s(%s) { %s } }',
@@ -1043,7 +1267,7 @@ class McpServerService extends Component
                 // Ultimate fallback - try without inline fragments (will likely fail for union types)
                 Craft::warning("No entry types found for section {$sectionHandle}, query may fail", 'mcp-wrapper');
                 return sprintf(
-                    'query { %s(%s) { id title slug uri dateCreated dateUpdated } }',
+                    'query { %s(%s) { id title slug uri url dateCreated dateUpdated } }',
                     $sectionField,
                     implode(', ', $filters)
                 );
@@ -1053,7 +1277,7 @@ class McpServerService extends Component
 
     /**
      * Filter out sensitive fields from entry data
-     * 
+     *
      * @param array $entries Array of entry data from GraphQL
      * @return array Filtered entries without sensitive fields
      */
@@ -1066,12 +1290,12 @@ class McpServerService extends Component
             'internalComments',
             'adminNotes',
         ];
-        
+
         foreach ($entries as &$entry) {
             if (!is_array($entry)) {
                 continue;
             }
-            
+
             foreach ($sensitiveFields as $field) {
                 if (isset($entry[$field])) {
                     unset($entry[$field]);
@@ -1079,7 +1303,7 @@ class McpServerService extends Component
                 }
             }
         }
-        
+
         return $entries;
     }
 
@@ -1105,20 +1329,47 @@ class McpServerService extends Component
         $availableTypes = array_column($schema['types'], 'name');
         Craft::info("Available GraphQL types for {$sectionHandle}: " . implode(', ', array_filter($availableTypes, fn($t) => str_contains($t, 'Entry'))), 'mcp-wrapper');
 
+        // Get the actual union type members for this section to avoid invalid fragment spreads
+        // The union type contains only the entry types that belong to THIS section in GraphQL
+        $unionTypeName = $sectionHandle . 'SectionEntryUnion';
+        $unionMembers = [];
+        if (in_array($unionTypeName, $availableTypes, true)) {
+            try {
+                $gqlSchema = $this->resolveGqlSchema($token);
+                $gqlService = Craft::$app->getGql();
+                $introspectionQuery = sprintf(
+                    '{ __type(name: "%s") { possibleTypes { name } } }',
+                    $unionTypeName
+                );
+                $data = $gqlService->executeQuery($gqlSchema, $introspectionQuery);
+                $possibleTypes = $data['data']['__type']['possibleTypes'] ?? [];
+                $unionMembers = array_column($possibleTypes, 'name');
+                Craft::info("Union {$unionTypeName} has types: " . implode(', ', $unionMembers), 'mcp-wrapper');
+            } catch (\Exception $e) {
+                Craft::warning("Failed to introspect union type {$unionTypeName}: {$e->getMessage()}", 'mcp-wrapper');
+            }
+        }
+
         $entryTypeFragments = [];
         foreach ($section->getEntryTypes() as $entryType) {
             // GraphQL type name format is: typeHandle_Entry
             $typeName = $entryType->handle . '_Entry';
-            
-            // Skip entry types that aren't registered in the current GraphQL schema
-            if (!in_array($typeName, $availableTypes, true)) {
+
+            // If we have union members, check against those (most accurate)
+            // Otherwise fall back to checking available schema types
+            if (!empty($unionMembers)) {
+                if (!in_array($typeName, $unionMembers, true)) {
+                    Craft::info("Skipping type not in union: {$typeName} (not in {$unionTypeName})", 'mcp-wrapper');
+                    continue;
+                }
+            } elseif (!in_array($typeName, $availableTypes, true)) {
                 Craft::info("Skipping unregistered type: {$typeName} (not in schema)", 'mcp-wrapper');
                 continue;
             }
-            
+
             // Include all entry types registered in GraphQL, regardless of entry count
             // This ensures queries work even if sections are empty or entries are disabled
-            Craft::info("Including type: {$typeName} in query", 'mcp-wrapper');
+            Craft::info("Including type: {$typeName} in query for {$sectionHandle}", 'mcp-wrapper');
 
             $fields = [];
             foreach ($entryType->getFieldLayout()->getCustomFields() as $field) {
@@ -1133,29 +1384,37 @@ class McpServerService extends Component
                     'internalComments',
                     'adminNotes',
                 ];
-                
+
                 if (in_array($handle, $sensitiveFields, true)) {
                     Craft::info("Excluding sensitive field from MCP: {$handle}", 'mcp-wrapper');
                     continue;
                 }
 
                 // Handle relational fields
-                if ($field instanceof \craft\fields\Entries ||
+                if (
+                    $field instanceof \craft\fields\Entries ||
                     $field instanceof \craft\fields\Categories ||
                     $field instanceof \craft\fields\Tags ||
                     $field instanceof \craft\fields\Users ||
-                    $field instanceof \craft\fields\Assets) {
+                    $field instanceof \craft\fields\Assets
+                ) {
                     $fields[] = "{$handle} { id title }";
                 }
+                // Handle Linkit link fields (require sub-selection for Linkit_Link type)
+                elseif (str_contains($fieldClass, 'linkit') || str_contains($fieldClass, 'LinkIt') || str_contains($fieldClass, 'Linkit')) {
+                    $fields[] = "{$handle} { url text type target }";
+                }
                 // Skip Matrix and other complex field types that require special handling
-                elseif ($field instanceof \craft\fields\Matrix ||
-                        $field instanceof \craft\fields\Table ||
-                        $fieldClass === 'benf\\neo\\Field' ||
-                        str_contains($fieldClass, '\\neo\\') ||
-                        str_contains($fieldClass, 'CKEditor') ||
-                        str_contains($fieldClass, 'Freeform') ||
-                        str_contains($fieldClass, 'SuperTable') ||
-                        str_contains($fieldClass, 'seomatic')) {
+                elseif (
+                    $field instanceof \craft\fields\Matrix ||
+                    $field instanceof \craft\fields\Table ||
+                    $fieldClass === 'benf\\neo\\Field' ||
+                    str_contains($fieldClass, '\\neo\\') ||
+                    str_contains($fieldClass, 'CKEditor') ||
+                    str_contains($fieldClass, 'Freeform') ||
+                    str_contains($fieldClass, 'SuperTable') ||
+                    str_contains($fieldClass, 'seomatic')
+                ) {
                     // Skip these fields - they require complex nested queries or special handling
                     Craft::info("Skipping complex field type: {$handle} ({$fieldClass})", 'mcp-wrapper');
                     continue;
@@ -1166,7 +1425,7 @@ class McpServerService extends Component
             }
 
             // Build inline fragment for this entry type including basic fields
-            $basicFields = ['id', 'title', 'slug', 'uri', 'dateCreated', 'dateUpdated'];
+            $basicFields = ['id', 'title', 'slug', 'uri', 'url', 'dateCreated', 'dateUpdated'];
             $allFields = array_merge($basicFields, $fields);
             $fieldsStr = implode(' ', $allFields);
             $entryTypeFragments[] = "... on {$typeName} { {$fieldsStr} }";
@@ -1176,39 +1435,21 @@ class McpServerService extends Component
     }
 
     /**
-     * Send GraphQL request to Craft API
+     * Send GraphQL request via Craft's internal GraphQL execution API
      */
     private function sendGraphQLRequest(string $token, string $query): array
     {
         try {
-            $client = new \GuzzleHttp\Client([
-                'base_uri' => $this->getTrustedBaseUri(),
-                'timeout' => 10,
-                'verify' => !str_ends_with($this->getTrustedBaseUri(), '.test'),
-            ]);
+            $schema = $this->resolveGqlSchema($token);
+            $gqlService = Craft::$app->getGql();
 
-            $response = $client->post('/api', [
-                'headers' => [
-                    'Authorization' => 'Bearer ' . $token,
-                    'Content-Type' => 'application/json',
-                ],
-                'json' => ['query' => $query],
-            ]);
-
-            return json_decode($response->getBody()->getContents(), true);
-        } catch (\GuzzleHttp\Exception\RequestException $e) {
-            Craft::error("GraphQL request failed: {$e->getMessage()}", 'mcp-wrapper');
-            if ($e->hasResponse()) {
-                $body = $e->getResponse()->getBody()->getContents();
-                Craft::error("Response body: {$body}", 'mcp-wrapper');
-            }
-            throw new \Exception('GraphQL request failed: ' . $e->getMessage(), -32603);
+            return $gqlService->executeQuery($schema, $query);
         } catch (\Exception $e) {
-            Craft::error("Unexpected error in GraphQL request: {$e->getMessage()}", 'mcp-wrapper');
-            throw $e;
+            Craft::error("GraphQL execution failed: {$e->getMessage()}", 'mcp-wrapper');
+            throw new \Exception('GraphQL request failed: ' . $e->getMessage(), -32603);
         }
     }
-    
+
     /**
      * Handle prompts/list request
      * Returns all available MCP prompts
@@ -1217,10 +1458,10 @@ class McpServerService extends Component
     {
         $promptRegistry = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('promptRegistry');
         $prompts = $promptRegistry->listPrompts();
-        
+
         return ['prompts' => $prompts];
     }
-    
+
     /**
      * Handle prompts/get request
      * Returns a specific prompt with its message content
@@ -1229,13 +1470,13 @@ class McpServerService extends Component
     {
         $name = $params['name'] ?? null;
         $arguments = $params['arguments'] ?? [];
-        
+
         if (!$name) {
             throw new \Exception('Missing required parameter: name', -32602);
         }
-        
+
         $promptRegistry = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('promptRegistry');
-        
+
         try {
             $prompt = $promptRegistry->getPrompt($name, $arguments);
             return $prompt;
@@ -1243,7 +1484,7 @@ class McpServerService extends Component
             throw new \Exception("Failed to get prompt '{$name}': {$e->getMessage()}", -32603);
         }
     }
-    
+
     /**
      * Handle resources/list request
      * Returns all available MCP resources
@@ -1251,17 +1492,17 @@ class McpServerService extends Component
     private function handleResourcesList(array $params): array
     {
         $schemaHandle = $params['schemaHandle'] ?? null;
-        
+
         if (!$schemaHandle) {
             throw new \Exception('Missing required parameter: schemaHandle', -32602);
         }
-        
+
         $resourceRegistry = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('resourceRegistry');
         $resources = $resourceRegistry->listResources($schemaHandle);
-        
+
         return ['resources' => $resources];
     }
-    
+
     /**
      * Handle resources/read request
      * Reads a specific resource by URI
@@ -1270,49 +1511,49 @@ class McpServerService extends Component
     {
         $uri = $params['uri'] ?? null;
         $schemaHandle = $params['schemaHandle'] ?? null;
-        
+
         if (!$uri) {
             throw new \Exception('Missing required parameter: uri', -32602);
         }
-        
+
         if (!$schemaHandle) {
             throw new \Exception('Missing required parameter: schemaHandle', -32602);
         }
-        
+
         $resourceRegistry = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('resourceRegistry');
-        
+
         try {
             return $resourceRegistry->readResource($uri, $schemaHandle);
         } catch (\Exception $e) {
             throw new \Exception("Failed to read resource '{$uri}': {$e->getMessage()}", -32603);
         }
     }
-    
+
     /**
      * Validate tool access based on security configuration
-     * 
+     *
      * @param string $toolName Tool name to validate
      * @throws \Exception if tool is disabled or dangerous tools are not enabled
      */
     private function validateToolAccess(string $toolName): void
     {
         $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
-        
+
         // Check if tool is explicitly disabled
         $disabledTools = $config['security']['disabledTools'] ?? [];
         if (in_array($toolName, $disabledTools, true)) {
             Craft::warning("Access denied: Tool '{$toolName}' is disabled", 'mcp-wrapper');
             throw new \Exception("Tool '{$toolName}' is disabled", -32601);
         }
-        
+
         // Check if tool is dangerous and if dangerous tools are enabled
         $enableDangerous = $config['security']['enableDangerousTools'] ?? false;
-        
+
         if (!$enableDangerous) {
             // Get tool definition to check if it's dangerous
             $toolRegistry = \rocketpark\mcpwrapper\McpWrapper::getInstance()->get('toolRegistry');
             $manualTools = $toolRegistry->discoverManualTools();
-            
+
             foreach ($manualTools as $tool) {
                 if ($tool['name'] === $toolName && ($tool['dangerous'] ?? false)) {
                     Craft::warning("Access denied: Dangerous tool '{$toolName}' not enabled", 'mcp-wrapper');
@@ -1321,11 +1562,11 @@ class McpServerService extends Component
             }
         }
     }
-    
+
     /**
      * Filter tools based on security configuration
      * Removes disabled tools and dangerous tools if not enabled
-     * 
+     *
      * @param array $tools Array of tool definitions
      * @return array Filtered tools array
      */
@@ -1334,22 +1575,22 @@ class McpServerService extends Component
         $config = Craft::$app->getConfig()->getConfigFromFile('mcpwrapper');
         $disabledTools = $config['security']['disabledTools'] ?? [];
         $enableDangerous = $config['security']['enableDangerousTools'] ?? false;
-        
-        return array_values(array_filter($tools, function($tool) use ($disabledTools, $enableDangerous) {
+
+        return array_values(array_filter($tools, function ($tool) use ($disabledTools, $enableDangerous) {
             $toolName = $tool['name'] ?? '';
-            
+
             // Filter out explicitly disabled tools
             if (in_array($toolName, $disabledTools, true)) {
                 Craft::info("Filtering out disabled tool: {$toolName}", 'mcp-wrapper');
                 return false;
             }
-            
+
             // Filter out dangerous tools if not enabled
             if (!$enableDangerous && ($tool['dangerous'] ?? false)) {
                 Craft::info("Filtering out dangerous tool: {$toolName} (dangerous tools not enabled)", 'mcp-wrapper');
                 return false;
             }
-            
+
             return true;
         }));
     }
@@ -1477,7 +1718,7 @@ class McpServerService extends Component
      */
     private function sanitizeStringInput(string $input): string
     {
-        return GraphQLSanitizer::sanitizeStringInput($input, function($message, $category) {
+        return GraphQLSanitizer::sanitizeStringInput($input, function ($message, $category) {
             Craft::warning($message, $category);
         });
     }

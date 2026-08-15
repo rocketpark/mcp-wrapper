@@ -44,3 +44,8 @@ PRODUCTION-*.md
 # Backup files
 *.backup
 src/**/*.backup
+data/studio-prompt-backup-*
+.playwright-mcp/
+
+# VS Code workspace files
+*.code-workspace
