@@ -26,6 +26,17 @@
             "rocketpark\\mcpwrapper\\": "src/"
         }
     },
+    "scripts": {
+        "test": "php -d error_reporting='E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED' ./vendor/bin/phpunit --no-coverage",
+        "check": [
+            "@test"
+        ],
+        "security": [
+            "composer audit",
+            "npm audit --audit-level=high"
+        ],
+        "phpstan-baseline": "./vendor/bin/phpstan analyse --configuration=phpstan.neon --no-progress --memory-limit=1G"
+    },
     "minimum-stability": "stable",
     "prefer-stable": true,
     "extra": {

@@ -1,0 +1,29 @@
+{
+  "allowedForCodex": true,
+  "automationLevel": "manual",
+  "confidentialContext": "none",
+  "context": "rocketpark-tooling",
+  "hosting": [],
+  "kind": "tool",
+  "lastReviewedAt": "2026-08-27",
+  "lifecycle": "maintain",
+  "notes": "Rocketpark Craft MCP wrapper tooling. Safe for Codex as tooling metadata only; do not run against or inspect Rocketpark client sites without explicit per-project permission.",
+  "observability": [],
+  "ownerContext": "rocketpark-tooling",
+  "source": "owned",
+  "surface": "automation",
+  "systems": [
+    "rocketpark-tooling",
+    "craft-mcp",
+    "agent-tooling"
+  ],
+  "tags": [
+    "craft-cms",
+    "mcp",
+    "playwright",
+    "rocketpark-tooling"
+  ],
+  "urls": {
+    "repository": "https://github.com/rocketpark/mcp-wrapper"
+  }
+}
